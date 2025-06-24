@@ -328,6 +328,7 @@ def draw_inside_outside_degree(g,communities):
     '''
     画出 inside outside degree 的分布图
     标准化之后的
+    :param communities:
     :param g:
     :return:
     '''
@@ -401,34 +402,40 @@ def average_shortest_path_length_largest_component(g):
     largest_component = max(nx.connected_components(g), key=len)  # 提取最大连通分量
     largest_subgraph = g.subgraph(largest_component)
     return nx.average_shortest_path_length(largest_subgraph)
-def draw_degree_strength(g):
+def draw_degree_strength(g1:nx.Graph, g2:nx.MultiDiGraph) -> None:
     '''
-    注意传入的图一定得是 加权的图 !!!
+    注意传入的两个图的 节点 一定是一样的
     得到度值和强度的关系图
-    :param g: 传入一个有权图
+    :param g1: 无向无多边的简单图
+    :param g2: 有向有多边的图
     :return:
     '''
-    degree = dict(g.degree())
-    strength = dict(g.degree(weight='weight'))
 
-    degree_list = np.array(list(degree.values()))
-    strength_list = np.array(list(strength.values()))
+    degree_strength = [(g1.degree(node), g2.degree(node)) for node in g1.nodes()]
+
+    degree_list = [data[0] for data in degree_strength]
+    strength_list = [data[1] for data in degree_strength]
 
     correlation = np.corrcoef([degree_list, strength_list])
 
     # 获取两个列表之间的相关系数
     correlation_value = correlation[0, 1]
-    # 打印相关系数
-    print(f"degree 和 strength 之间的相关系数：{correlation_value}")
 
-    plt.scatter(list(degree.values()), list(strength.values()), s=2, color='darkblue', label=f'correlation={correlation_value:.3f}')
+    # plt.plot(list(range(1,len(degree_list))), list(range(1,len(strength_list))), color='red', linestyle='--')
+    plt.scatter(degree_list, strength_list, s=2, color='darkblue', label=f'correlation={correlation_value:.3f}')
     plt.xlabel('Degree')
     plt.ylabel('Strength')
+    plt.title('Degree--Strength')
     plt.yscale('log')
     plt.xscale('log')
     plt.legend()
     plt.show()
 def draw_strength_frequency_distribution(g):
+    '''
+    以前的版本 使用 Graph 中的weight属性计算
+    :param g:
+    :return:
+    '''
     N = g.number_of_nodes()
     # 计算每个节点的强度
     port_strengths = {node: val for (node, val) in g.degree(weight='weight')}
@@ -444,4 +451,42 @@ def draw_strength_frequency_distribution(g):
     plt.yscale("log")
     plt.xlabel("strength")
     plt.ylabel("P(K=k)")
+    plt.show()
+def draw_strength_distribution(g):
+    '''
+    画强度分布图
+    :param g:
+    :return:
+    '''
+    degree_frequency_numbers = nx.degree_histogram(g)  # 度的频数
+
+    N = g.number_of_nodes()
+    # [0, 675, 789, 676, 428, 258, 205, 153, 140, 99, 92, 65, 45, 57, 38, 48, 25, 44, 20, 18, 28, 16, 12, ...]
+    # print(len(nx.degree_histogram(G)))  # 82
+    x_degree = list(range(len(degree_frequency_numbers)))  # 所有的度数 作为下面画图的x坐标
+
+    # 删去 度为0的元素
+    for i in sorted(x_degree, reverse=True):  # 注意这里要反向遍历 不然索引会出问题
+        if degree_frequency_numbers[i] == 0:
+            del degree_frequency_numbers[i]
+            del x_degree[i]
+
+    degree_frequency = [x / N for x in degree_frequency_numbers]  # 度的频率
+
+    # 绘制原始数据点
+    plt.scatter(x_degree, degree_frequency, color='blue', label='Ports')
+
+    # 设置对数坐标轴
+    plt.xscale("log")
+    plt.yscale("log")
+
+    # 设置坐标轴范围
+    plt.xlim([min(x_degree) * 0.6, max(x_degree) * 1.7])  # 设置x轴范围为数据的最小值到最大值的1.1倍
+    plt.ylim([min(degree_frequency) * 0.6, max(degree_frequency) * 1.7])  # 设置y轴范围为数据的最小值到最大值的1.1倍
+
+    # 添加图例和标题
+    plt.legend()
+    plt.title("Strength Distribution")
+    plt.xlabel("Strength")
+    plt.ylabel("Strength Frequency")
     plt.show()
