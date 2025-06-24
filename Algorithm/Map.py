@@ -50,7 +50,7 @@ def draw_world_ports_degree_heat_map(g, centrality):
 
     Port_Data = ConstructNetwork.Read_Port_Data()
 
-
+    # 得到 tuple 组成的 list  tuple中的元素依次为 longitude、latitude、节点中心性
     coord = [(float(Port_Data[node]["longitude"]), float(Port_Data[node]["latitude"]), centrality[node])
              for node in g.nodes() if "latitude" in Port_Data[node].keys() and "longitude" in Port_Data[node].keys()]
     value = [data[2] for data in coord]
@@ -75,6 +75,50 @@ def draw_world_ports_degree_heat_map(g, centrality):
     x, y = world_map([data[0] for data in coord], [data[1] for data in coord])
     world_map.scatter(x, y, marker='o', color='b', s=sizes, zorder=10, alpha=alphas)
     plt.show()
+def draw_world_ports_in_out_degree_heat_map(g, value:str):
+
+    Port_Data = ConstructNetwork.Read_Port_Data()
+    g = nx.read_graphml('../Data/FinalGraph/MultiDiGraph2019.graphml')
+
+
+    if value == "in":
+        # 得到 tuple 组成的 list  tuple中的元素依次为 longitude、latitude、节点中心性
+        coord = [(float(Port_Data[node]["longitude"]), float(Port_Data[node]["latitude"]), g.in_degree(node), node)
+                 for node in g.nodes() if
+                 "latitude" in Port_Data[node].keys() and "longitude" in Port_Data[node].keys()]
+    elif value == "out":
+        # 得到 tuple 组成的 list  tuple中的元素依次为 longitude、latitude、节点中心性
+        coord = [(float(Port_Data[node]["longitude"]), float(Port_Data[node]["latitude"]), g.out_degree(node), node)
+                 for node in g.nodes() if
+                 "latitude" in Port_Data[node].keys() and "longitude" in Port_Data[node].keys()]
+
+    print(len(coord))
+    value = [data[2] for data in coord]
+
+    # 计算散点大小 - 使用度值的线性映射，并添加最小尺寸
+    min_size = 10
+    max_size = 100
+    min_value = min(value)
+    max_value = max(value)
+
+    # 线性映射函数：将度值映射到散点大小
+    sizes = [min_size + (d - min_value) * (max_size - min_size) / (max_value - min_value) for d in value]
+    # 计算与度值相关的透明度（0.3-1.0）
+    alphas = [0.1 + (d - min_value) * (1.0 - 0.3) / (max_value - min_value) for d in value]
+
+    world_map = Basemap()
+    # 绘制地图边界，并设置背景颜色为灰色（海洋颜色）
+    world_map.drawmapboundary(fill_color='#D0CFD4')
+    world_map.fillcontinents(color='#EFEFEF', lake_color='#D0CFD4')
+    world_map.drawcoastlines()
+
+    x, y = world_map([data[0] for data in coord], [data[1] for data in coord])
+    world_map.scatter(x, y, marker='o', color='b', s=sizes, zorder=10, alpha=alphas)
+    plt.title("in" if value == "in" else "out" + "_Degree")
+    plt.show()
+
+    for item in coord:
+        print(item)
 
 def draw_world_ports_map(g):
     Latitude = {}
