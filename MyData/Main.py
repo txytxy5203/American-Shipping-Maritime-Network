@@ -1,9 +1,11 @@
 import csv
+import json
 import powerlaw
 import numpy as np
 import pandas as pd
 import networkx as nx
 import matplotlib.pyplot as plt
+from matplotlib.pyplot import scatter
 from mpl_toolkits.basemap import Basemap
 from Algorithm.ConstructNetwork import ConstructNetwork
 # from Algorithm.Basic_Topology import *
@@ -74,72 +76,91 @@ def generate_graph():
 # for com in community:
 #     print(len(com))
 
-# Port_Data = ConstructNetwork.Read_Port_Data()
-# # error = []
-# #
-# # for data in Port_Data.values():
-# #     try:
-# #         print(data["latitude"])
-# #     except:
-# #         error.append(data["english_name"])
-# # print(error)
-#
-# world_map = Basemap()
-# # 绘制地图边界，并设置背景颜色为灰色（海洋颜色）
-# world_map.drawmapboundary(fill_color='#D0CFD4')
-# world_map.fillcontinents(color='#EFEFEF', lake_color='#D0CFD4')
-# world_map.drawcoastlines()
-# # 读经纬度时一定记得转成 float
-# coord_all_port = [(float(port["longitude"]),float(port["latitude"])) for port in Port_Data.values() if "latitude" in port and "longitude" in port]
-# x, y = world_map([data[0] for data in coord_all_port], [data[1] for data in coord_all_port])
-# world_map.scatter(x, y, marker='o', color='g', s=10, zorder=10)
-#
-#
-# coord = [(float(Port_Data[node]["longitude"]),float(Port_Data[node]["latitude"]))
-#          for node in G_2019.nodes() if "latitude" in Port_Data[node].keys() and "longitude" in Port_Data[node].keys()]
-# print(coord)
-# print(len(coord))
-#
-#
-# a, b = world_map([data[0] for data in coord], [data[1] for data in coord])
-# world_map.scatter(a, b, marker='o', color='b', s=10, zorder=10)
-# plt.show()
-# MultiDiG_2019 = nx.read_graphml('../Data/FinalGraph/MultiDiGraph2019.graphml')
-
-def draw_degree_bc_cc(g, value:str) -> None:
-    '''
-    查看三种中心性指标之间的关系
-    :param g: 传入要计算的 Graph
-    :param value: 有 Degree——BC，Degree——CC，BC--CC三种模式
-    :return:
-    '''
-    bc = nx.betweenness_centrality(g)
-    degree = nx.degree_centrality(g)
-    cc = nx.closeness_centrality(g)
-    degree_bc_cc = [(degree[node], bc[node], cc[node], node) for node in g.nodes()]
-
-    if value == "DB":
-        plt.scatter([data[0] for data in degree_bc_cc], [data[1] for data in degree_bc_cc], marker='s', c='red')
-        plt.xlabel("degree")
-        plt.ylabel("BC")
-        plt.title("degree--BC")
-        plt.savefig('../Figure/节点度值与BC的关系.svg')
-        plt.show()
-    elif value == "DC":
-        plt.scatter([data[0] for data in degree_bc_cc], [data[2] for data in degree_bc_cc], marker='s', c='red')
-        plt.xlabel("degree")
-        plt.ylabel("CC")
-        plt.title("degree--CC")
-        plt.savefig('../Figure/节点度值与CC的关系.svg')
-        plt.show()
-    elif value == "BC":
-        plt.scatter([data[1] for data in degree_bc_cc], [data[2] for data in degree_bc_cc], marker='s', c='red')
-        plt.xlabel("BC")
-        plt.ylabel("CC")
-        plt.title("BC--CC")
-        plt.savefig('../Figure/节点BC与CC的关系.svg')
-        plt.show()
 
 
 
+animal_plant = [1,2,3,4,5,6,7,8,9,10,11,12,13,14]
+grease = [15,16,17,18,19,20,21,22,23,24]
+minerals = [25,26,27,28,29,30,31,32,33,34,35,36,37,38]
+rubber_plastics = [39,40,41,42,43]
+pulpwood = [44,45,46,47,48,49]
+textile = [50,51,52,53,54,55,56,57,58,59,60,61,62,63,64,65,66,67]
+metal = [71,72,73,74,75,76,77,78,79,80,81,82,83]
+machinery = [84,85,86,87,88,89]
+precision_instrument = [90,91,92,94,95,96]
+special_other = [68,69,70,93,97,98,99]
+
+# port_in_out_info = dict()
+# for node in MultiDiG_2019.nodes():
+#     degree = MultiDiG_2019.degree(node)
+#     in_rate = MultiDiG_2019.in_degree(node) / degree
+#     out_rate = MultiDiG_2019.out_degree(node) / degree
+#
+#     in_out_dict = dict()
+#     in_out_dict["in_rate"] = in_rate
+#     in_out_dict["out_rate"] = out_rate
+#     port_in_out_info[node] = in_out_dict
+# json_bytes = json.dumps(port_in_out_info).encode('utf-8')
+#
+# # 将编码后的字符串写入文件
+# with open('../Data/FinalGraph/port_in_out_info.json', 'wb') as f:
+#     f.write(json_bytes)
+
+MultiDiG_2019 = nx.read_graphml('../Data/FinalGraph/MultiDiGraph2019.graphml')
+# draw_in_out_rate_map()
+
+def draw_in_out_rate_map() -> None:
+    with open('../Data/FinalGraph/port_in_out_info.json', "r", encoding="utf-8") as file:
+        port_in_out_info = json.load(file)
+
+    Port_Data = ConstructNetwork.Read_Port_Data()
+
+    # 得到 tuple 组成的 list  tuple中的元素依次为 longitude、latitude、节点中心性
+    coord = [(float(Port_Data[node]["longitude"]), float(Port_Data[node]["latitude"]), port_in_out_info[node]['in_rate'],node)
+             for node in port_in_out_info
+             if "latitude" in Port_Data[node].keys() and "longitude" in Port_Data[node].keys() and Port_Data[node]["country_english"] == "China"]
+    value = [data[2] for data in coord]
+    # 使用内置的 coolwarm 颜色映射（从蓝色到红色）
+    cmap = plt.cm.coolwarm
+    # 创建归一化函数，将值映射到0-1范围
+    norm = plt.Normalize(0, 1)
+
+
+    world_map = Basemap(resolution='l')
+    # 绘制地图边界，并设置背景颜色为灰色（海洋颜色）
+    world_map.drawmapboundary(fill_color='#D0CFD4')
+    world_map.fillcontinents(color='#EFEFEF', lake_color='#D0CFD4')
+    world_map.drawcoastlines()
+
+    x, y = world_map([data[0] for data in coord], [data[1] for data in coord])
+    scatter = world_map.scatter(x, y, marker='o', c=value, norm=norm, cmap=cmap ,s=50, zorder=10 )
+    # 添加颜色条
+    cbar = plt.colorbar(scatter, shrink=0.5, aspect=10)
+    # 一次性添加所有标签
+    for i, (x_pos, y_pos) in enumerate(zip(x, y)):
+        plt.annotate(
+            f"{coord[i][3]}({coord[i][2]:.3f})",
+            xy=(x_pos, y_pos),
+            xytext=(5, 5),
+            textcoords='offset points',
+            fontsize=9,
+            bbox=dict(boxstyle="round,pad=0.3", fc="white", ec="gray", alpha=0.8),
+            zorder=11
+        )
+
+    plt.show()
+
+
+port_hs_rate_info = dict()
+
+for node in MultiDiG_2019:
+    for neighbor, edge_dict in MultiDiG_2019[node].items():  # G[node] 等价于 G.adj[node]
+        for key, data in edge_dict.items():
+            print(f"    {node} → {neighbor} (键={key}), 属性: {data}")
+
+
+
+    for predecessor, edge_dict in MultiDiG_2019.pred[node].items():
+        for key, data in edge_dict.items():
+            print(f"    {predecessor} → {node} (键={key}), 属性: {data}")
 

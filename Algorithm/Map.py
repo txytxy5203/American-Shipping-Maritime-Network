@@ -75,8 +75,13 @@ def draw_world_ports_degree_heat_map(g, centrality):
     x, y = world_map([data[0] for data in coord], [data[1] for data in coord])
     world_map.scatter(x, y, marker='o', color='b', s=sizes, zorder=10, alpha=alphas)
     plt.show()
-def draw_world_ports_in_out_degree_heat_map(g, value:str):
-
+def draw_world_ports_in_out_degree_heat_map(g, value:str) ->None:
+    '''
+    画出度和入度的热力图 就是进出口 次数
+    :param g:
+    :param value: 选择 出度还是入度
+    :return:
+    '''
     Port_Data = ConstructNetwork.Read_Port_Data()
     g = nx.read_graphml('../Data/FinalGraph/MultiDiGraph2019.graphml')
 

@@ -490,3 +490,36 @@ def draw_strength_distribution(g):
     plt.xlabel("Strength")
     plt.ylabel("Strength Frequency")
     plt.show()
+def draw_degree_bc_cc(g, value:str) -> None:
+    '''
+    查看三种中心性指标之间的关系
+    :param g: 传入要计算的 Graph
+    :param value: 有 Degree——BC，Degree——CC，BC--CC三种模式
+    :return:
+    '''
+    bc = nx.betweenness_centrality(g)
+    degree = nx.degree_centrality(g)
+    cc = nx.closeness_centrality(g)
+    degree_bc_cc = [(degree[node], bc[node], cc[node], node) for node in g.nodes()]
+
+    if value == "DB":
+        plt.scatter([data[0] for data in degree_bc_cc], [data[1] for data in degree_bc_cc], marker='s', c='red')
+        plt.xlabel("degree")
+        plt.ylabel("BC")
+        plt.title("degree--BC")
+        plt.savefig('../Figure/节点度值与BC的关系.svg')
+        plt.show()
+    elif value == "DC":
+        plt.scatter([data[0] for data in degree_bc_cc], [data[2] for data in degree_bc_cc], marker='s', c='red')
+        plt.xlabel("degree")
+        plt.ylabel("CC")
+        plt.title("degree--CC")
+        plt.savefig('../Figure/节点度值与CC的关系.svg')
+        plt.show()
+    elif value == "BC":
+        plt.scatter([data[1] for data in degree_bc_cc], [data[2] for data in degree_bc_cc], marker='s', c='red')
+        plt.xlabel("BC")
+        plt.ylabel("CC")
+        plt.title("BC--CC")
+        plt.savefig('../Figure/节点BC与CC的关系.svg')
+        plt.show()
