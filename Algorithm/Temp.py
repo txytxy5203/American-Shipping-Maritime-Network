@@ -24,20 +24,11 @@ G.add_edge(1, 3, hs=2)
 # for node in G.nodes():
 #     out_degree = G.out_degree(node)
 #     in_degree = G.in_degree(node)
-for node in G:
-    print(f"\n节点 {node} 的邻接关系:")
 
-    # 出边（从node出发）
-    print("  出边:")
-    for neighbor, edge_dict in G[node].items():  # G[node] 等价于 G.adj[node]
-        for key, data in edge_dict.items():
-            print(f"    {node} → {neighbor} (键={key}), 属性: {data}")
+a = "12"
+a = a[:2]
+print(a)
 
-    # 入边（指向node）
-    print("  入边:")
-    for predecessor, edge_dict in G.pred[node].items():
-        for key, data in edge_dict.items():
-            print(f"    {predecessor} → {node} (键={key}), 属性: {data}")
 
 
 # # 转换为无向图（忽略多重边和方向）
@@ -62,4 +53,3 @@ for node in G:
 # # # 验证结果
 # print(G_combined.edges())
 
-print("tan","xue")

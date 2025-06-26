@@ -44,7 +44,7 @@ def draw_world_ports_degree_heat_map(g, centrality):
     '''
     港口重要性  可视化图
     :param g:
-    :param centrality:
+    :param centrality: 节点中心性指标  dict key为港口 value为对应的值
     :return:
     '''
 
