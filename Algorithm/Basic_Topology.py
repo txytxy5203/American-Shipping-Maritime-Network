@@ -92,6 +92,7 @@ def draw_degree_frequency_cumulative_distribution(g):
     plt.yscale("log")
     plt.xlabel("K")
     plt.ylabel("P(K>k)")
+    plt.title("Cumulative Degree Frequency Distribution")
     plt.legend()
     plt.show()
 def draw_length_frequency_distribution(g):
@@ -122,6 +123,7 @@ def draw_length_frequency_distribution(g):
     plt.yscale("log")
     plt.xlabel("Length")
     plt.ylabel("P(L)")
+    plt.title("Length Frequency Distribution")
     plt.show()
 def draw_degree_cluster(g, is_mean=False):
     '''
@@ -252,8 +254,7 @@ def draw_betweenness_centrality_cumulative_distribution(g1, g2):
     plt.scatter(BC_values_not_repeat, BC_values_cumulative_distribution, c='darkblue', label='Nodes', s=5)
     # print(BC_values_not_repeat)
 
-    # 设置横坐标的范围
-    plt.xlim(0, 0.06)
+    plt.title("Betweenness Centrality Cumulative Distribution")
     plt.yscale("log")
     plt.xlabel("BC")
     plt.ylabel("P(BC>bc)")
@@ -286,6 +287,7 @@ def draw_closeness_centrality_cumulative_distribution(g1,g2):
     plt.scatter(CC_zero[2:], P_zero_value[2:], c='gray', label='Random', s=5)
     plt.scatter(CC[2:], P_value[2:], c='darkblue', label='Nodes', s=5)
 
+    plt.title("Closeness Centrality Cumulative Distribution")
     plt.yscale("log")
     plt.xlabel("CC")
     plt.ylabel("P(CC>cc)")

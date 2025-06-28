@@ -825,7 +825,7 @@ class ConstructNetwork:
 
         # nrows = 1000000
         DataFrame = pd.read_csv(IN_data_path, header=None)
-        DataFrame.columns = ['panjivaRecordId' ,'departureDate' ,'conCity','conCountry','shpCity','shpCountry',
+        DataFrame.columns = ['panjivaRecordId' ,'billOfEntryNumber' ,'departureDate' ,'conCity','conCountry','shpCity','shpCountry',
                              'portOfUnlading','portOfUnladingCountry','portOfUnladingUNLOCODE',
 		                     'portOfLading', 'portOfLadingCountry', 'portOfLadingUNLOCODE',
                              'transportMethod', 'hsCode', 'volumeTEU']
@@ -834,8 +834,8 @@ class ConstructNetwork:
         print(f"原始DataFrame大小:{len(DataFrame)}")
         Origin_Len = len(DataFrame)
 
-        # 删除 'panjivaRecordId' 列重复的行，只保留第一次出现的行
-        DataFrame = DataFrame.drop_duplicates(subset=['panjivaRecordId'], keep='first')
+        # 删除 'billOfEntryNumber' 列重复的行，只保留第一次出现的行
+        DataFrame = DataFrame.drop_duplicates(subset=['billOfEntryNumber'], keep='first')
         print(f"剔除重复数据后DataFrame大小:{len(DataFrame)}")
 
         # 检查 volumeTEU、weightKg、valueOfGoodsUSD 字段中的空值数量
@@ -958,7 +958,7 @@ class ConstructNetwork:
 
         # nrows = 1000000
         DataFrame = pd.read_csv(IN_data_path, header=None)
-        DataFrame.columns = ['panjivaRecordId', 'departureDate', 'conCity', 'conCountry', 'shpCity', 'shpCountry',
+        DataFrame.columns = ['panjivaRecordId', 'billOfLadingNumber' , 'departureDate', 'conCity', 'conCountry', 'shpCity', 'shpCountry',
                              'portOfUnlading', 'portOfUnladingCountry', 'portOfUnladingUNLOCODE',
                              'portOfLading', 'portOfLadingCountry', 'portOfLadingUNLOCODE',
                              'transportMethod', 'hsCode', 'volumeTEU']
@@ -968,7 +968,7 @@ class ConstructNetwork:
         Origin_Len = len(DataFrame)
 
         # 删除 'panjivaRecordId' 列重复的行，只保留第一次出现的行
-        DataFrame = DataFrame.drop_duplicates(subset=['panjivaRecordId'], keep='first')
+        DataFrame = DataFrame.drop_duplicates(subset=['billOfLadingNumber'], keep='first')
         print(f"剔除重复数据后DataFrame大小:{len(DataFrame)}")
 
         # 检查 volumeTEU、weightKg、valueOfGoodsUSD 字段中的空值数量

@@ -1,5 +1,6 @@
 import re
 import csv
+import json
 
 # 这几个方法 暂时弃用
 # def read_port_name_info():
@@ -97,7 +98,6 @@ import csv
 #             writer.writerow([key, value])
 
 class Read:
-
     @classmethod
     def read_USImpHSCode(cls):
         '''
@@ -152,3 +152,26 @@ class Read:
         print("USExpHSCode读取完毕")
         return USExpHSCode
 
+    @classmethod
+    def read_port_hs_rate_info(cls):
+        '''
+        类方法 直接 cls. 出来用
+        :return: port_hs_rate_info Dict
+        '''
+        data_path = "../Data/FinalGraph/port_hs_rate_info.json"
+        # 一次性读取整个JSON文件
+        with open(data_path, "r", encoding="utf-8") as file:
+            port_hs_rate_info = json.load(file)
+        return port_hs_rate_info
+
+    @classmethod
+    def read_port_in_out_info(cls):
+        '''
+        类方法 直接 cls. 出来用
+        :return: port_port_in_out_info Dict
+        '''
+        data_path = "../Data/FinalGraph/port_in_out_info.json"
+        # 一次性读取整个JSON文件
+        with open(data_path, "r", encoding="utf-8") as file:
+            port_in_out_info = json.load(file)
+        return port_in_out_info
