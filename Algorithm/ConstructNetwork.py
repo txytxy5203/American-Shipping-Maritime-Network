@@ -131,10 +131,14 @@ class ConstructNetwork:
 
             portOfLading = row['portOfLading'].lower()
             portOfLading = re.sub(r'[^a-zA-Z]', '', portOfLading)
+            portOfLading_country = row['portOfLadingCountry'].lower()
+
             for port in port_data:
                 port_name = port_data[port]["english_name"].lower()
                 port_name = re.sub(r'[^a-zA-Z]', '', port_name)
-                if port_name in portOfLading:
+                port_country = port_data[port]["country_english"].lower()
+
+                if port_name in portOfLading and portOfLading_country == port_country:
                     OriIndex += 1
                     match = True
                     Lading_Code = port

@@ -75,27 +75,31 @@ def draw_world_ports_degree_heat_map(g, centrality):
     x, y = world_map([data[0] for data in coord], [data[1] for data in coord])
     world_map.scatter(x, y, marker='o', color='b', s=sizes, zorder=10, alpha=alphas)
     plt.show()
-def draw_world_ports_in_out_degree_heat_map(g, value:str) ->None:
+def draw_world_ports_in_out_degree_heat_map(g, type:str) ->None:
     '''
     画出度和入度的热力图 就是进出口 次数
+    :param type:
     :param g:
-    :param value: 选择 出度还是入度
     :return:
     '''
     Port_Data = ConstructNetwork.Read_Port_Data()
-    g = nx.read_graphml('../Data/FinalGraph/MultiDiGraph2019.graphml')
+    # g = nx.read_graphml('../Data/FinalGraph/MultiDiGraph2019.graphml')
 
 
-    if value == "in":
+    if type == "in":
         # 得到 tuple 组成的 list  tuple中的元素依次为 longitude、latitude、节点中心性
         coord = [(float(Port_Data[node]["longitude"]), float(Port_Data[node]["latitude"]), g.in_degree(node), node)
-                 for node in g.nodes() if
-                 "latitude" in Port_Data[node].keys() and "longitude" in Port_Data[node].keys()]
-    elif value == "out":
+                 for node in g.nodes()
+                 if "latitude" in Port_Data[node].keys() and "longitude" in Port_Data[node].keys()]
+    elif type == "out":
         # 得到 tuple 组成的 list  tuple中的元素依次为 longitude、latitude、节点中心性
         coord = [(float(Port_Data[node]["longitude"]), float(Port_Data[node]["latitude"]), g.out_degree(node), node)
-                 for node in g.nodes() if
-                 "latitude" in Port_Data[node].keys() and "longitude" in Port_Data[node].keys()]
+                 for node in g.nodes()
+                 if "latitude" in Port_Data[node].keys() and "longitude" in Port_Data[node].keys()]
+    elif type == "all":
+        coord = [(float(Port_Data[node]["longitude"]), float(Port_Data[node]["latitude"]), g.degree(node), node)
+                 for node in g.nodes()
+                 if "latitude" in Port_Data[node].keys() and "longitude" in Port_Data[node].keys()]
 
     print(len(coord))
     value = [data[2] for data in coord]
@@ -119,11 +123,17 @@ def draw_world_ports_in_out_degree_heat_map(g, value:str) ->None:
 
     x, y = world_map([data[0] for data in coord], [data[1] for data in coord])
     world_map.scatter(x, y, marker='o', color='b', s=sizes, zorder=10, alpha=alphas)
-    plt.title("in" if value == "in" else "out" + "_Degree")
+    if type == "in":
+        title = "in_"
+    elif type == "out":
+        title = "out_"
+    else:
+        title = ""
+    plt.title(title + "Strength")
     plt.show()
 
-    for item in coord:
-        print(item)
+    # for item in coord:
+    #     print(item)
 
 def draw_world_ports_map(g):
     Latitude = {}
