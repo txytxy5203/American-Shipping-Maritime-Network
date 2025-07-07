@@ -48,7 +48,7 @@ class ConstructNetwork:
         us_data = {
             port_code: info
             for port_code, info in port_data.items()
-            if "United States of America" in info.get("country_english", "")
+            if "United States" in info.get("country_english", "")
         }
         us_data_dict = {value["english_name"]: key for key, value in us_data.items()}
 
@@ -60,12 +60,14 @@ class ConstructNetwork:
                              'portOfLadingCountry', 'portOfLadingRegion', 'transportMethod', 'vessel', 'volumeTEU',
                              'weightKg',
                              'valueOfGoodsUSD']
+
         # 剔除重复数据
         DataFrame = DataFrame.drop_duplicates()
         # 将 相关列转换为字符串类型
         DataFrame['portOfUnlading'] = DataFrame['portOfUnlading'].astype(str)
         DataFrame['portOfLading'] = DataFrame['portOfLading'].astype(str)
         DataFrame['panjivaRecordId'] = DataFrame['panjivaRecordId'].astype(str)
+        DataFrame['portOfLadingCountry'] = DataFrame['portOfLadingCountry'].astype(str)
 
         print("DataFrame加载完毕")
 
@@ -73,7 +75,7 @@ class ConstructNetwork:
         Origin_Len = len(DataFrame)
         # # 剔除重复数据
         # 删除 'panjivaRecordId' 列重复的行，只保留第一次出现的行
-        DataFrame = DataFrame.drop_duplicates(subset=['panjivaRecordId'], keep='first')
+        DataFrame = DataFrame.drop_duplicates(subset=['billOfLadingNumber'], keep='first')
         print(f"剔除重复数据后DataFrame大小:{len(DataFrame)}")
 
         # 检查 volumeTEU、weightKg、valueOfGoodsUSD 字段中的空值数量
@@ -113,6 +115,7 @@ class ConstructNetwork:
 
             # 在美国的port里面去找即可  注意小写和按逗号分割
             portOfUnlading = row['portOfUnlading'].lower()
+
             for us_port in us_data_dict.keys():
                 us_port_deal = us_port.lower().split(',', 1)[0]
                 if us_port_deal in portOfUnlading:
@@ -132,11 +135,14 @@ class ConstructNetwork:
             portOfLading = row['portOfLading'].lower()
             portOfLading = re.sub(r'[^a-zA-Z]', '', portOfLading)
             portOfLading_country = row['portOfLadingCountry'].lower()
+            # print("----------")
+            # print(portOfLading_country)
 
             for port in port_data:
                 port_name = port_data[port]["english_name"].lower()
                 port_name = re.sub(r'[^a-zA-Z]', '', port_name)
                 port_country = port_data[port]["country_english"].lower()
+                # print(port_country)
 
                 if port_name in portOfLading and portOfLading_country == port_country:
                     OriIndex += 1
@@ -183,7 +189,7 @@ class ConstructNetwork:
         us_data = {
             port_code: info
             for port_code, info in port_data.items()
-            if "United States of America" in info.get("country_english", "")
+            if "United States" in info.get("country_english", "")
         }
         us_data_dict = {value["english_name"]: key for key, value in us_data.items()}
 
@@ -198,6 +204,7 @@ class ConstructNetwork:
         DataFrame['portOfUnlading'] = DataFrame['portOfUnlading'].astype(str)
         DataFrame['portOfLading'] = DataFrame['portOfLading'].astype(str)
         DataFrame['panjivaRecordId'] = DataFrame['panjivaRecordId'].astype(str)
+        DataFrame['portOfUnladingCountry'] = DataFrame['portOfUnladingCountry'].astype(str)
 
         print("DataFrame加载完毕")
 
@@ -262,10 +269,13 @@ class ConstructNetwork:
 
             portOfUnlading = row['portOfUnlading'].lower()
             portOfUnlading = re.sub(r'[^a-zA-Z]', '', portOfUnlading)
+            portOfUnlading_country = row['portOfUnladingCountry'].lower()
+
             for port in port_data:
                 port_name = port_data[port]["english_name"].lower()
                 port_name = re.sub(r'[^a-zA-Z]', '', port_name)
-                if port_name in portOfUnlading:
+                port_country = port_data[port]["country_english"].lower()
+                if port_name in portOfUnlading and portOfUnlading_country == port_country:
                     OriIndex += 1
                     match = True
                     UnLading_Code = port
@@ -308,7 +318,7 @@ class ConstructNetwork:
 
         # nrows = 1000000
         DataFrame = pd.read_csv(BR_data_path, header=None)
-        DataFrame.columns =  ['panjivaRecordId', 'shpmtDate', 'conCountry', 'shpCountry', 'shpmtOrigin','shpmtOriginCountry','shpmtDestination',
+        DataFrame.columns =  ['panjivaRecordId', 'billOfLadingNumber','shpmtDate', 'conCountry', 'shpCountry', 'shpmtOrigin','shpmtOriginCountry','shpmtDestination',
                             'shpmtDestinationCountry','portOfOriginCountry','portOfUnlading','portOfUnladingCountry','portOfLading', 'vesselName',
                            'hsCode','volumeTEU', 'grossWeightKg', 'valueOfGoodsUSD']
         # 剔除重复数据
@@ -317,6 +327,9 @@ class ConstructNetwork:
         DataFrame['portOfUnlading'] = DataFrame['portOfUnlading'].astype(str)
         DataFrame['portOfLading'] = DataFrame['portOfLading'].astype(str)
         DataFrame['panjivaRecordId'] = DataFrame['panjivaRecordId'].astype(str)
+        DataFrame['portOfUnladingCountry'] = DataFrame['portOfUnladingCountry'].astype(str)
+        DataFrame['portOfOriginCountry'] = DataFrame['portOfOriginCountry'].astype(str)
+
 
         print("DataFrame加载完毕")
         print(f"原始DataFrame大小:{len(DataFrame)}")
@@ -324,7 +337,7 @@ class ConstructNetwork:
         Origin_Len = len(DataFrame)
         # # 剔除重复数据
         # 删除 'panjivaRecordId' 列重复的行，只保留第一次出现的行
-        DataFrame = DataFrame.drop_duplicates(subset=['panjivaRecordId'], keep='first')
+        DataFrame = DataFrame.drop_duplicates(subset=['billOfLadingNumber'], keep='first')
         print(f"剔除重复数据后DataFrame大小:{len(DataFrame)}")
 
         # 检查 volumeTEU、weightKg、valueOfGoodsUSD 字段中的空值数量
@@ -336,6 +349,7 @@ class ConstructNetwork:
         DataFrame.fillna({'volumeTEU': DataFrame['volumeTEU'].mean()}, inplace=True)
         # 2 删除 某某 列为空的行
         DataFrame = DataFrame.dropna(subset=['portOfUnlading', 'portOfLading'])
+        DataFrame = DataFrame.reset_index(drop=True)  # drop=True 丢弃原索引
 
         print(f"剔除不能使用的数据后DataFrame大小:{len(DataFrame)}({len(DataFrame) / Origin_Len * 100:.2f}%)")
         print("DataFrame处理完毕")
@@ -370,6 +384,7 @@ class ConstructNetwork:
             portOfUnlading = cls.To_English_Spelling(portOfUnlading)
             # 再去掉空格
             portOfUnlading = re.sub(r'[^a-zA-Z]', '', portOfUnlading)
+            portOfUnlading_country = row['portOfUnladingCountry'].lower()
 
 
             portOfLading = row['portOfLading'].lower()
@@ -379,16 +394,20 @@ class ConstructNetwork:
             portOfLading = cls.To_English_Spelling(portOfLading)
             # 再去掉空格
             portOfLading = re.sub(r'[^a-zA-Z]', '', portOfLading)
+            portOfLading_country = row['portOfOriginCountry'].lower()
+
 
             for port in port_data:
                 port_name = port_data[port]["english_name"].lower()
                 port_name = re.sub(r'[^a-zA-Z]', '', port_name)
-                if  (portOfUnlading in port_name or port_name in portOfUnlading) and UnLading_Match is False:
+                port_country = port_data[port]["country_english"].lower()
+
+                if  (portOfUnlading in port_name or port_name in portOfUnlading) and UnLading_Match is False and port_country == portOfUnlading_country:
                     UnLadingIndex += 1
                     UnLading_Match = True
                     UnLading_Code = port
 
-                if  (portOfLading in port_name or port_name in portOfLading) and Lading_Match is False:
+                if  (portOfLading in port_name or port_name in portOfLading) and Lading_Match is False and port_country == portOfLading_country:
                     LadingIndex += 1
                     Lading_Match = True
                     Lading_Code = port
@@ -446,6 +465,9 @@ class ConstructNetwork:
         DataFrame['portOfUnlading'] = DataFrame['portOfUnlading'].astype(str)
         DataFrame['portOfLading'] = DataFrame['portOfLading'].astype(str)
         DataFrame['panjivaRecordId'] = DataFrame['panjivaRecordId'].astype(str)
+        DataFrame['portOfUnladingCountry'] = DataFrame['portOfUnladingCountry'].astype(str)
+        DataFrame['portOfLadingCountry'] = DataFrame['portOfLadingCountry'].astype(str)
+
 
         print("DataFrame加载完毕")
         print(f"原始DataFrame大小:{len(DataFrame)}")
@@ -453,7 +475,7 @@ class ConstructNetwork:
         Origin_Len = len(DataFrame)
         # # 剔除重复数据
         # 删除 'panjivaRecordId' 列重复的行，只保留第一次出现的行
-        DataFrame = DataFrame.drop_duplicates(subset=['panjivaRecordId'], keep='first')
+        DataFrame = DataFrame.drop_duplicates(subset=['billOfLadingNumber'], keep='first')
         print(f"剔除重复数据后DataFrame大小:{len(DataFrame)}")
 
         # 检查 volumeTEU、weightKg、valueOfGoodsUSD 字段中的空值数量
@@ -465,7 +487,7 @@ class ConstructNetwork:
         DataFrame.fillna({'volumeTEU': DataFrame['volumeTEU'].mean()}, inplace=True)
         # 2 删除 某某 列为空的行
         DataFrame = DataFrame.dropna(subset=['portOfUnlading', 'portOfLading'])
-
+        DataFrame = DataFrame.reset_index(drop=True)  # drop=True 丢弃原索引
         print(f"剔除不能使用的数据后DataFrame大小:{len(DataFrame)}({len(DataFrame) / Origin_Len * 100:.2f}%)")
         print("DataFrame处理完毕")
 
@@ -497,6 +519,7 @@ class ConstructNetwork:
             portOfUnlading = cls.To_English_Spelling(portOfUnlading)
             # 再去掉空格
             portOfUnlading = re.sub(r'[^a-zA-Z]', '', portOfUnlading)
+            portOfUnlading_country = row['portOfUnladingCountry'].lower()
 
 
             portOfLading = row['portOfLading'].lower()
@@ -506,17 +529,20 @@ class ConstructNetwork:
             portOfLading = cls.To_English_Spelling(portOfLading)
             # 再去掉空格
             portOfLading = re.sub(r'[^a-zA-Z]', '', portOfLading)
+            portOfLading_country = row['portOfLadingCountry'].lower()
 
             for port in port_data:
                 port_name = port_data[port]["english_name"].lower()
                 port_name = re.sub(r'[^a-zA-Z]', '', port_name)
+                port_country = port_data[port]["country_english"].lower()
+
                 # 交叉匹配 无敌！！
-                if (portOfUnlading in port_name or port_name in portOfUnlading) and UnLading_Match is False:
+                if (portOfUnlading in port_name or port_name in portOfUnlading) and UnLading_Match is False and port_country == portOfUnlading_country:
                     UnLadingIndex += 1
                     UnLading_Match = True
                     UnLading_Code = port
 
-                if (portOfLading in port_name or port_name in portOfLading) and Lading_Match is False:
+                if (portOfLading in port_name or port_name in portOfLading) and Lading_Match is False and port_country == portOfLading_country:
                     LadingIndex += 1
                     Lading_Match = True
                     Lading_Code = port

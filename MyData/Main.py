@@ -106,7 +106,7 @@ def draw_in_out_rate_map() -> None:
     plt.show()
 
 
-ConstructNetwork.Save_Network_USImport2019()
+ConstructNetwork.Save_Network_BRExport2019()
 # G_null = G.copy()
 # # 进行n_swaps次边交换
 # nx.double_edge_swap(G_null, nswap=100000, max_tries=1000000)
