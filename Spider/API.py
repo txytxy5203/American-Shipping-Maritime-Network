@@ -27,7 +27,7 @@ import json
 # port_name = "aqineh，Afghanistan"
 # url = "https://us1.locationiq.com/v1/search?key=pk.abff6204e75809c0221e6da17a295174&q=" + port_name + "&format=json&"
 # data=requests.get(url)
-data_path = "../Data/Port/Port_Info_Json.json"
+data_path = "../Data/2019/Port/Port_Info_Json.json"
 # 一次性读取整个JSON文件
 with open(data_path, "r", encoding="utf-8") as file:
     port_data = json.load(file)

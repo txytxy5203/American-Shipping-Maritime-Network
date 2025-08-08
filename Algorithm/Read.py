@@ -158,7 +158,7 @@ class Read:
         类方法 直接 cls. 出来用
         :return: port_hs_rate_info Dict
         '''
-        data_path = "../Data/FinalGraph/port_hs_rate_info.json"
+        data_path = "../Data/2019/FinalGraph/port_hs_rate_info.json"
         # 一次性读取整个JSON文件
         with open(data_path, "r", encoding="utf-8") as file:
             port_hs_rate_info = json.load(file)
@@ -170,7 +170,7 @@ class Read:
         类方法 直接 cls. 出来用
         :return: port_port_in_out_info Dict
         '''
-        data_path = "../Data/FinalGraph/port_in_out_info.json"
+        data_path = "../Data/2019/FinalGraph/port_in_out_info.json"
         # 一次性读取整个JSON文件
         with open(data_path, "r", encoding="utf-8") as file:
             port_in_out_info = json.load(file)

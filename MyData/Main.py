@@ -15,55 +15,96 @@ from Algorithm.Map import *
 from Algorithm.Read import *
 
 
-def generate_graph():
-    # # # 读取 GraphML 文件
-    BR_Im = nx.read_graphml('../Data/BR2019/BRImport2019.graphml')
-    BR_Ex = nx.read_graphml('../Data/BR2019/BRExport2019.graphml')
-    BR_Im_Graph = nx.Graph(BR_Im)
-    BR_Ex_Graph = nx.Graph(BR_Ex)
-    G_BR = nx.compose(BR_Im_Graph, BR_Ex_Graph)
-    print("BR is ready")
+def generate_graph(is_mul: bool):
+    if is_mul:
+        # # # 读取 GraphML 文件
+        BR_Im = nx.read_graphml('../Data/2019/BR2019/BRImport2019.graphml')
+        BR_Ex = nx.read_graphml('../Data/2019/BR2019/BRExport2019.graphml')
 
-    CL_Im = nx.read_graphml('../Data/CL2019/CLImport2019.graphml')
-    G_CL = nx.Graph(CL_Im)
-    print("CL is ready")
+        G_BR = nx.compose(BR_Im, BR_Ex)
+        print("BR is ready")
 
-    CO_Ex = nx.read_graphml('../Data/CO2019/COExport2019.graphml')
-    G_CO = nx.Graph(CO_Ex)
-    print("CO is ready")
+        G_CL = nx.read_graphml('../Data/2019/CL2019/CLImport2019.graphml')
+        print("CL is ready")
 
-    IN_Im = nx.read_graphml('../Data/IN2019/INImport2019.graphml')
-    IN_Ex = nx.read_graphml('../Data/IN2019/INExport2019.graphml')
-    IN_Im_Graph = nx.Graph(IN_Im)
-    IN_Ex_Graph = nx.Graph(IN_Ex)
-    G_IN = nx.compose(IN_Im_Graph, IN_Ex_Graph)
-    print("IN is ready")
+        G_CO = nx.read_graphml('../Data/2019/CO2019/COExport2019.graphml')
+        print("CO is ready")
 
-    US_Im = nx.read_graphml('../Data/US2019/USImport2019.graphml')
-    US_Ex = nx.read_graphml('../Data/US2019/USExport2019.graphml')
-    US_Im_Graph = nx.Graph(US_Im)
-    US_Ex_Graph = nx.Graph(US_Ex)
-    G_US = nx.compose(US_Im_Graph, US_Ex_Graph)
-    print("US is ready")
+        IN_Im = nx.read_graphml('../Data/2019/IN2019/INImport2019.graphml')
+        IN_Ex = nx.read_graphml('../Data/2019/IN2019/INExport2019.graphml')
+        G_IN = nx.compose(IN_Im, IN_Ex)
+        print("IN is ready")
 
-    VE_Im = nx.read_graphml('../Data/VE2019/VEImport2019.graphml')
-    G_VE = nx.Graph(VE_Im)
-    print("VE is ready")
+        US_Im = nx.read_graphml('../Data/2019/US/USImport2019.graphml')
+        US_Ex = nx.read_graphml('../Data/2019/US/USExport2019.graphml')
+        G_US = nx.compose(US_Im, US_Ex)
+        print("US is ready")
 
-    # 合并两个图
-    G_combined = nx.compose(G_BR, G_CL)
-    G_combined = nx.compose(G_combined, G_CO)
-    G_combined = nx.compose(G_combined, G_IN)
-    G_combined = nx.compose(G_combined, G_US)
-    G_combined = nx.compose(G_combined, G_VE)
+        G_VE = nx.read_graphml('../Data/2019/VE2019/VEImport2019.graphml')
+        print("VE is ready")
 
-    print("N:", G_combined.number_of_nodes())
-    print("M:", G_combined.number_of_edges())
+        # 合并两个图
+        G_combined = nx.compose(G_BR, G_CL)
+        G_combined = nx.compose(G_combined, G_CO)
+        G_combined = nx.compose(G_combined, G_IN)
+        G_combined = nx.compose(G_combined, G_US)
+        G_combined = nx.compose(G_combined, G_VE)
 
-    # 使用 GraphML 保存图
-    nx.write_graphml(G_combined, '../Data/FinalGraph/Graph2019.graphml')
+        print("N:", G_combined.number_of_nodes())
+        print("M:", G_combined.number_of_edges())
+
+        # 使用 GraphML 保存图
+        nx.write_graphml(G_combined, '../Data/2019/FinalGraph/MultiDiGraph2019.graphml')
+    else:
+        # # # 读取 GraphML 文件
+        BR_Im = nx.read_graphml('../Data/2019/BR2019/BRImport2019.graphml')
+        BR_Ex = nx.read_graphml('../Data/2019/BR2019/BRExport2019.graphml')
+        BR_Im_Graph = nx.Graph(BR_Im)
+        BR_Ex_Graph = nx.Graph(BR_Ex)
+        G_BR = nx.compose(BR_Im_Graph, BR_Ex_Graph)
+        print("BR is ready")
+
+        CL_Im = nx.read_graphml('../Data/2019/CL2019/CLImport2019.graphml')
+        G_CL = nx.Graph(CL_Im)
+        print("CL is ready")
+
+        CO_Ex = nx.read_graphml('../Data/2019/CO2019/COExport2019.graphml')
+        G_CO = nx.Graph(CO_Ex)
+        print("CO is ready")
+
+        IN_Im = nx.read_graphml('../Data/2019/IN2019/INImport2019.graphml')
+        IN_Ex = nx.read_graphml('../Data/2019/IN2019/INExport2019.graphml')
+        IN_Im_Graph = nx.Graph(IN_Im)
+        IN_Ex_Graph = nx.Graph(IN_Ex)
+        G_IN = nx.compose(IN_Im_Graph, IN_Ex_Graph)
+        print("IN is ready")
+
+        US_Im = nx.read_graphml('../Data/2019/US/USImport2019.graphml')
+        US_Ex = nx.read_graphml('../Data/2019/US/USExport2019.graphml')
+        US_Im_Graph = nx.Graph(US_Im)
+        US_Ex_Graph = nx.Graph(US_Ex)
+        G_US = nx.compose(US_Im_Graph, US_Ex_Graph)
+        print("US is ready")
+
+        VE_Im = nx.read_graphml('../Data/2019/VE2019/VEImport2019.graphml')
+        G_VE = nx.Graph(VE_Im)
+        print("VE is ready")
+
+        # 合并两个图
+        G_combined = nx.compose(G_BR, G_CL)
+        G_combined = nx.compose(G_combined, G_CO)
+        G_combined = nx.compose(G_combined, G_IN)
+        G_combined = nx.compose(G_combined, G_US)
+        G_combined = nx.compose(G_combined, G_VE)
+
+        print("N:", G_combined.number_of_nodes())
+        print("M:", G_combined.number_of_edges())
+
+        # 使用 GraphML 保存图
+        nx.write_graphml(G_combined, '../Data/2019/FinalGraph/Graph2019.graphml')
+
 def draw_in_out_rate_map() -> None:
-    with open('../Data/FinalGraph/port_in_out_info.json', "r", encoding="utf-8") as file:
+    with open('../Data/2019/FinalGraph/port_in_out_info.json', "r", encoding="utf-8") as file:
         port_in_out_info = json.load(file)
 
     Port_Data = ConstructNetwork.Read_Port_Data()
@@ -105,8 +146,20 @@ def draw_in_out_rate_map() -> None:
 
     plt.show()
 
+# g_ex = nx.read_graphml('../Data/US/USExport2019.graphml')
+# g_im = nx.read_graphml('../Data/US/USImport2019.graphml')
+# g_1 = nx.compose(g_ex, g_im)
+# g = nx.Graph(g_1)
+#
+# print(g.number_of_edges())
+# print(g.number_of_nodes())
 
-ConstructNetwork.Save_Network_BRExport2019()
+
+ConstructNetwork.Save_Network_USExport(year=2021)
+
+
+# draw_world_ports_degree_heat_map(g, degree)
+
 # G_null = G.copy()
 # # 进行n_swaps次边交换
 # nx.double_edge_swap(G_null, nswap=100000, max_tries=1000000)

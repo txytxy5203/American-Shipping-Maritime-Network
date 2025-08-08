@@ -70,7 +70,7 @@ def extract_coordinates(text):
 isLocation1 = {"isLocation": True}  # 修正键名拼写
 isLocation2 = {"isLocation": False}
 
-data_path = "../Data/Port/Port_Info_Json.json"
+data_path = "../Data/2019/Port/Port_Info_Json.json"
 
 # 一次性读取整个JSON文件
 with open(data_path, "r", encoding="utf-8") as file:

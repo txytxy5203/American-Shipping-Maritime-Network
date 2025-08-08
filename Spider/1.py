@@ -10,7 +10,7 @@ import Algorithm.Read
 
 
 HSCode = Algorithm.Read.read_USImpHSCode()
-data_path = "../Data/Port/Port_Info_Json.json"
+data_path = "../Data/2019/Port/Port_Info_Json.json"
 # 一次性读取整个JSON文件
 with open(data_path, "r", encoding="utf-8") as file:
     port_data = json.load(file)
@@ -136,7 +136,7 @@ for index, row in DataFrame.iterrows():
 
 
 # 使用 GraphML 保存图
-nx.write_graphml(G, '../Data/US2019/USImport2019.graphml')
+nx.write_graphml(G, '../Data/2019/US/USImport2019.graphml')
 
 print(USIndex / len(DataFrame))
 print(OriIndex / len(DataFrame))

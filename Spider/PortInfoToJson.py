@@ -41,7 +41,7 @@ file_path = 'C:/Users/Tan/Desktop/文件/爬虫/Port_Info_Table.txt'  # 替换�
 ports_data = parse_port_data(file_path)
 
 # 保存为JSON文件
-with open('../Data/Port/Port_Info_Json.json.old', 'w', encoding='utf-8') as f:
+with open('../Data/2019/Port/Port_Info_Json.json.old', 'w', encoding='utf-8') as f:
     json.dump(ports_data, f, ensure_ascii=False, indent=4)
 
 # 打印结果

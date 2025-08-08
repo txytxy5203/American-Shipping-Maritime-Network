@@ -9,7 +9,7 @@ def draw_The_proportion_of_the_number_of_transactions_on_each_continent():
     '''
     # 读取port位置区域
     port_Region = {}
-    with open('../Data/Port/port_Region.csv', 'r', encoding='utf-8') as file:
+    with open('../Data/2019/Port/port_Region.csv', 'r', encoding='utf-8') as file:
         lines = file.readlines()
     for line in lines:
         # 去掉行尾的换行符号

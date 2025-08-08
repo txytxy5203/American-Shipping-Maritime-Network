@@ -140,7 +140,7 @@ def draw_world_ports_map(g):
     Longitude = {}
 
     # 逐行读取txt文档 记录经纬度 有一些Ports有问题就不读取了
-    with open('../Data/Port/PortCoordinateInfo.txt', 'r', encoding='utf-8') as file:
+    with open('../Data/2019/Port/PortCoordinateInfo.txt', 'r', encoding='utf-8') as file:
         lines = file.readlines()
     for line in lines:
         try:
@@ -198,7 +198,7 @@ def draw_Panama_map(g):
     Longitude = {}
 
     # 逐行读取txt文档 记录经纬度 有一些Ports有问题就不读取了
-    with open('../Data/Port/PortCoordinateInfo.txt', 'r', encoding='utf-8') as file:
+    with open('../Data/2019/Port/PortCoordinateInfo.txt', 'r', encoding='utf-8') as file:
         lines = file.readlines()
     for line in lines:
         try:
@@ -298,7 +298,7 @@ def draw_except_US_port_strength_map():
     Longitude = {}
 
     # 逐行读取txt文档 记录经纬度 有一些Ports有问题就不读取了
-    with open('../Data/Port/PortCoordinateInfo.txt', 'r', encoding='utf-8') as file:
+    with open('../Data/2019/Port/PortCoordinateInfo.txt', 'r', encoding='utf-8') as file:
         lines = file.readlines()
     for line in lines:
         try:
