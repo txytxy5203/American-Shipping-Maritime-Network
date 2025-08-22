@@ -140,7 +140,7 @@ def calc_metrics(G):
 # plt.savefig('network_evolution_14curves.png', dpi=300)
 # plt.show()
 
-def scale_picture():
+def draw_scale_picture():
     '''
     绘制网络规模演化图
     :return:
@@ -186,3 +186,32 @@ def scale_picture():
     plt.savefig('scale_evolution.png', dpi=300, bbox_inches='tight')
     plt.show()
 
+def draw_density_cluster_picture():
+    # 1. 读数据
+    df = pd.read_csv('network_evolution_14metrics.csv')
+
+    # 2. 出版级样式
+    plt.rcParams['figure.dpi'] = 300
+    plt.rcParams['font.family'] = 'Times New Roman'
+    plt.rcParams['axes.labelsize'] = 12
+    plt.rcParams['xtick.labelsize'] = 11
+    plt.rcParams['ytick.labelsize'] = 11
+
+    # 3. 画图
+    fig, ax = plt.subplots(figsize=(6.5, 3.8))
+    ax.plot(df['year'], df['density'], marker='o', color='#1f77b4', lw=2.5, label='Density')
+
+    # 4. 去网格、整年刻度
+    ax.grid(False)
+    ax.set_xticks(df['year'])
+    ax.set_xticklabels(df['year'])
+    ax.set_xlabel('Year')
+    ax.set_ylabel('Density')
+    ax.set_title('Network Density Evolution (2017–2021)', pad=15)
+    ax.legend(frameon=False, loc='upper right')   # 图例
+    # 5. 保存
+    plt.tight_layout()
+    plt.savefig('density_evolution.png', dpi=300, bbox_inches='tight')
+    plt.show()
+
+draw_density_cluster_picture()
