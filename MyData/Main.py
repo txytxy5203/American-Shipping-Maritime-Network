@@ -146,16 +146,20 @@ def draw_in_out_rate_map() -> None:
 
     plt.show()
 
-# g_ex = nx.read_graphml('../Data/US/USExport2019.graphml')
-# g_im = nx.read_graphml('../Data/US/USImport2019.graphml')
-# g_1 = nx.compose(g_ex, g_im)
-# g = nx.Graph(g_1)
-#
+for year in range(2017, 2022):
+    g_ex = nx.read_graphml('../Data/' + str(year) + '/US/USExport' + str(year) + '.graphml')
+    print(str(year) + "Ex is ready")
+    g_im = nx.read_graphml('../Data/' + str(year) + '/US/USImport' + str(year) + '.graphml')
+    print(str(year) + "IM is ready")
+    g = nx.compose(g_ex, g_im)
+    nx.write_graphml(g, '../Data/' + str(year) + '/US' + '/US' + str(year) + '.graphml')
+    print(str(year) + "is ready")
+
 # print(g.number_of_edges())
 # print(g.number_of_nodes())
 
 
-ConstructNetwork.Save_Network_USExport(year=2021)
+# ConstructNetwork.Save_Network_USExport(year=2017)
 
 
 # draw_world_ports_degree_heat_map(g, degree)
