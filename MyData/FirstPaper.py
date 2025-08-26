@@ -9,7 +9,7 @@ from scipy.stats import entropy
 
 # ---------- 参数 ----------
 years = list(range(2017, 2022))
-records = []
+
 
 # ---------- 工具函数 ----------
 def rich_club_phi(G, k):
@@ -140,6 +140,7 @@ def calc_metrics(G):
 # plt.savefig('network_evolution_14curves.png', dpi=300)
 # plt.show()
 
+#region Network Structure
 def draw_scale_picture():
     '''
     绘制网络规模演化图
@@ -185,8 +186,7 @@ def draw_scale_picture():
     plt.tight_layout()
     plt.savefig('scale_evolution.png', dpi=300, bbox_inches='tight')
     plt.show()
-
-def draw_density_cluster_picture():
+def draw_density_avgDegree_picture():
     # 1. 读数据
     df = pd.read_csv('network_evolution_14metrics.csv')
 
@@ -198,20 +198,182 @@ def draw_density_cluster_picture():
     plt.rcParams['ytick.labelsize'] = 11
 
     # 3. 画图
-    fig, ax = plt.subplots(figsize=(6.5, 3.8))
-    ax.plot(df['year'], df['density'], marker='o', color='#1f77b4', lw=2.5, label='Density')
+    fig, ax1 = plt.subplots(figsize=(6.5, 3.8))
+    ax1.plot(df['year'], df['density'], marker='o', color='#1f77b4', lw=2.5, label='Density')
 
-    # 4. 去网格、整年刻度
-    ax.grid(False)
-    ax.set_xticks(df['year'])
-    ax.set_xticklabels(df['year'])
-    ax.set_xlabel('Year')
-    ax.set_ylabel('Density')
-    ax.set_title('Network Density Evolution (2017–2021)', pad=15)
-    ax.legend(frameon=False, loc='upper right')   # 图例
-    # 5. 保存
+    ax1.set_ylabel('density', color='black')
+    ax1.tick_params(axis='y')
+
+
+    ax2 = ax1.twinx()
+    ax2.plot(df['year'], df['avg_degree'], marker='s', color='#ff7f0e', lw=2.5, label='avg degree')
+    ax2.set_ylabel('avg degree', color='black')
+    ax2.tick_params(axis='y')
+
+    # 4. 横坐标整年刻度
+    ax1.set_xlabel('Year')
+    ax1.set_xticks(df['year'])
+    ax1.set_xticklabels(df['year'])
+
+    # 5. 图例
+    lines1, labels1 = ax1.get_legend_handles_labels()
+    lines2, labels2 = ax2.get_legend_handles_labels()
+    ax1.legend(lines1 + lines2, labels1 + labels2, frameon=False, loc='upper right')
+
     plt.tight_layout()
-    plt.savefig('density_evolution.png', dpi=300, bbox_inches='tight')
+    # 不加 ./ 也可以   加了就相当于是显式的
+    plt.savefig('./Figure/scale_evolution.png', dpi=300, bbox_inches='tight')
     plt.show()
+    # 单独画density
+    # # 4. 去网格、整年刻度
+    # ax1.grid(False)
+    # ax1.set_xticks(df['year'])
+    # ax1.set_xticklabels(df['year'])
+    # ax1.set_xlabel('Year')
+    # ax1.set_ylabel('Density')
+    # ax1.set_title('Network Density Evolution (2017–2021)', pad=15)
+    # ax1.legend(frameon=False, loc='upper right')   # 图例
+    # # 5. 保存
+    # plt.tight_layout()
+    # plt.savefig('density_evolution.png', dpi=300, bbox_inches='tight')
+    # plt.show()
+def draw_length_efficiency_picture():
+    # 1. 读取数据
+    df = pd.read_csv('network_evolution_14metrics.csv')
 
-draw_density_cluster_picture()
+    # 2. 设置出版级样式
+    sns.set_style('white')  # 无网格
+    plt.rcParams['figure.dpi'] = 300
+    plt.rcParams['font.family'] = 'Times New Roman'
+    plt.rcParams['axes.labelsize'] = 12
+    plt.rcParams['xtick.labelsize'] = 11
+    plt.rcParams['ytick.labelsize'] = 11
+    plt.rcParams['legend.fontsize'] = 10
+
+    # 3. 绘制
+    fig, ax1 = plt.subplots(figsize=(6.5, 3.8))
+
+    # 左轴：nodes
+    ax1.plot(df['year'], df['avg_path_length'], marker='o', color='#1f77b4', lw=2.5, label='avg path length')
+    ax1.set_ylabel('avg path length', color='black')
+    ax1.tick_params(axis='y')
+
+    # 右轴：edges（量级大）
+    ax2 = ax1.twinx()
+    ax2.plot(df['year'], df['global_efficiency'], marker='s', color='#ff7f0e', lw=2.5, label='global efficiency')
+    ax2.set_ylabel('global efficiency', color='black')
+    ax2.tick_params(axis='y')
+
+    # 4. 横坐标整年刻度
+    ax1.set_xlabel('Year')
+    ax1.set_xticks(df['year'])
+    ax1.set_xticklabels(df['year'])
+
+    # 5. 图例
+    lines1, labels1 = ax1.get_legend_handles_labels()
+    lines2, labels2 = ax2.get_legend_handles_labels()
+    ax1.legend(lines1 + lines2, labels1 + labels2, frameon=False, loc='upper right')
+    # 在绘图后、保存前插入
+
+
+    # 6. 保存
+    plt.savefig('path_efficiency_evolution.png', dpi=300, bbox_inches='tight')
+    plt.show()
+#endregion
+
+#region Node Centrality
+# 2. 计算中心性并取 TOP10
+def top10_df(G, year):
+
+    # 度中心性
+    deg = nx.degree_centrality(G)
+    # 介数中心性
+    betw = nx.betweenness_centrality(G)
+    # 接近中心性
+    close = nx.closeness_centrality(G)
+    # PageRank
+    pr = nx.pagerank(G)
+
+    # 强度   1.TEU作为强度   2.交易次数作为强度
+    # 1.TEU
+    total_TEU_strength   = {}   # 所有邻边
+    out_TEU_strength     = {}   # 仅起点
+    in_TEU_strength      = {}   # 仅终点
+
+    # 2.交易次数
+    total_times_strength = {}
+    out_times_strength = {}
+    in_times_strength = {}
+    for n in G.nodes:
+        total_TEU_strength[n] = 0.
+        out_TEU_strength[n]   = 0.
+        in_TEU_strength[n]    = 0.
+
+        total_times_strength[n] = 0.
+        out_times_strength[n]   = 0.
+        in_times_strength[n]    = 0.
+    # 遍历所有多重边
+    for u, v, key, data in G.edges(keys=True, data=True):
+        # 1.TEU
+        w = data.get('volumeTEU', 1.0)
+        total_TEU_strength[u] += w
+        total_TEU_strength[v] += w
+        out_TEU_strength[u]   += w
+        in_TEU_strength[v]    += w
+
+        # 2.交易次数
+        total_times_strength[u] += 1
+        total_times_strength[v] += 1
+        out_times_strength[u]   += 1
+        in_times_strength[v]    += 1
+
+    # ---------- 统一 DataFrame ----------
+    df = pd.DataFrame({
+        'year': year,
+        'port': list(deg.keys()),
+        'degree': list(deg.values()),
+        'total_TEU_strength': [total_TEU_strength[n] for n in deg],
+        'out_TEU_strength': [out_TEU_strength[n] for n in deg],
+        'in_TEU_strength': [in_TEU_strength[n] for n in deg],
+        'total_times_strength': [total_times_strength[n] for n in deg],
+        'out_times_strength': [out_times_strength[n] for n in deg],
+        'in_times_strength': [in_times_strength[n] for n in deg],
+        'betweenness': list(betw.values()),
+        'closeness': list(close.values()),
+        'pagerank': list(pr.values())
+    })
+
+    # 对每种中心性取 TOP10
+    top10_list = []
+    cols = ['degree', 'total_TEU_strength', 'out_TEU_strength','in_TEU_strength',
+            'total_times_strength', 'out_times_strength', 'in_times_strength',
+            'betweenness', 'closeness', 'pagerank']
+    for col in cols:
+        top10 = (df[['year', 'port', col]]
+                 .rename(columns={col: 'value'})
+                 .assign(metric=col)
+                 .sort_values('value', ascending=False)
+                 .head(10))
+        top10_list.append(top10)
+
+    return pd.concat(top10_list, ignore_index=True)
+
+#endregion
+all_rows = []  # 用于收集所有年份的 TOP10 结果
+# ------------------------------------------------------------
+# 3. 主循环
+for year in years:
+    file_path = f'../Data/{year}/US/US{year}.graphml'
+    if not os.path.exists(file_path):
+        print(f'⚠️ 文件不存在: {file_path}')
+        continue
+    Multi_G = nx.read_graphml(file_path)
+    # G = nx.Graph(Multi_G)  # 无向加权简单图
+    all_rows.append(top10_df(Multi_G, year))
+
+# ------------------------------------------------------------
+# 4. 保存
+result = pd.concat(all_rows, ignore_index=True)
+result.to_csv('Figure/centrality_top10.csv', index=False)
+print('✅ 已保存 centrality_top10.csv')
+print(result.head(15))
