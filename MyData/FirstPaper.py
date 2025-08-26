@@ -283,16 +283,16 @@ def draw_length_efficiency_picture():
 
 #region Node Centrality
 # 2. 计算中心性并取 TOP10
-def top10_df(G, year):
-
+def top10_df(Multi_G, year):
+    G = nx.Graph(Multi_G)  # 无向加权简单图
     # 度中心性
     deg = nx.degree_centrality(G)
     # 介数中心性
-    betw = nx.betweenness_centrality(G)
+    betw = nx.betweenness_centrality(Multi_G)
     # 接近中心性
-    close = nx.closeness_centrality(G)
+    close = nx.closeness_centrality(Multi_G)
     # PageRank
-    pr = nx.pagerank(G)
+    pr = nx.pagerank(Multi_G)
 
     # 强度   1.TEU作为强度   2.交易次数作为强度
     # 1.TEU
@@ -304,7 +304,7 @@ def top10_df(G, year):
     total_times_strength = {}
     out_times_strength = {}
     in_times_strength = {}
-    for n in G.nodes:
+    for n in Multi_G.nodes:
         total_TEU_strength[n] = 0.
         out_TEU_strength[n]   = 0.
         in_TEU_strength[n]    = 0.
@@ -313,7 +313,7 @@ def top10_df(G, year):
         out_times_strength[n]   = 0.
         in_times_strength[n]    = 0.
     # 遍历所有多重边
-    for u, v, key, data in G.edges(keys=True, data=True):
+    for u, v, key, data in Multi_G.edges(keys=True, data=True):
         # 1.TEU
         w = data.get('volumeTEU', 1.0)
         total_TEU_strength[u] += w
