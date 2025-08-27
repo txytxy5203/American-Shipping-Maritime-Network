@@ -141,9 +141,9 @@ def calc_metrics(G):
 # plt.show()
 
 #region Network Structure
-def draw_scale_picture():
+def draw_nodes_edges_picture():
     '''
-    绘制网络规模演化图
+    绘制网络nodes，edges数量演化图
     :return:
     '''
     # 1. 读取数据
@@ -184,8 +184,17 @@ def draw_scale_picture():
 
     # 6. 保存
     plt.tight_layout()
-    plt.savefig('scale_evolution.png', dpi=300, bbox_inches='tight')
+    plt.savefig('Figure/nodes_edges.png', dpi=300, bbox_inches='tight')
     plt.show()
+def get_numbers_of_connect_countries_to_US(G, year):
+    # 统计与美国直接相连的非美国国家数
+    connected_countries = {
+        G.nodes[n]['Country']
+        for n in G.nodes
+        if G.nodes[n].get('Country') != 'United States'
+    }
+    print(year)
+    print(f'与美国连接的国家（去重）个数 = {len(connected_countries)}')
 def draw_density_avgDegree_picture():
     # 1. 读数据
     df = pd.read_csv('network_evolution_14metrics.csv')
@@ -282,7 +291,6 @@ def draw_length_efficiency_picture():
 #endregion
 
 #region Node Centrality
-# 2. 计算中心性并取 TOP10
 def top10_df(Multi_G, year):
     G = nx.Graph(Multi_G)  # 无向加权简单图
     # 度中心性
@@ -357,23 +365,68 @@ def top10_df(Multi_G, year):
         top10_list.append(top10)
 
     return pd.concat(top10_list, ignore_index=True)
+def port_appearance_in_top10_across_centrality_metrics():
+    # 1. 读入真实 top10 表（列：year, port, metric）
+    df = pd.read_csv('Figure/centrality_top10.csv')
 
+    # 2. 10 个真实指标列表（与你的列名完全一致）
+    real_metrics = [
+        'degree', 'total_TEU_strength', 'out_TEU_strength', 'in_TEU_strength',
+        'total_times_strength', 'out_times_strength', 'in_times_strength',
+        'betweenness', 'closeness', 'pagerank'
+    ]
+
+    # 3. 过滤 + 统计出现次数
+    heatmap_df = (
+        df[df['metric'].isin(real_metrics)]  # 只保留 10 个真指标
+        .assign(count=1)  # 每行算 1 次出现
+        .pivot_table(index='port', columns='year', values='count',
+                     aggfunc='sum', fill_value=0)
+    )
+
+    # 4. 按出现总频次降序排列，方便阅读
+    heatmap_df = heatmap_df.loc[
+        heatmap_df.sum(axis=1).sort_values(ascending=False).index
+    ]
+
+    # 5. 画热力图
+    plt.figure(figsize=(10, 6))
+    sns.heatmap(
+        heatmap_df,
+        cmap='Blues',
+        linewidths=.5,
+        linecolor='gray',
+        annot=True,
+        fmt='g',
+        cbar_kws={'label': 'Times in Top10'}
+    )
+    plt.title('Top10 Port Presence Across 10 Centrality Metrics (2017–2021)', fontsize=14, pad=15)
+    plt.xlabel('Year')
+    plt.ylabel('Port')
+    plt.tight_layout()
+    plt.savefig('Figure/real_port_top10_heatmap.png', dpi=300, bbox_inches='tight')
+    plt.show()
+
+    # 6. 导出频次汇总表（港口 × 总出现次数）
+    freq_summary = (
+        heatmap_df.sum(axis=1)
+        .rename('total_times')
+        .to_frame()
+        .sort_values('total_times', ascending=False)
+    )
+    freq_summary.to_csv('real_port_top10_frequency.csv', index=True)
+    print(freq_summary.head())
 #endregion
-all_rows = []  # 用于收集所有年份的 TOP10 结果
-# ------------------------------------------------------------
-# 3. 主循环
+# all_rows = []  # 用于收集所有年份的 TOP10 结果
 for year in years:
     file_path = f'../Data/{year}/US/US{year}.graphml'
     if not os.path.exists(file_path):
         print(f'⚠️ 文件不存在: {file_path}')
         continue
     Multi_G = nx.read_graphml(file_path)
-    # G = nx.Graph(Multi_G)  # 无向加权简单图
-    all_rows.append(top10_df(Multi_G, year))
-
-# ------------------------------------------------------------
-# 4. 保存
-result = pd.concat(all_rows, ignore_index=True)
-result.to_csv('Figure/centrality_top10.csv', index=False)
-print('✅ 已保存 centrality_top10.csv')
-print(result.head(15))
+    get_numbers_of_connect_countries_to_US(Multi_G, year)
+    print("---------------")
+# result = pd.concat(all_rows, ignore_index=True)
+# result.to_csv('Figure/centrality_top10.csv', index=False)
+# print('✅ 已保存 centrality_top10.csv')
+# print(result.head(15))
