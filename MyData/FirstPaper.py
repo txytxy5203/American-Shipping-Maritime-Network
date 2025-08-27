@@ -8,7 +8,7 @@ from collections import Counter
 from scipy.stats import entropy
 
 # ---------- 参数 ----------
-years = list(range(2017, 2022))
+# years = list(range(2017, 2022))
 
 
 # ---------- 工具函数 ----------
@@ -195,6 +195,43 @@ def get_numbers_of_connect_countries_to_US(G, year):
     }
     print(year)
     print(f'与美国连接的国家（去重）个数 = {len(connected_countries)}')
+def the_degree_of_connection_of_all_countries_to_the_US():
+    years = range(2017, 2022)
+    teu_rows, trips_rows = [], []
+
+    for year in years:
+        G = nx.read_graphml(f'../Data/{year}/US/US{year}.graphml')
+
+        country_stats = {}
+        for u, v, d in G.edges(data=True):
+            c_u = G.nodes[u].get('country', 'Unknown')
+            c_v = G.nodes[v].get('country', 'Unknown')
+            if 'United States' in [c_u, c_v] and c_u != c_v:
+                teu = float(d.get('volumeTEU', 1.0))
+                trips = 1.0
+                partner = c_u if c_v == 'United States' else c_v
+                country_stats.setdefault(partner, {'TEU': 0, 'Trips': 0})
+                country_stats[partner]['TEU'] += teu
+                country_stats[partner]['Trips'] += trips
+
+        # 每年两张榜单
+        for metric, label in [('TEU', 'TEU'), ('Trips', 'Trips')]:
+            top = (
+                pd.Series({k: v[label] for k, v in country_stats.items()})
+                .sort_values(ascending=False)
+                .head(10)
+                .reset_index()
+                .rename(columns={'index': 'country', 0: metric})
+                .assign(year=year)
+            )
+            (teu_rows if label == 'TEU' else trips_rows).append(top)
+
+    # 导出
+    pd.concat(teu_rows).to_csv('Figure/US_top10_TEU_bilateral.csv', index=False)
+    pd.concat(trips_rows).to_csv('Figure/US_top10_Times_bilateral.csv', index=False)
+
+    print('✅ 已生成双边统计：')
+    print(pd.concat(teu_rows).head())
 def draw_density_avgDegree_picture():
     # 1. 读数据
     df = pd.read_csv('network_evolution_14metrics.csv')
