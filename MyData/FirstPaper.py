@@ -7,10 +7,6 @@ import matplotlib.pyplot as plt
 from collections import Counter
 from scipy.stats import entropy
 
-# ---------- 参数 ----------
-# years = list(range(2017, 2022))
-
-
 # ---------- 工具函数 ----------
 def rich_club_phi(G, k):
     """无权无向 rich-club coefficient @ degree k"""
@@ -196,6 +192,10 @@ def get_numbers_of_connect_countries_to_US(G, year):
     print(year)
     print(f'与美国连接的国家（去重）个数 = {len(connected_countries)}')
 def the_degree_of_connection_of_all_countries_to_the_US():
+    '''
+    得到 Figure/US_top10_TEU_bilateral.csv  Figure/US_top10_Times_bilateral.csv  每年和美国联系程度的top10
+    :return:
+    '''
     years = range(2017, 2022)
     teu_rows, trips_rows = [], []
 
@@ -204,8 +204,8 @@ def the_degree_of_connection_of_all_countries_to_the_US():
 
         country_stats = {}
         for u, v, d in G.edges(data=True):
-            c_u = G.nodes[u].get('country', 'Unknown')
-            c_v = G.nodes[v].get('country', 'Unknown')
+            c_u = G.nodes[u].get('Country', 'Unknown')
+            c_v = G.nodes[v].get('Country', 'Unknown')
             if 'United States' in [c_u, c_v] and c_u != c_v:
                 teu = float(d.get('volumeTEU', 1.0))
                 trips = 1.0
@@ -232,6 +232,59 @@ def the_degree_of_connection_of_all_countries_to_the_US():
 
     print('✅ 已生成双边统计：')
     print(pd.concat(teu_rows).head())
+def draw_degree_of_connection_of_all_countries_to_the_US():
+    # 1) 读数据（TEU 或 Times 均可）
+    metrics = 'Times'
+    df = pd.read_csv(f'Figure/US_top10_{metrics}_bilateral.csv')  # 或 Trips 文件
+
+    # 2) 计算年度排名（1 最高）
+    df['rank'] = df.groupby('year')[metrics].rank(method='min', ascending=False)
+
+    # 3) 绘图
+    plt.figure(figsize=(7, 4.2))
+    # 2. 设置出版级样式
+    plt.rcParams['figure.dpi'] = 300
+    plt.rcParams['font.family'] = 'Times New Roman'
+    plt.rcParams['axes.labelsize'] = 12
+    plt.rcParams['xtick.labelsize'] = 11
+    plt.rcParams['ytick.labelsize'] = 11
+    plt.rcParams['legend.fontsize'] = 10
+    sns.set_style('whitegrid')  # 带方框边框
+    sns.lineplot(
+        data=df,
+        x='year',
+        y='rank',
+        hue='country',
+        marker='o',
+        linewidth=2.5,
+        palette='tab10'
+    )
+
+    # 4) 倒序 y 轴（1 在上）
+    plt.gca().invert_yaxis()
+    plt.xticks(range(2017, 2022))
+    plt.yticks(range(1, 11))
+    plt.ylim(10.5, 0.5)
+
+    # 5) 坐标轴
+    plt.xlabel('Year')
+    plt.ylabel('Rank')
+    plt.title('Top 10 Countries Ranked by U.S. Connection (2017–2021)', pad=15)
+
+    # 6) 图例放在右下角，不挡折线
+    plt.legend(
+        title='Country',
+        loc='lower right',  # 右下角
+        frameon=True,
+        fancybox=True,
+        shadow=False
+    )
+
+    plt.tight_layout()
+    plt.savefig(f'Figure/top10_rank_{metrics}.png', dpi=300, bbox_inches='tight')
+    plt.show()
+def calculate_graph_entrogy():
+
 def draw_density_avgDegree_picture():
     # 1. 读数据
     df = pd.read_csv('network_evolution_14metrics.csv')
@@ -454,16 +507,40 @@ def port_appearance_in_top10_across_centrality_metrics():
     freq_summary.to_csv('real_port_top10_frequency.csv', index=True)
     print(freq_summary.head())
 #endregion
+# ---------- 参数 ----------
+draw_degree_of_connection_of_all_countries_to_the_US()
 # all_rows = []  # 用于收集所有年份的 TOP10 结果
-for year in years:
-    file_path = f'../Data/{year}/US/US{year}.graphml'
-    if not os.path.exists(file_path):
-        print(f'⚠️ 文件不存在: {file_path}')
-        continue
-    Multi_G = nx.read_graphml(file_path)
-    get_numbers_of_connect_countries_to_US(Multi_G, year)
-    print("---------------")
+# years = list(range(2017, 2022))
+# for year in years:
+#     file_path = f'../Data/{year}/US/US{year}.graphml'
+#     if not os.path.exists(file_path):
+#         print(f'⚠️ 文件不存在: {file_path}')
+#         continue
+#     Multi_G = nx.read_graphml(file_path)
+#     get_numbers_of_connect_countries_to_US(Multi_G, year)
+#     print("---------------")
 # result = pd.concat(all_rows, ignore_index=True)
 # result.to_csv('Figure/centrality_top10.csv', index=False)
 # print('✅ 已保存 centrality_top10.csv')
 # print(result.head(15))
+
+
+
+# 把 Macau HongKong Taiwan 改成China
+# regions = {'Macau', 'Hong Kong', 'Taiwan'}
+# for year in years:
+#     path = f'../Data/{year}/US/US{year}.graphml'
+#     if not os.path.exists(path):
+#         print(f'⚠️ 文件不存在: {path}')
+#         continue
+#
+#     G = nx.read_graphml(path)
+#
+#     # 就地修改
+#     for n in G.nodes:
+#         if G.nodes[n].get('Country') in regions:
+#             G.nodes[n]['Country'] = 'China'
+#
+#     # 直接覆盖原文件
+#     nx.write_graphml(G, path)
+#     print(f'✅ 已覆盖 {path}')
