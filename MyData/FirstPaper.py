@@ -284,7 +284,38 @@ def draw_degree_of_connection_of_all_countries_to_the_US():
     plt.savefig(f'Figure/top10_rank_{metrics}.png', dpi=300, bbox_inches='tight')
     plt.show()
 def calculate_graph_entrogy():
+    years = range(2017, 2022)
+    results = []
 
+    for year in years:
+        path = f'../Data/{year}/US/US{year}.graphml'
+        if not os.path.exists(path):
+            print(f'⚠️ 文件不存在: {path}')
+            continue
+
+        G = nx.read_graphml(path)
+
+        # 节点总 TEU 强度（出 + 入）
+        strength = {n: 0.0 for n in G.nodes}
+        for u, v, d in G.edges(data=True):
+            w = float(d.get('volumeTEU', 1.0))
+            strength[u] += w
+            strength[v] += w
+
+        # 归一化概率
+        total = sum(strength.values())
+        if total == 0:
+            entropy = np.nan
+        else:
+            p = np.array(list(strength.values())) / total
+            entropy = -np.sum(p * np.log2(p + 1e-12))
+
+        results.append({'year': year, 'weighted_entropy': entropy})
+
+    # 保存 CSV
+    df_out = pd.DataFrame(results)
+    df_out.to_csv('Figure/weighted_entropy.csv', index=False)
+    print(df_out)
 def draw_density_avgDegree_picture():
     # 1. 读数据
     df = pd.read_csv('network_evolution_14metrics.csv')
@@ -508,7 +539,7 @@ def port_appearance_in_top10_across_centrality_metrics():
     print(freq_summary.head())
 #endregion
 # ---------- 参数 ----------
-draw_degree_of_connection_of_all_countries_to_the_US()
+calculate_graph_entrogy()
 # all_rows = []  # 用于收集所有年份的 TOP10 结果
 # years = list(range(2017, 2022))
 # for year in years:
