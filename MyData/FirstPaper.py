@@ -284,6 +284,10 @@ def draw_degree_of_connection_of_all_countries_to_the_US():
     plt.savefig(f'Figure/top10_rank_{metrics}.png', dpi=300, bbox_inches='tight')
     plt.show()
 def calculate_graph_entrogy():
+    '''
+    计算图的熵值
+    :return:
+    '''
     years = range(2017, 2022)
     results = []
 
@@ -316,6 +320,34 @@ def calculate_graph_entrogy():
     df_out = pd.DataFrame(results)
     df_out.to_csv('Figure/weighted_entropy.csv', index=False)
     print(df_out)
+def calculate_spectral_radius():
+    years = range(2017, 2022)
+    records = []
+
+    for year in years:
+        path = f'../Data/{year}/US/US{year}.graphml'
+        if not os.path.exists(path):
+            print(f'⚠️ 文件不存在: {path}')
+            continue
+
+        G = nx.read_graphml(path)
+
+        # 1) 无权谱半径
+        A = nx.adjacency_matrix(G).astype(float)
+        rho_unw = max(abs(np.linalg.eigvals(A.toarray())))
+
+        # 2) TEU 加权谱半径（把邻接矩阵元素换成 volumeTEU）
+        A_w = nx.adjacency_matrix(G, weight='volumeTEU').astype(float)
+        rho_w = max(abs(np.linalg.eigvals(A_w.toarray())))
+
+        records.append({'year': year,
+                        'unweighted_rho': rho_unw,
+                        'weighted_rho': rho_w})
+
+    # 保存
+    df = pd.DataFrame(records)
+    df.to_csv('Figure/spectral_radius_year.csv', index=False)
+    print(df)
 def draw_density_avgDegree_picture():
     # 1. 读数据
     df = pd.read_csv('network_evolution_14metrics.csv')
@@ -539,7 +571,7 @@ def port_appearance_in_top10_across_centrality_metrics():
     print(freq_summary.head())
 #endregion
 # ---------- 参数 ----------
-calculate_graph_entrogy()
+calculate_spectral_radius()
 # all_rows = []  # 用于收集所有年份的 TOP10 结果
 # years = list(range(2017, 2022))
 # for year in years:
