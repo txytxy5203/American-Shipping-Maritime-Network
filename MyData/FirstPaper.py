@@ -348,6 +348,86 @@ def calculate_spectral_radius():
     df = pd.DataFrame(records)
     df.to_csv('Figure/spectral_radius_year.csv', index=False)
     print(df)
+def calculate_structural_homogeneity():
+    '''
+    结构同质性
+    :return:
+    '''
+    YEARS = range(2017, 2022)
+    records = []
+
+    DATA_DIR = 'Data'
+    OUTPUT_DIR = 'Figure'
+    os.makedirs(OUTPUT_DIR, exist_ok=True)
+
+    def calc_structural_homogeneity(values):
+        if len(values) <= 1:
+            return np.nan
+        avg = np.mean(values)
+        std = np.std(values, ddof=0)
+        return 1 - std / avg if avg else np.nan
+
+    for y in YEARS:
+        path = f'../{DATA_DIR}/{y}/US/US{y}.graphml'
+        if not os.path.exists(path):
+            print(f'⚠️ 文件不存在: {path}')
+            continue
+        # G = nx.Graph(nx.read_graphml(path))
+
+        G = nx.read_graphml(path)
+
+        # 1) 节点强度汇总
+        node_TEU = {n: float(G.nodes[n].get('volumeTEU', 0)) for n in G.nodes}
+        node_trips = {n: 0.0 for n in G.nodes}
+        for u, v in G.edges():
+            node_trips[u] += 1
+            node_trips[v] += 1
+
+        rec = {
+            'year': y,
+            'unweighted': calc_structural_homogeneity(
+                [G.degree(n) for n in G.nodes]),
+            'weighted_TEU': calc_structural_homogeneity(
+                list(node_TEU.values())),
+            'weighted_trips': calc_structural_homogeneity(
+                list(node_trips.values()))
+        }
+        records.append(rec)
+
+    df = pd.DataFrame(records)
+    df.to_csv(f'{OUTPUT_DIR}/structural_homogeneity_year.csv', index=False)
+    print(df)
+def calculate_assortativity():
+    '''
+    计算同配性
+    :return:
+    '''
+    YEARS = range(2017, 2022)
+    DATA_DIR = '../Data'
+    OUTPUT_DIR = '../Figure'
+    os.makedirs(OUTPUT_DIR, exist_ok=True)
+
+    def calc_assortativity(G, weight=None, attr=None):
+        """返回三种同配系数"""
+        if attr is not None:
+            return nx.attribute_assortativity_coefficient(G, attr)
+        if weight is not None:
+            return nx.degree_pearson_correlation_coefficient(G, weight=weight)
+        return nx.degree_assortativity_coefficient(G)
+
+    records = []
+    for y in YEARS:
+        G = nx.Graph(nx.read_graphml(f'{DATA_DIR}/{y}/US/US{y}.graphml'))
+        rec = {
+            'year': y,
+            'degree_assort': calc_assortativity(G),
+            'weighted_TEU': calc_assortativity(G, weight='volumeTEU'),
+        }
+        records.append(rec)
+
+    df = pd.DataFrame(records)
+    df.to_csv(f'{OUTPUT_DIR}/US_assortativity_year.csv', index=False)
+    print(df)
 def draw_density_avgDegree_picture():
     # 1. 读数据
     df = pd.read_csv('network_evolution_14metrics.csv')
@@ -571,7 +651,7 @@ def port_appearance_in_top10_across_centrality_metrics():
     print(freq_summary.head())
 #endregion
 # ---------- 参数 ----------
-calculate_spectral_radius()
+calculate_assortativity()
 # all_rows = []  # 用于收集所有年份的 TOP10 结果
 # years = list(range(2017, 2022))
 # for year in years:
