@@ -5,6 +5,8 @@ import pandas as pd
 import seaborn as sns
 import matplotlib.pyplot as plt
 from collections import Counter
+
+from matplotlib.ticker import ScalarFormatter
 from scipy.stats import entropy
 
 # ---------- 工具函数 ----------
@@ -363,18 +365,22 @@ def calculate_structural_homogeneity():
     def calc_structural_homogeneity(values):
         if len(values) <= 1:
             return np.nan
+        print(y)
         avg = np.mean(values)
+        print(avg)
         std = np.std(values, ddof=0)
+        print(std)
         return 1 - std / avg if avg else np.nan
+        print("-------------")
 
     for y in YEARS:
         path = f'../{DATA_DIR}/{y}/US/US{y}.graphml'
         if not os.path.exists(path):
             print(f'⚠️ 文件不存在: {path}')
             continue
-        # G = nx.Graph(nx.read_graphml(path))
+        G = nx.Graph(nx.read_graphml(path))
 
-        G = nx.read_graphml(path)
+        # G = nx.read_graphml(path)
 
         # 1) 节点强度汇总
         node_TEU = {n: float(G.nodes[n].get('volumeTEU', 0)) for n in G.nodes}
@@ -387,10 +393,10 @@ def calculate_structural_homogeneity():
             'year': y,
             'unweighted': calc_structural_homogeneity(
                 [G.degree(n) for n in G.nodes]),
-            'weighted_TEU': calc_structural_homogeneity(
-                list(node_TEU.values())),
-            'weighted_trips': calc_structural_homogeneity(
-                list(node_trips.values()))
+            # 'weighted_TEU': calc_structural_homogeneity(
+            #     list(node_TEU.values()))
+            # 'weighted_trips': calc_structural_homogeneity(
+            #     list(node_trips.values()))
         }
         records.append(rec)
 
@@ -427,6 +433,46 @@ def calculate_assortativity():
 
     df = pd.DataFrame(records)
     df.to_csv(f'{OUTPUT_DIR}/US_assortativity_year.csv', index=False)
+    print(df)
+def calculate_total_TEU():
+    YEARS = range(2017, 2022)  # 一年一个单位
+    DATA_DIR = '../Data'
+    OUTPUT_DIR = 'Figure'
+    os.makedirs(OUTPUT_DIR, exist_ok=True)
+
+    records = []
+    for y in YEARS:
+        path = f'{DATA_DIR}/{y}/US/US{y}.graphml'
+        if not os.path.exists(path):
+            print(f'⚠️ 文件不存在: {path}')
+            continue
+        G = nx.read_graphml(path)
+        total_teu = sum(float(d.get('volumeTEU', 0)) for _, _, d in G.edges(data=True))
+        records.append({'year': y, 'total_TEU': total_teu})
+
+    df = pd.DataFrame(records)
+    df.to_csv(f'{OUTPUT_DIR}/US_total_TEU_year.csv', index=False)
+
+    fig, ax = plt.subplots(figsize=(7, 4))
+    sns.set_style('whitegrid')
+    sns.lineplot(data=df, x='year', y='total_TEU', marker='o', lw=2.5)
+
+    # 1. 强制整年横坐标
+    ax.set_xticks(list(YEARS))
+
+    # 2. 纵轴刻度：2×10⁷、3×10⁷ …
+    ax.yaxis.set_major_formatter(ScalarFormatter(useMathText=True))
+    ax.ticklabel_format(style='sci', axis='y', scilimits=(7, 7))
+
+    # 3. 其余不变
+    plt.title('Total TEU Flow of U.S. Port Network (2017–2021)', fontsize=14)
+    plt.xlabel('Year')
+    plt.ylabel('Total TEU')
+    plt.tight_layout()
+    plt.savefig(f'{OUTPUT_DIR}/US_total_TEU_year.png', dpi=300, bbox_inches='tight')
+
+    plt.show()
+
     print(df)
 def draw_density_avgDegree_picture():
     # 1. 读数据
@@ -651,7 +697,7 @@ def port_appearance_in_top10_across_centrality_metrics():
     print(freq_summary.head())
 #endregion
 # ---------- 参数 ----------
-calculate_assortativity()
+calculate_total_TEU()
 # all_rows = []  # 用于收集所有年份的 TOP10 结果
 # years = list(range(2017, 2022))
 # for year in years:

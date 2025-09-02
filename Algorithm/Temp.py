@@ -25,9 +25,9 @@ G.add_edge(1, 3, hs=2)
 #     out_degree = G.out_degree(node)
 #     in_degree = G.in_degree(node)
 
-a = "12"
-a = a[:2]
-print(a)
+# 一维数组
+arr_1d = np.array([10, 20, 30])
+print("一维数组的标准差：", np.std(arr_1d))
 
 
 
