@@ -474,6 +474,36 @@ def calculate_total_TEU():
     plt.show()
 
     print(df)
+def calculate_US_top10_node_pairs_by_TEU_year():
+    YEARS = range(2017, 2022)
+    DATA_DIR = '../Data'
+    OUTPUT_DIR = 'Figure'
+    os.makedirs(OUTPUT_DIR, exist_ok=True)
+
+    all_rows = []
+
+    for y in YEARS:
+        G = nx.read_graphml(f'{DATA_DIR}/{y}/US/US{y}.graphml')
+
+        # 用 MultiGraph 方便累加
+        MG = nx.MultiGraph(G)
+
+        # 按节点对累加 TEU
+        flows = {}
+        for u, v, d in MG.edges(data=True):
+            pair = tuple(sorted([u, v]))  # 无向，排序去重
+            flows[pair] = flows.get(pair, 0) + float(d.get('volumeTEU', 0))
+
+        # 转成 DataFrame
+        data = [{'year': y, 'from': pair[0], 'to': pair[1], 'total_TEU': teu}
+                for pair, teu in flows.items()]
+
+        # 当年 Top10
+        top10 = pd.DataFrame(data).sort_values('total_TEU', ascending=False).head(10)
+        all_rows.append(top10)
+
+    df = pd.concat(all_rows, ignore_index=True)
+    df.to_csv(f'{OUTPUT_DIR}/US_top10_node_pairs_by_TEU_year.csv', index=False)
 def draw_density_avgDegree_picture():
     # 1. 读数据
     df = pd.read_csv('network_evolution_14metrics.csv')
@@ -697,7 +727,7 @@ def port_appearance_in_top10_across_centrality_metrics():
     print(freq_summary.head())
 #endregion
 # ---------- 参数 ----------
-calculate_total_TEU()
+calculate_US_top10_node_pairs_by_TEU_year()
 # all_rows = []  # 用于收集所有年份的 TOP10 结果
 # years = list(range(2017, 2022))
 # for year in years:
