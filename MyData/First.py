@@ -1,9 +1,19 @@
+import sys
+sys.path.append('../Algorithm')
 import os
-import numpy as np
 import networkx as nx
-import pandas as pd
 import seaborn as sns
+import pandas as pd
+import numpy as np
 import matplotlib.pyplot as plt
+from mpl_toolkits.basemap import Basemap
+import geopandas as gpd
+from shapely.geometry import Point, LineString
+from geopy.distance import great_circle
+from geopy.point import Point as GeopyPoint
+# from geosphere import intermediate_points  # 用于生成大圆路径点
+from Algorithm.ConstructNetwork import ConstructNetwork
+from Algorithm.Read import Read
 from collections import Counter
 
 from matplotlib.ticker import ScalarFormatter
@@ -726,40 +736,110 @@ def port_appearance_in_top10_across_centrality_metrics():
     freq_summary.to_csv('real_port_top10_frequency.csv', index=True)
     print(freq_summary.head())
 #endregion
-# ---------- 参数 ----------
-calculate_US_top10_node_pairs_by_TEU_year()
-# all_rows = []  # 用于收集所有年份的 TOP10 结果
-# years = list(range(2017, 2022))
-# for year in years:
-#     file_path = f'../Data/{year}/US/US{year}.graphml'
-#     if not os.path.exists(file_path):
-#         print(f'⚠️ 文件不存在: {file_path}')
-#         continue
-#     Multi_G = nx.read_graphml(file_path)
-#     get_numbers_of_connect_countries_to_US(Multi_G, year)
-#     print("---------------")
-# result = pd.concat(all_rows, ignore_index=True)
-# result.to_csv('Figure/centrality_top10.csv', index=False)
-# print('✅ 已保存 centrality_top10.csv')
-# print(result.head(15))
+
+
+def world_ports_map():
+    # 1. 读 Top10 边
+    edges = pd.read_csv('Figure/US_top10_node_pairs_by_TEU_year.csv')
+
+    # 2. 读港口坐标
+    Port_Data = ConstructNetwork.Read_Port_Data()
+    port_coords = {
+        node: (float(Port_Data[node]["longitude"]),
+               float(Port_Data[node]["latitude"]))
+        for node in Port_Data
+        if "longitude" in Port_Data[node] and "latitude" in Port_Data[node]
+    }
+
+    # 3. 只保留 Top10 用到的港口
+    needed_ports = set(edges['from']).union(set(edges['to']))
+    coords = {p: port_coords[p] for p in needed_ports}
+
+    # 4. 创建地图
+    fig = plt.figure(figsize=(10, 6))
+
+    m = Basemap(projection='ortho',
+                lat_0=90, lon_0=0,  # 中心点为北极点，经度0°
+                resolution='c')
+
+    m.drawmapboundary(fill_color='#D0CFD4')
+    m.fillcontinents(color='#EFEFEF', lake_color='#D0CFD4')
+    m.drawcoastlines()
+    m.drawcountries(linewidth=0.5, color='black')  # 绘制国家边界，设置线宽和颜色
+
+    # 5. 画港口
+    px, py = m([c[0] for c in coords.values()],
+               [c[1] for c in coords.values()])
+    m.scatter(px, py, marker='o', color='red', zorder=10, label='Top-10 Ports')
+
+    # 6. 画 Top10 航线（大圆航线）
+    for _, row in edges.iterrows():
+        u, v = row['from'], row['to']
+        lon1, lat1 = coords[u]
+        lon2, lat2 = coords[v]
+
+        # 大圆航线：将路径拆成 50 段，避免直线
+        m.drawgreatcircle(lon1, lat1, lon2, lat2,
+                          linewidth=2,
+                          color='blue',
+                          zorder=5)
+
+    plt.title('Top 10 TEU Great-Circle Routes on World Map')
+    plt.legend()
+    plt.savefig('Figure/US_top10_links_worldmap.png', dpi=300, bbox_inches='tight')
+    plt.show()
+def world_ports_map2():
+    # 1. 读 Top10 边
+    edges = pd.read_csv('Figure/US_top10_node_pairs_by_TEU_year.csv')
+
+    # 2. 读港口坐标
+    Port_Data = ConstructNetwork.Read_Port_Data()
+    port_coords = {
+        node: (float(Port_Data[node]["longitude"]),
+               float(Port_Data[node]["latitude"]))
+        for node in Port_Data
+        if "longitude" in Port_Data[node] and "latitude" in Port_Data[node]
+    }
+
+    # 3. 只保留 Top10 用到的港口
+    needed_ports = set(edges['from']).union(set(edges['to']))
+    coords = {p: port_coords[p] for p in needed_ports}
+
+    # 4. 创建地图
+    fig = plt.figure(figsize=(10, 6))
+
+    m = Basemap(projection='ortho',
+                lat_0=90, lon_0=0,  # 中心点为北极点，经度0°
+                resolution='c')
+
+    m.drawmapboundary(fill_color='#D0CFD4')
+    m.fillcontinents(color='#EFEFEF', lake_color='#D0CFD4')
+    m.drawcoastlines()
+    m.drawcountries(linewidth=0.5, color='black')  # 绘制国家边界，设置线宽和颜色
+
+    # 5. 画港口
+    px, py = m([c[0] for c in coords.values()],
+               [c[1] for c in coords.values()])
+    m.scatter(px, py, marker='o', color='red', zorder=10, label='Top-10 Ports')
+
+    # 6. 画 Top10 航线（大圆航线）
+    for _, row in edges.iterrows():
+        u, v = row['from'], row['to']
+        lon1, lat1 = coords[u]
+        lon2, lat2 = coords[v]
+
+        # 大圆航线：将路径拆成 50 段，避免直线
+        m.drawgreatcircle(lon1, lat1, lon2, lat2,
+                          linewidth=2,
+                          color='blue',
+                          zorder=5)
+
+    plt.title('Top 10 TEU Great-Circle Routes on World Map')
+    plt.legend()
+    plt.savefig('Figure/US_top10_links_worldmap.png', dpi=300, bbox_inches='tight')
+    plt.show()
 
 
 
-# 把 Macau HongKong Taiwan 改成China
-# regions = {'Macau', 'Hong Kong', 'Taiwan'}
-# for year in years:
-#     path = f'../Data/{year}/US/US{year}.graphml'
-#     if not os.path.exists(path):
-#         print(f'⚠️ 文件不存在: {path}')
-#         continue
-#
-#     G = nx.read_graphml(path)
-#
-#     # 就地修改
-#     for n in G.nodes:
-#         if G.nodes[n].get('Country') in regions:
-#             G.nodes[n]['Country'] = 'China'
-#
-#     # 直接覆盖原文件
-#     nx.write_graphml(G, path)
-#     print(f'✅ 已覆盖 {path}')
+
+world_ports_map()
