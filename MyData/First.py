@@ -397,46 +397,8 @@ def calculate_assortativity():
     df = pd.DataFrame(records)
     df.to_csv(f'{OUTPUT_DIR}/US_assortativity_year.csv', index=False)
     print(df)
-def calculate_total_TEU():
-    YEARS = range(2017, 2022)  # 一年一个单位
-    DATA_DIR = '../Data'
-    OUTPUT_DIR = 'Figure'
-    os.makedirs(OUTPUT_DIR, exist_ok=True)
 
-    records = []
-    for y in YEARS:
-        path = f'{DATA_DIR}/{y}/US/US{y}.graphml'
-        if not os.path.exists(path):
-            print(f'⚠️ 文件不存在: {path}')
-            continue
-        G = nx.read_graphml(path)
-        total_teu = sum(float(d.get('volumeTEU', 0)) for _, _, d in G.edges(data=True))
-        records.append({'year': y, 'total_TEU': total_teu})
 
-    df = pd.DataFrame(records)
-    df.to_csv(f'{OUTPUT_DIR}/US_total_TEU_year.csv', index=False)
-
-    fig, ax = plt.subplots(figsize=(7, 4))
-    sns.set_style('whitegrid')
-    sns.lineplot(data=df, x='year', y='total_TEU', marker='o', lw=2.5)
-
-    # 1. 强制整年横坐标
-    ax.set_xticks(list(YEARS))
-
-    # 2. 纵轴刻度：2×10⁷、3×10⁷ …
-    ax.yaxis.set_major_formatter(ScalarFormatter(useMathText=True))
-    ax.ticklabel_format(style='sci', axis='y', scilimits=(7, 7))
-
-    # 3. 其余不变
-    plt.title('Total TEU Flow of U.S. Port Network (2017–2021)', fontsize=14)
-    plt.xlabel('Year')
-    plt.ylabel('Total TEU')
-    plt.tight_layout()
-    plt.savefig(f'{OUTPUT_DIR}/US_total_TEU_year.png', dpi=300, bbox_inches='tight')
-
-    plt.show()
-
-    print(df)
 def calculate_US_top10_node_pairs_by_TEU_year():
     YEARS = range(2017, 2022)
     DATA_DIR = '../Data'
@@ -689,56 +651,7 @@ def port_appearance_in_top10_across_centrality_metrics():
     freq_summary.to_csv('real_port_top10_frequency.csv', index=True)
     print(freq_summary.head())
 #endregion
-def world_ports_map():
-    # 1. 读 Top10 边
-    edges = pd.read_csv('Figure/US_top10_node_pairs_by_TEU_year.csv')
 
-    # 2. 读港口坐标
-    Port_Data = ConstructNetwork.Read_Port_Data()
-    port_coords = {
-        node: (float(Port_Data[node]["longitude"]),
-               float(Port_Data[node]["latitude"]))
-        for node in Port_Data
-        if "longitude" in Port_Data[node] and "latitude" in Port_Data[node]
-    }
-
-    # 3. 只保留 Top10 用到的港口
-    needed_ports = set(edges['from']).union(set(edges['to']))
-    coords = {p: port_coords[p] for p in needed_ports}
-
-    # 4. 创建地图
-    fig = plt.figure(figsize=(10, 6))
-
-    m = Basemap(projection='ortho',
-                lat_0=90, lon_0=0,  # 中心点为北极点，经度0°
-                resolution='c')
-
-    m.drawmapboundary(fill_color='#D0CFD4')
-    m.fillcontinents(color='#EFEFEF', lake_color='#D0CFD4')
-    m.drawcoastlines()
-    m.drawcountries(linewidth=0.5, color='black')  # 绘制国家边界，设置线宽和颜色
-
-    # 5. 画港口
-    px, py = m([c[0] for c in coords.values()],
-               [c[1] for c in coords.values()])
-    m.scatter(px, py, marker='o', color='red', zorder=10, label='Top-10 Ports')
-
-    # 6. 画 Top10 航线（大圆航线）
-    for _, row in edges.iterrows():
-        u, v = row['from'], row['to']
-        lon1, lat1 = coords[u]
-        lon2, lat2 = coords[v]
-
-        # 大圆航线：将路径拆成 50 段，避免直线
-        m.drawgreatcircle(lon1, lat1, lon2, lat2,
-                          linewidth=2,
-                          color='blue',
-                          zorder=5)
-
-    plt.title('Top 10 TEU Great-Circle Routes on World Map')
-    plt.legend()
-    plt.savefig('Figure/US_top10_links_worldmap.png', dpi=300, bbox_inches='tight')
-    plt.show()
 def world_ports_map2():
     # 利用matplotlib内置函数生成贝塞尔曲线
     def draw_bezier_route(m, ax, start_lonlat, end_lonlat, control_factor=0.3, **kwargs):
@@ -846,15 +759,16 @@ def world_ports_map2():
     plt.savefig('Figure/US_top10_bezier_routes_matplotlib.png', dpi=300, bbox_inches='tight')
     plt.show()
 
-def all_in_one(mul_g, year) -> dict:
+
+
+# 处理过的函数
+def all_in_one(g, year) -> dict:
     """
     统一计算相应的基础指标
-    :param mul_g: 是一个有向多边的图
+    :param g: 是一个无向无多边的简单图
     :param year:  图的年份
     :return: 基础信息的表格
     """
-    g = nx.Graph(mul_g)
-
 
     # 先算能够直接计算的
     N = g.number_of_nodes()
@@ -915,8 +829,101 @@ def all_in_one(mul_g, year) -> dict:
         "spectral_radius": spectral_radius,
         "mcc_sizes": mcc_sizes
     }
+def draw_total_TEU():
+    """
+    画出总的TEU变化图   有点丑下次记得修改
+    :return:
+    """
+    YEARS = range(2017, 2022)  # 一年一个单位
+    DATA_DIR = '../Data'
+    OUTPUT_DIR = 'Figure'
+    os.makedirs(OUTPUT_DIR, exist_ok=True)
+
+    records = []
+    for y in YEARS:
+        path = f'{DATA_DIR}/{y}/US/US{y}.graphml'
+        if not os.path.exists(path):
+            print(f'⚠️ 文件不存在: {path}')
+            continue
+        G = nx.read_graphml(path)
+        total_teu = sum(float(d.get('volumeTEU', 0)) for _, _, d in G.edges(data=True))
+        records.append({'year': y, 'total_TEU': total_teu})
+
+    df = pd.DataFrame(records)
+    df.to_csv(f'{OUTPUT_DIR}/US_total_TEU_year.csv', index=False)
+
+    fig, ax = plt.subplots(figsize=(7, 4))
+    sns.set_style('whitegrid')
+    sns.lineplot(data=df, x='year', y='total_TEU', marker='o', lw=2.5)
+
+    # 1. 强制整年横坐标
+    ax.set_xticks(list(YEARS))
+
+    # 2. 纵轴刻度：2×10⁷、3×10⁷ …
+    ax.yaxis.set_major_formatter(ScalarFormatter(useMathText=True))
+    ax.ticklabel_format(style='sci', axis='y', scilimits=(7, 7))
+
+    # 3. 其余不变
+    plt.title('Total TEU Flow of U.S. Port Network (2017–2021)', fontsize=14)
+    plt.xlabel('Year')
+    plt.ylabel('Total TEU')
+    plt.tight_layout()
+    plt.savefig(f'{OUTPUT_DIR}/US_total_TEU_year.png', dpi=300, bbox_inches='tight')
+
+    plt.show()
+def draw_top10_TEU_edges_map():
+    # 1. 读 Top10 边
+    edges = pd.read_csv('Figure/US_top10_node_pairs_by_TEU_year.csv')
+
+    # 2. 读港口坐标
+    Port_Data = ConstructNetwork.Read_Port_Data()
+    port_coords = {
+        node: (float(Port_Data[node]["longitude"]),
+               float(Port_Data[node]["latitude"]))
+        for node in Port_Data
+        if "longitude" in Port_Data[node] and "latitude" in Port_Data[node]
+    }
+
+    # 3. 只保留 Top10 用到的港口
+    needed_ports = set(edges['from']).union(set(edges['to']))
+    coords = {p: port_coords[p] for p in needed_ports}
+
+    # 4. 创建地图
+    fig = plt.figure(figsize=(10, 6))
+
+    m = Basemap(projection='ortho',
+                lat_0=90, lon_0=0,  # 中心点为北极点，经度0°
+                resolution='c')
+
+    m.drawmapboundary(fill_color='#D0CFD4')
+    m.fillcontinents(color='#EFEFEF', lake_color='#D0CFD4')
+    m.drawcoastlines()
+    m.drawcountries(linewidth=0.5, color='black')  # 绘制国家边界，设置线宽和颜色
+
+    # 5. 画港口
+    px, py = m([c[0] for c in coords.values()],
+               [c[1] for c in coords.values()])
+    m.scatter(px, py, marker='o', color='red', zorder=10, label='Top-10 Ports')
+
+    # 6. 画 Top10 航线（大圆航线）
+    for _, row in edges.iterrows():
+        u, v = row['from'], row['to']
+        lon1, lat1 = coords[u]
+        lon2, lat2 = coords[v]
+
+        # 大圆航线：将路径拆成 50 段，避免直线
+        m.drawgreatcircle(lon1, lat1, lon2, lat2,
+                          linewidth=2,
+                          color='blue',
+                          zorder=5)
+
+    plt.title('Top 10 TEU Great-Circle Routes on World Map')
+    plt.legend()
+    plt.savefig('Figure/US_top10_links_worldmap.png', dpi=300, bbox_inches='tight')
+    plt.show()
 
 
+# Main
 structure_metrics = []
 years = range(2017, 2022)
 
@@ -926,10 +933,18 @@ for year in years:
         print(f'⚠️ 文件不存在: {file_path}')
         continue
     Multi_G = nx.read_graphml(file_path)
-    result_year = all_in_one(Multi_G, year)
+    G = nx.Graph(Multi_G)
+
+
+    G_null = G.copy()
+    nx.double_edge_swap(G_null, nswap=20000, max_tries=100000)
+    G_null.remove_edges_from(nx.selfloop_edges(G_null))
+
+    result_year = all_in_one(G_null, year)
     structure_metrics.append(result_year)
     print(f"{year} is already down!")
 
 # 保存成csv
 df = pd.DataFrame(structure_metrics)
-df.to_csv(f'Figure/all_in_one.csv')
+df.to_csv(f'Figure/all_in_one_zero_model.csv')
+
