@@ -295,43 +295,6 @@ def draw_degree_of_connection_of_all_countries_to_the_US():
     plt.tight_layout()
     plt.savefig(f'Figure/top10_rank_{metrics}.png', dpi=300, bbox_inches='tight')
     plt.show()
-def calculate_graph_entrogy():
-    '''
-    计算图的熵值
-    :return:
-    '''
-    years = range(2017, 2022)
-    results = []
-
-    for year in years:
-        path = f'../Data/{year}/US/US{year}.graphml'
-        if not os.path.exists(path):
-            print(f'⚠️ 文件不存在: {path}')
-            continue
-
-        G = nx.read_graphml(path)
-
-        # 节点总 TEU 强度（出 + 入）
-        strength = {n: 0.0 for n in G.nodes}
-        for u, v, d in G.edges(data=True):
-            w = float(d.get('volumeTEU', 1.0))
-            strength[u] += w
-            strength[v] += w
-
-        # 归一化概率
-        total = sum(strength.values())
-        if total == 0:
-            entropy = np.nan
-        else:
-            p = np.array(list(strength.values())) / total
-            entropy = -np.sum(p * np.log2(p + 1e-12))
-
-        results.append({'year': year, 'weighted_entropy': entropy})
-
-    # 保存 CSV
-    df_out = pd.DataFrame(results)
-    df_out.to_csv('Figure/weighted_entropy.csv', index=False)
-    print(df_out)
 def calculate_spectral_radius():
     years = range(2017, 2022)
     records = []
@@ -342,19 +305,24 @@ def calculate_spectral_radius():
             print(f'⚠️ 文件不存在: {path}')
             continue
 
-        G = nx.read_graphml(path)
+        Mul_G = nx.read_graphml(path)
+        G = nx.Graph(Mul_G)
 
         # 1) 无权谱半径
-        A = nx.adjacency_matrix(G).astype(float)
+        A = nx.adjacency_matrix(G).astype(float).astype(float)
+
+
         rho_unw = max(abs(np.linalg.eigvals(A.toarray())))
 
         # 2) TEU 加权谱半径（把邻接矩阵元素换成 volumeTEU）
-        A_w = nx.adjacency_matrix(G, weight='volumeTEU').astype(float)
-        rho_w = max(abs(np.linalg.eigvals(A_w.toarray())))
+        # A_w = nx.adjacency_matrix(G, weight='volumeTEU').astype(float)
+        # rho_w = max(abs(np.linalg.eigvals(A_w.toarray())))
 
         records.append({'year': year,
-                        'unweighted_rho': rho_unw,
-                        'weighted_rho': rho_w})
+                        'unweighted_rho': rho_unw})
+        # records.append({'year': year,
+        #                 'unweighted_rho': rho_unw,
+        #                 'weighted_rho': rho_w})
 
     # 保存
     df = pd.DataFrame(records)
@@ -366,6 +334,7 @@ def calculate_structural_homogeneity():
     :return:
     '''
     YEARS = range(2017, 2022)
+
     records = []
 
     DATA_DIR = 'Data'
@@ -375,11 +344,9 @@ def calculate_structural_homogeneity():
     def calc_structural_homogeneity(values):
         if len(values) <= 1:
             return np.nan
-        print(y)
+        pd.Series(values, name='col').to_csv('list.csv', index=False)
         avg = np.mean(values)
-        print(avg)
         std = np.std(values, ddof=0)
-        print(std)
         return 1 - std / avg if avg else np.nan
         print("-------------")
 
@@ -390,26 +357,12 @@ def calculate_structural_homogeneity():
             continue
         G = nx.Graph(nx.read_graphml(path))
 
-        # G = nx.read_graphml(path)
-
-        # 1) 节点强度汇总
-        node_TEU = {n: float(G.nodes[n].get('volumeTEU', 0)) for n in G.nodes}
-        node_trips = {n: 0.0 for n in G.nodes}
-        for u, v in G.edges():
-            node_trips[u] += 1
-            node_trips[v] += 1
-
         rec = {
             'year': y,
             'unweighted': calc_structural_homogeneity(
                 [G.degree(n) for n in G.nodes]),
-            # 'weighted_TEU': calc_structural_homogeneity(
-            #     list(node_TEU.values()))
-            # 'weighted_trips': calc_structural_homogeneity(
-            #     list(node_trips.values()))
         }
         records.append(rec)
-
     df = pd.DataFrame(records)
     df.to_csv(f'{OUTPUT_DIR}/structural_homogeneity_year.csv', index=False)
     print(df)
@@ -736,8 +689,6 @@ def port_appearance_in_top10_across_centrality_metrics():
     freq_summary.to_csv('real_port_top10_frequency.csv', index=True)
     print(freq_summary.head())
 #endregion
-
-
 def world_ports_map():
     # 1. 读 Top10 边
     edges = pd.read_csv('Figure/US_top10_node_pairs_by_TEU_year.csv')
@@ -789,6 +740,53 @@ def world_ports_map():
     plt.savefig('Figure/US_top10_links_worldmap.png', dpi=300, bbox_inches='tight')
     plt.show()
 def world_ports_map2():
+    # 利用matplotlib内置函数生成贝塞尔曲线
+    def draw_bezier_route(m, ax, start_lonlat, end_lonlat, control_factor=0.3, **kwargs):
+        """
+        使用matplotlib.path绘制贝塞尔曲线航线
+        m: Basemap实例
+        ax: 绘图轴对象
+        start_lonlat: 起点经纬度 (lon, lat)
+        end_lonlat: 终点经纬度 (lon, lat)
+        control_factor: 控制点偏移因子（控制弯曲程度，0-1之间）
+        """
+        # 转换经纬度到投影坐标
+        start_x, start_y = m(*start_lonlat)
+        end_x, end_y = m(*end_lonlat)
+
+        # 计算中间控制点（基于两点连线的垂直方向偏移）
+        mid_x = (start_x + end_x) / 2
+        mid_y = (start_y + end_y) / 2
+
+        # 计算垂直偏移方向
+        dx = end_x - start_x
+        dy = end_y - start_y
+        offset_x = -dy * control_factor  # 垂直方向x偏移
+        offset_y = dx * control_factor  # 垂直方向y偏移
+
+        # 贝塞尔曲线的控制点
+        control_x = mid_x + offset_x
+        control_y = mid_y + offset_y
+
+        # 定义贝塞尔曲线路径（Path对象支持贝塞尔曲线指令）
+        # 路径指令：MOVETO -> CURVE3（二次贝塞尔曲线）-> LINETO
+        vertices = [
+            (start_x, start_y),  # 起点
+            (control_x, control_y),  # 控制点
+            (end_x, end_y)  # 终点
+        ]
+        codes = [
+            Path.MOVETO,  # 移动到起点
+            Path.CURVE3,  # 二次贝塞尔曲线到终点（使用控制点）
+            Path.LINETO  # 确保终点连接
+        ]
+
+        # 创建路径并绘制
+        path = Path(vertices, codes)
+        patch = patches.PathPatch(path, **kwargs)
+        ax.add_patch(patch)
+        return patch
+
     # 1. 读 Top10 边
     edges = pd.read_csv('Figure/US_top10_node_pairs_by_TEU_year.csv')
 
@@ -803,43 +801,135 @@ def world_ports_map2():
 
     # 3. 只保留 Top10 用到的港口
     needed_ports = set(edges['from']).union(set(edges['to']))
-    coords = {p: port_coords[p] for p in needed_ports}
+    coords = {p: port_coords[p] for p in needed_ports if p in port_coords}
 
     # 4. 创建地图
-    fig = plt.figure(figsize=(10, 6))
+    fig = plt.figure(figsize=(10, 10))
+    ax = fig.add_subplot(111)  # 获取轴对象用于添加曲线
 
     m = Basemap(projection='ortho',
-                lat_0=90, lon_0=0,  # 中心点为北极点，经度0°
+                lat_0=90, lon_0=0,
                 resolution='c')
 
     m.drawmapboundary(fill_color='#D0CFD4')
     m.fillcontinents(color='#EFEFEF', lake_color='#D0CFD4')
     m.drawcoastlines()
-    m.drawcountries(linewidth=0.5, color='black')  # 绘制国家边界，设置线宽和颜色
+    m.drawcountries(linewidth=0.5, color='black')
 
     # 5. 画港口
-    px, py = m([c[0] for c in coords.values()],
-               [c[1] for c in coords.values()])
+    px, py = m([c[0] for c in coords.values()], [c[1] for c in coords.values()])
     m.scatter(px, py, marker='o', color='red', zorder=10, label='Top-10 Ports')
 
-    # 6. 画 Top10 航线（大圆航线）
-    for _, row in edges.iterrows():
-        u, v = row['from'], row['to']
-        lon1, lat1 = coords[u]
-        lon2, lat2 = coords[v]
-
-        # 大圆航线：将路径拆成 50 段，避免直线
-        m.drawgreatcircle(lon1, lat1, lon2, lat2,
-                          linewidth=2,
-                          color='blue',
-                          zorder=5)
-
-    plt.title('Top 10 TEU Great-Circle Routes on World Map')
+    # # 6. 用matplotlib内置函数画贝塞尔曲线航线
+    # for _, row in edges.iterrows():
+    #     u, v = row['from'], row['to']
+    #     if u not in coords or v not in coords:
+    #         continue
+    #
+    #     start_lonlat = coords[u]
+    #     end_lonlat = coords[v]
+    #
+    #     # 调用封装好的贝塞尔曲线绘制函数
+    #     draw_bezier_route(
+    #         m, ax,
+    #         start_lonlat,
+    #         end_lonlat,
+    #         control_factor=0.8,  # 调整弯曲程度（值越小越接近直线）
+    #         linewidth=2,
+    #         color='blue',
+    #         zorder=5,
+    #         fill=False  # 曲线不需要填充
+    #     )
+    #
+    plt.title('Top 10 TEU Routes with Matplotlib Bezier Curves')
     plt.legend()
-    plt.savefig('Figure/US_top10_links_worldmap.png', dpi=300, bbox_inches='tight')
+    plt.savefig('Figure/US_top10_bezier_routes_matplotlib.png', dpi=300, bbox_inches='tight')
     plt.show()
 
+def all_in_one(mul_g, year) -> dict:
+    """
+    统一计算相应的基础指标
+    :param mul_g: 是一个有向多边的图
+    :param year:  图的年份
+    :return: 基础信息的表格
+    """
+    g = nx.Graph(mul_g)
 
 
+    # 先算能够直接计算的
+    N = g.number_of_nodes()
+    M = g.number_of_edges()
+    density = nx.density(g)
+    avg_clustering = nx.average_clustering(g)                               # 平均聚类系数
+    max_connected_component = max(nx.connected_components(g), key=len)      # 最大连通分量
+    mcc_sizes = len(max_connected_component)                                # 最大连通分量的大小
+    avg_degrees = 2 * M / N                                                 # 平均度
 
-world_ports_map()
+    # 无权谱半径
+    A = nx.adjacency_matrix(g)
+    spectral_radius = max(abs(np.linalg.eigvals(A.toarray())))              # 无权谱半径
+
+
+    # 平均路径长度 and 全局效率
+    if nx.is_connected(g):
+        avg_length = nx.average_shortest_path_length(g)
+        efficiency = nx.global_efficiency(g)
+    else:
+        h = g.subgraph(max_connected_component)                             # 最大连通分量的那个子图
+        avg_length = nx.average_shortest_path_length(h)
+        efficiency = nx.global_efficiency(h)
+
+
+    # 结构同质性
+    degrees = dict(nx.degree(g))
+    degrees_list = list(degrees.values())
+    std_degrees = np.std(degrees_list, ddof=0)
+    homogeneity = 1 - std_degrees / avg_degrees                             # 结构同质性
+
+
+    strength_TEU = {n : 0.0 for n in g.nodes}                   # 存放每个节点的TEU强度
+    # 遍历图（主循环）
+    for u, v, d in g.edges(data=True):
+        w = float(d.get('volumeTEU', 1.0))
+        strength_TEU[u] += w
+        strength_TEU[v] += w
+
+    total_TEU = sum(strength_TEU.values())
+    if total_TEU != 0:
+        p = np.array(list(strength_TEU.values())) / total_TEU
+        entropy = -np.sum(p * np.log2(p + 1e-12))
+    else:
+        entropy = np.nan
+
+    return {
+        "year": year,
+        "N": N,
+        "M": M,
+        "avg_clustering": avg_clustering,
+        "avg_degrees": avg_degrees,
+        "avg_length": avg_length,
+        "efficiency": efficiency,
+        "homogeneity": homogeneity,
+        "entropy": entropy,
+        "density": density,
+        "spectral_radius": spectral_radius,
+        "mcc_sizes": mcc_sizes
+    }
+
+
+structure_metrics = []
+years = range(2017, 2022)
+
+for year in years:
+    file_path = f'../Data/{year}/US/US{year}.graphml'
+    if not os.path.exists(file_path):
+        print(f'⚠️ 文件不存在: {file_path}')
+        continue
+    Multi_G = nx.read_graphml(file_path)
+    result_year = all_in_one(Multi_G, year)
+    structure_metrics.append(result_year)
+    print(f"{year} is already down!")
+
+# 保存成csv
+df = pd.DataFrame(structure_metrics)
+df.to_csv(f'Figure/all_in_one.csv')
