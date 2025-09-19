@@ -1,3 +1,4 @@
+import random
 import sys
 sys.path.append('../Algorithm')
 import os
@@ -7,15 +8,13 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 from mpl_toolkits.basemap import Basemap
-import geopandas as gpd
-from shapely.geometry import Point, LineString
-from geopy.distance import great_circle
-from geopy.point import Point as GeopyPoint
-# from geosphere import intermediate_points  # 用于生成大圆路径点
+from scipy.special import comb
 from Algorithm.ConstructNetwork import ConstructNetwork
 from Algorithm.Read import Read
 from collections import Counter
-
+import cartopy.crs as ccrs
+import cartopy.feature as cfeature
+from sklearn.preprocessing import minmax_scale
 from matplotlib.ticker import ScalarFormatter
 from scipy.stats import entropy
 
@@ -399,36 +398,7 @@ def calculate_assortativity():
     print(df)
 
 
-def calculate_US_top10_node_pairs_by_TEU_year():
-    YEARS = range(2017, 2022)
-    DATA_DIR = '../Data'
-    OUTPUT_DIR = 'Figure'
-    os.makedirs(OUTPUT_DIR, exist_ok=True)
 
-    all_rows = []
-
-    for y in YEARS:
-        G = nx.read_graphml(f'{DATA_DIR}/{y}/US/US{y}.graphml')
-
-        # 用 MultiGraph 方便累加
-        MG = nx.MultiGraph(G)
-
-        # 按节点对累加 TEU
-        flows = {}
-        for u, v, d in MG.edges(data=True):
-            pair = tuple(sorted([u, v]))  # 无向，排序去重
-            flows[pair] = flows.get(pair, 0) + float(d.get('volumeTEU', 0))
-
-        # 转成 DataFrame
-        data = [{'year': y, 'from': pair[0], 'to': pair[1], 'total_TEU': teu}
-                for pair, teu in flows.items()]
-
-        # 当年 Top10
-        top10 = pd.DataFrame(data).sort_values('total_TEU', ascending=False).head(10)
-        all_rows.append(top10)
-
-    df = pd.concat(all_rows, ignore_index=True)
-    df.to_csv(f'{OUTPUT_DIR}/US_top10_node_pairs_by_TEU_year.csv', index=False)
 def draw_density_avgDegree_picture():
     # 1. 读数据
     df = pd.read_csv('network_evolution_14metrics.csv')
@@ -871,80 +841,316 @@ def draw_total_TEU():
     plt.savefig(f'{OUTPUT_DIR}/US_total_TEU_year.png', dpi=300, bbox_inches='tight')
 
     plt.show()
-def draw_top10_TEU_edges_map():
-    # 1. 读 Top10 边
-    edges = pd.read_csv('Figure/US_top10_node_pairs_by_TEU_year.csv')
+def calculate_US_top10_node_pairs_by_TEU_year():
+    YEARS = range(2017, 2022)
+    DATA_DIR = '../Data'
+    OUTPUT_DIR = 'Figure'
+    os.makedirs(OUTPUT_DIR, exist_ok=True)
 
+    all_rows = []
+
+    for y in YEARS:
+        G = nx.read_graphml(f'{DATA_DIR}/{y}/US/US{y}.graphml')
+
+        # 用 MultiGraph 方便累加
+        MG = nx.MultiGraph(G)
+
+        # 按节点对累加 TEU
+        flows = {}
+        for u, v, d in MG.edges(data=True):
+            pair = tuple(sorted([u, v]))  # 无向，排序去重
+            flows[pair] = flows.get(pair, 0) + float(d.get('volumeTEU', 0))
+
+        # 转成 DataFrame
+        data = [{'year': y, 'from': pair[0], 'to': pair[1], 'total_TEU': teu}
+                for pair, teu in flows.items()]
+
+        # 当年 Top
+        top = pd.DataFrame(data).sort_values('total_TEU', ascending=False).head(30)
+        all_rows.append(top)
+    df = pd.concat(all_rows, ignore_index=True)
+    df.to_csv(f'{OUTPUT_DIR}/US_top10_node_pairs_by_TEU_year.csv', index=False)
+def draw_top10_TEU_edges_map():
+    # 绘图函数（只建一次地图，复用）
+    # def draw_year(year):
+    #     fig, ax = plt.subplots(figsize=(8, 5))
+    #     world_map = Basemap(resolution='l', projection='cyl', lon_0=-100, ax=ax)
+    #     world_map.drawmapboundary(fill_color='#D0CFD4')
+    #     world_map.fillcontinents(color='#EFEFEF', lake_color='#D0CFD4')
+    #     world_map.drawcoastlines()
+    #
+    #     # ---------- 画港口 ----------
+    #     ports = year_to_ports.get(year, set())
+    #     if ports:
+    #         lon = [shift_lon(port_coords[p][0]) for p in ports]
+    #         lat = [port_coords[p][1] for p in ports]
+    #         x, y = world_map(lon, lat)
+    #         # 按 TEU 总和决定大小
+    #         sizes = [year_to_node_size[year].get(p, base_sz) for p in ports]
+    #         world_map.scatter(x, y, s=sizes, marker='o', color='red', zorder=10, label='Port')
+    #
+    #     # ---------- 画边 ----------
+    #     edges = year_to_edges.get(year, [])
+    #     widths = year_to_edge_width[year]  # Series，行号与 edges 一致
+    #     for index, row in edges.iterrows():
+    #         lon1, lat1 = shift_lon(port_coords[row['from']][0]), port_coords[row['from']][1]
+    #         lon2, lat2 = shift_lon(port_coords[row['to']][0]), port_coords[row['to']][1]
+    #         x1, y1 = world_map(lon1, lat1)
+    #         x2, y2 = world_map(lon2, lat2)
+    #         w = widths[index]  # 取出该行对应的线宽
+    #
+    #         # 从列表中随机选择一个元素
+    #         random_list = [-20, 20]
+    #         delta = random.choice(random_list)
+    #         (cx1, cy1), (cx2, cy2) = auto_control_points(x1, y1, x2, y2, delta)
+    #
+    #         # 3. 生成曲线点
+    #         bx, by = bezier([x1, y1], [cx1, cy1], [cx2, cy2], [x2, y2], num=100)
+    #         world_map.plot(bx, by, linewidth=w, color='blue', zorder=5)
+    #
+    #     ax.set_title(f'Top 30 TEU Links – {year}')
+    #     ax.legend()
+    #     fig.savefig(f'Figure/Top10/US_top30_edges_worldmap_{year}.png',
+    #                 dpi=300, bbox_inches='tight')
+    #     plt.show()
+    #     plt.close(fig)  # 防止内存泄漏
+    def draw_year(year):
+        # ---------------- 1. 画布与投影 ----------------
+        plt.rcParams['font.family'] = 'Arial'
+        plt.rcParams['mathtext.fontset'] = 'stix'
+        fig = plt.figure(figsize=(10, 5))
+        ax = plt.axes(projection=ccrs.Robinson(central_longitude=-100))
+        ax.set_global()
+
+        # 高分辨率自然地表 + 海岸线
+        ax.add_feature(cfeature.NaturalEarthFeature('physical', 'land', '50m',
+                                                    facecolor=sns.color_palette("mako", as_cmap=True)(0.15)),
+                       zorder=1)
+        ax.add_feature(cfeature.NaturalEarthFeature('physical', 'ocean', '50m',
+                                                    facecolor='#0b1b2b'), zorder=1)
+        ax.coastlines('50m', color='#ffffff', linewidth=0.3, zorder=2)
+
+        # ---------------- 2. 节点大小与颜色 ----------------
+        ports = year_to_ports.get(year, set())
+        if ports:
+            lon = [shift_lon(port_coords[p][0]) for p in ports]
+            lat = [port_coords[p][1] for p in ports]
+            # 面积 ∝ TEU（归一化）
+            sizes = np.array([year_to_node_size[year].get(p, base_sz) for p in ports])
+            sizes = minmax_scale(sizes, feature_range=(base_sz, max_sz)) ** 1.5
+            # 颜色 ∝ TEU
+            colors = minmax_scale(sizes)
+            cmap = sns.color_palette("flare", as_cmap=True)
+
+            ax.scatter(lon, lat, s=sizes, c=colors, cmap=cmap,
+                       edgecolors='white', linewidths=0.5,
+                       transform=ccrs.PlateCarree(), zorder=10, label='Port')
+
+        # ---------------- 3. 贝塞尔曲线边 + 颜色映射 ----------------
+        edges = year_to_edges.get(year, [])
+        widths = year_to_edge_width[year]
+        # 边颜色映射（蓝→橙）
+        edge_colors = minmax_scale(widths, feature_range=(0, 1))
+        cmap_edge = sns.color_palette("blend:blue,orange", as_cmap=True)
+
+        for idx, row in edges.iterrows():
+            lon1 = shift_lon(port_coords[row['from']][0])
+            lat1 = port_coords[row['from']][1]
+            lon2 = shift_lon(port_coords[row['to']][0])
+            lat2 = port_coords[row['to']][1]
+            w = widths[idx]
+
+            # 画布坐标（Robinson 投影）
+            x1, y1 = ax.projection.transform_point(lon1, lat1, ccrs.PlateCarree())
+            x2, y2 = ax.projection.transform_point(lon2, lat2, ccrs.PlateCarree())
+
+            # 贝塞尔
+            delta = -80 if {row['from'], row['to']} in \
+                           [{'Shanghai', 'Los Angeles'}, {'Hong Kong', 'Long Beach'}] else 80
+            (cx1, cy1), (cx2, cy2) = smooth_control_points(x1, y1, x2, y2, delta)
+            bx, by = bezier([x1, y1], [cx1, cy1], [cx2, cy2], [x2, y2], num=150)
+
+            # 颜色随 TEU
+            color = cmap_edge(edge_colors[idx])
+            ax.plot(bx, by, linewidth=w, color=color,
+                    alpha=0.85, solid_capstyle='round', zorder=4)
+
+        # ---------------- 4. 标题 & 出图 ----------------
+        plt.title(f'Top 30 TEU Links – {year}', fontsize=14, fontweight='bold', pad=15)
+        fig.savefig(f'Figure/Top10/US_top30_edges_worldmap_{year}.png',
+                    dpi=600, bbox_inches='tight', facecolor=fig.get_facecolor())
+        plt.show()
+        plt.close(fig)
+    def auto_control_points(x1, y1, x2, y2, delta=30):
+        """
+        给定起点、终点，返回自动生成的一组三次贝塞尔控制点
+        delta : 偏移像素，>0 向上弯，<0 向下弯
+        """
+        t = 1 / 3
+        # 1/3 处
+        p1x = x1 + t * (x2 - x1)
+        p1y = y1 + t * (y2 - y1)
+        # 2/3 处
+        p2x = x1 + 2 * t * (x2 - x1)
+        p2y = y1 + 2 * t * (y2 - y1)
+        # 垂直偏移
+        dx, dy = x2 - x1, y2 - y1
+        lenAB = np.hypot(dx, dy)
+        nx, ny = -dy / lenAB, dx / lenAB
+        c1x = p1x + delta * nx
+        c1y = p1y + delta * ny
+        c2x = p2x + delta * nx
+        c2y = p2y + delta * ny
+        return (c1x, c1y), (c2x, c2y)
+    def shift_lon(lon):
+        """把经度压到 [-180,180]，解决跨中央经线问题"""
+        return lon - 360 if lon > 70 else lon
+    # 三阶贝塞尔插值
+    def bezier(p0, p1, p2, p3, num=100):
+        t = np.linspace(0, 1, num)
+        b = lambda i, t: comb(3, i) * (t ** i) * ((1 - t) ** (3 - i))
+        pts = (np.outer(b(0, t), p0) + np.outer(b(1, t), p1) +
+               np.outer(b(2, t), p2) + np.outer(b(3, t), p3))
+        return pts[:, 0], pts[:, 1]
+        # 1. 读 Top10 边
+
+
+
+    top30_edges = pd.read_csv('Figure/US_top10_node_pairs_by_TEU_year.csv')
     # 2. 读港口坐标
     Port_Data = ConstructNetwork.Read_Port_Data()
     port_coords = {
-        node: (float(Port_Data[node]["longitude"]),
-               float(Port_Data[node]["latitude"]))
-        for node in Port_Data
-        if "longitude" in Port_Data[node] and "latitude" in Port_Data[node]
+        node: (float(d["longitude"]), float(d["latitude"]))
+        for node, d in Port_Data.items()
+        if "longitude" in d and "latitude" in d
     }
 
-    # 3. 只保留 Top10 用到的港口
-    needed_ports = set(edges['from']).union(set(edges['to']))
-    coords = {p: port_coords[p] for p in needed_ports}
+    # 按年份分组，提前建好 {year: set_of_ports} 和 {year: edges}
+    year_to_ports = {}
+    year_to_edges = {}
 
-    # 4. 创建地图
-    fig = plt.figure(figsize=(10, 6))
+    # 预先算好每年「边」和「节点」的 TEU 比例
+    year_to_edge_width = {}  # {year: Series(index=原始行号, 值=线宽)}
+    year_to_node_size = {}  # {year: Series(index=港口名, 值=点大小)}
 
-    m = Basemap(projection='ortho',
-                lat_0=90, lon_0=0,  # 中心点为北极点，经度0°
-                resolution='c')
+    base_lw = 0.5  # 最细线宽
+    max_lw = 3  # 最粗线宽
+    base_sz = 20  # 最小点
+    max_sz = 100  # 最大点
 
-    m.drawmapboundary(fill_color='#D0CFD4')
-    m.fillcontinents(color='#EFEFEF', lake_color='#D0CFD4')
-    m.drawcoastlines()
-    m.drawcountries(linewidth=0.5, color='black')  # 绘制国家边界，设置线宽和颜色
+    for year, group in top30_edges.groupby('year'):  # 按照year分成若干份DataFrame
+        # 港口和连接
+        ports = set(group['from']).union(set(group['to']))
+        year_to_ports[year] = {p for p in ports if p in port_coords}
+        year_to_edges[year] = group[
+            (group['from'].isin(port_coords)) & (group['to'].isin(port_coords))
+            ]
 
-    # 5. 画港口
-    px, py = m([c[0] for c in coords.values()],
-               [c[1] for c in coords.values()])
-    m.scatter(px, py, marker='o', color='red', zorder=10, label='Top-10 Ports')
+        # 节点和连接的大小
+        # 1. 边宽：按 TEU 占比线性映射
+        teu = group['total_TEU']
+        share = (teu - teu.min()) / (teu.max() - teu.min()) if teu.max() != teu.min() else 0
+        year_to_edge_width[year] = base_lw + share * (max_lw - base_lw)
 
-    # 6. 画 Top10 航线（大圆航线）
-    for _, row in edges.iterrows():
-        u, v = row['from'], row['to']
-        lon1, lat1 = coords[u]
-        lon2, lat2 = coords[v]
+        # 2. 节点大小：把每条边的 TEU 累加到两端港口
+        node_teus = {}
+        for _, row in group.iterrows():
+            for node in (row['from'], row['to']):
+                node_teus[node] = node_teus.get(node, 0) + row['total_TEU']
+        # 同样归一化
+        if node_teus:
+            max_t = max(node_teus.values())
+            min_t = min(node_teus.values())
+            for n in node_teus:
+                sh = (node_teus[n] - min_t) / (max_t - min_t) if max_t != min_t else 0
+                node_teus[n] = base_sz + sh * (max_sz - base_sz)
+        year_to_node_size[year] = node_teus
 
-        # 大圆航线：将路径拆成 50 段，避免直线
-        m.drawgreatcircle(lon1, lat1, lon2, lat2,
-                          linewidth=2,
-                          color='blue',
-                          zorder=5)
-
-    plt.title('Top 10 TEU Great-Circle Routes on World Map')
-    plt.legend()
-    plt.savefig('Figure/US_top10_links_worldmap.png', dpi=300, bbox_inches='tight')
-    plt.show()
-
-
-# Main
-structure_metrics = []
-years = range(2017, 2022)
-
-for year in years:
-    file_path = f'../Data/{year}/US/US{year}.graphml'
-    if not os.path.exists(file_path):
-        print(f'⚠️ 文件不存在: {file_path}')
-        continue
-    Multi_G = nx.read_graphml(file_path)
-    G = nx.Graph(Multi_G)
+    # 主循环（支持多年）
+    for year in range(2017, 2018):  # 现在只 2017，但你可以扩到 2017–2023
+        draw_year(year)
 
 
-    G_null = G.copy()
-    nx.double_edge_swap(G_null, nswap=20000, max_tries=100000)
-    G_null.remove_edges_from(nx.selfloop_edges(G_null))
+draw_top10_TEU_edges_map()
+#regionMain
+# structure_metrics = []
+# years = range(2017, 2022)
+#
+# for year in years:
+#     file_path = f'../Data/{year}/US/US{year}.graphml'
+#     if not os.path.exists(file_path):
+#         print(f'⚠️ 文件不存在: {file_path}')
+#         continue
+#     Multi_G = nx.read_graphml(file_path)
+#     G = nx.Graph(Multi_G)
+#
+#
+#     G_null = G.copy()
+#     nx.double_edge_swap(G_null, nswap=20000, max_tries=100000)
+#     G_null.remove_edges_from(nx.selfloop_edges(G_null))
+#
+#     result_year = all_in_one(G_null, year)
+#     structure_metrics.append(result_year)
+#     print(f"{year} is already down!")
+#
+# # 保存成csv
+# df = pd.DataFrame(structure_metrics)
+# df.to_csv(f'Figure/all_in_one_zero_model.csv')
+#endregion
 
-    result_year = all_in_one(G_null, year)
-    structure_metrics.append(result_year)
-    print(f"{year} is already down!")
-
-# 保存成csv
-df = pd.DataFrame(structure_metrics)
-df.to_csv(f'Figure/all_in_one_zero_model.csv')
-
+#region 弃用
+# def draw_top10_TEU_edges_map():
+#     # 1. 读 Top10 边
+#     top10_edges = pd.read_csv('Figure/US_top10_node_pairs_by_TEU_year.csv')
+#
+#     # 2. 读港口坐标
+#     Port_Data = ConstructNetwork.Read_Port_Data()
+#     port_coords = {
+#         node: (float(Port_Data[node]["longitude"]),
+#                float(Port_Data[node]["latitude"]))
+#         for node in Port_Data
+#         if "longitude" in Port_Data[node] and "latitude" in Port_Data[node]
+#     }
+#
+#     years = range(2017, 2018)
+#     for year in years:
+#         curr_year_port = set()
+#         for idx, row in top10_edges.iterrows():
+#             from_port = row['from']
+#             to_port   = row['to']
+#             teu       = row['total_TEU']
+#             y = row['year']
+#             if y == year:
+#                 curr_year_port.add(from_port)
+#                 curr_year_port.add(to_port)
+#
+#
+#         # ------------ 3  绘制世界地图 ------------
+#         world_map = Basemap(resolution='l')
+#
+#         world_map.drawmapboundary(fill_color='#D0CFD4')
+#         world_map.fillcontinents(color='#EFEFEF', lake_color='#D0CFD4')
+#         world_map.drawcoastlines()
+#
+#         # ------------ 4  画港口 ------------
+#         port_lon = [port_coords[node][0] for node in curr_year_port]
+#         port_lat = [port_coords[node][1] for node in curr_year_port]
+#         px, py = world_map(port_lon, port_lat)
+#         world_map.scatter(px, py, marker='o', color='red', zorder=10, label='Port')
+#
+#         # ------------ 5  画 Top10 边 ------------
+#         for _, row in top10_edges.iterrows():
+#             from_port, to_port = row['from'], row['to']
+#             if from_port in port_coords and to_port in port_coords:
+#                 x1, y1 = world_map(port_coords[from_port][0], port_coords[from_port][1])
+#                 x2, y2 = world_map(port_coords[to_port][0], port_coords[to_port][1])
+#                 world_map.plot([x1, x2], [y1, y2],
+#                                linewidth=2,
+#                                color='blue',
+#                                zorder=5)
+#
+#         # ------------ 6  保存并展示 ------------
+#         plt.title('Top 10 TEU Links on World Map')
+#         plt.legend()
+#         plt.savefig(f'Figure/Top10/US_top10_edges_worldmap_{year}.png', dpi=300, bbox_inches='tight')
+#         plt.show()
