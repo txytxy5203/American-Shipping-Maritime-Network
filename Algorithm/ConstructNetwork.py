@@ -1,4 +1,5 @@
 import re
+import os
 import json
 import sys
 sys.path.append('../Algorithm')
@@ -35,6 +36,33 @@ class ConstructNetwork:
         normalized = unicodedata.normalize('NFKD', text)
         # 只保留 ASCII 字符（移除变音符号）
         return ''.join([c for c in normalized if ord(c) < 128])
+
+    @classmethod
+    def Save_MultiDiGraph_To_Digraph(cls):
+        years = range(2017, 2022)
+
+        for year in years:
+            file_path = f'../Data/{year}/US/US{year}.graphml'
+            if not os.path.exists(file_path):
+                print(f'⚠️ 文件不存在: {file_path}')
+                continue
+            Multi_G = nx.read_graphml(file_path)
+
+            # 假设 G 是 MultiDiGraph，边有 total_TEU 属性
+            D = nx.DiGraph()  # 目标简单有向图
+            D.add_nodes_from(Multi_G.nodes(data=True))  # 1. 先拷节点属性
+
+            # 2. 把平行边的 TEU 累加
+            for u, v, data in Multi_G.edges(data=True):
+                teu = data.get('total_TEU', 0)
+                if D.has_edge(u, v):
+                    D[u][v]['total_TEU'] += teu
+                else:
+                    D.add_edge(u, v, total_TEU=teu)
+
+            # 使用 GraphML 保存图
+            nx.write_graphml(D, f'../Data/{year}/US/US{year}_Digraph.graphml')
+
 
     @classmethod
     def Save_Network_USImport(cls, year:int) -> None:
