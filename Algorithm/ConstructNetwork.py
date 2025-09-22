@@ -54,11 +54,11 @@ class ConstructNetwork:
 
             # 2. 把平行边的 TEU 累加
             for u, v, data in Multi_G.edges(data=True):
-                teu = data.get('total_TEU', 0)
+                teu = data.get('volumeTEU', 0)
                 if D.has_edge(u, v):
-                    D[u][v]['total_TEU'] += teu
+                    D[u][v]['volumeTEU'] += teu
                 else:
-                    D.add_edge(u, v, total_TEU=teu)
+                    D.add_edge(u, v, volumeTEU=teu)
 
             # 使用 GraphML 保存图
             nx.write_graphml(D, f'../Data/{year}/US/US{year}_Digraph.graphml')

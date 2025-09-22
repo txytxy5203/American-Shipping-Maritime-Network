@@ -1,3 +1,4 @@
+import pathlib
 import random
 import sys
 sys.path.append('../Algorithm')
@@ -622,115 +623,6 @@ def port_appearance_in_top10_across_centrality_metrics():
     print(freq_summary.head())
 #endregion
 
-def world_ports_map2():
-    # 利用matplotlib内置函数生成贝塞尔曲线
-    def draw_bezier_route(m, ax, start_lonlat, end_lonlat, control_factor=0.3, **kwargs):
-        """
-        使用matplotlib.path绘制贝塞尔曲线航线
-        m: Basemap实例
-        ax: 绘图轴对象
-        start_lonlat: 起点经纬度 (lon, lat)
-        end_lonlat: 终点经纬度 (lon, lat)
-        control_factor: 控制点偏移因子（控制弯曲程度，0-1之间）
-        """
-        # 转换经纬度到投影坐标
-        start_x, start_y = m(*start_lonlat)
-        end_x, end_y = m(*end_lonlat)
-
-        # 计算中间控制点（基于两点连线的垂直方向偏移）
-        mid_x = (start_x + end_x) / 2
-        mid_y = (start_y + end_y) / 2
-
-        # 计算垂直偏移方向
-        dx = end_x - start_x
-        dy = end_y - start_y
-        offset_x = -dy * control_factor  # 垂直方向x偏移
-        offset_y = dx * control_factor  # 垂直方向y偏移
-
-        # 贝塞尔曲线的控制点
-        control_x = mid_x + offset_x
-        control_y = mid_y + offset_y
-
-        # 定义贝塞尔曲线路径（Path对象支持贝塞尔曲线指令）
-        # 路径指令：MOVETO -> CURVE3（二次贝塞尔曲线）-> LINETO
-        vertices = [
-            (start_x, start_y),  # 起点
-            (control_x, control_y),  # 控制点
-            (end_x, end_y)  # 终点
-        ]
-        codes = [
-            Path.MOVETO,  # 移动到起点
-            Path.CURVE3,  # 二次贝塞尔曲线到终点（使用控制点）
-            Path.LINETO  # 确保终点连接
-        ]
-
-        # 创建路径并绘制
-        path = Path(vertices, codes)
-        patch = patches.PathPatch(path, **kwargs)
-        ax.add_patch(patch)
-        return patch
-
-    # 1. 读 Top10 边
-    edges = pd.read_csv('Figure/US_top10_node_pairs_by_TEU_year.csv')
-
-    # 2. 读港口坐标
-    Port_Data = ConstructNetwork.Read_Port_Data()
-    port_coords = {
-        node: (float(Port_Data[node]["longitude"]),
-               float(Port_Data[node]["latitude"]))
-        for node in Port_Data
-        if "longitude" in Port_Data[node] and "latitude" in Port_Data[node]
-    }
-
-    # 3. 只保留 Top10 用到的港口
-    needed_ports = set(edges['from']).union(set(edges['to']))
-    coords = {p: port_coords[p] for p in needed_ports if p in port_coords}
-
-    # 4. 创建地图
-    fig = plt.figure(figsize=(10, 10))
-    ax = fig.add_subplot(111)  # 获取轴对象用于添加曲线
-
-    m = Basemap(projection='ortho',
-                lat_0=90, lon_0=0,
-                resolution='c')
-
-    m.drawmapboundary(fill_color='#D0CFD4')
-    m.fillcontinents(color='#EFEFEF', lake_color='#D0CFD4')
-    m.drawcoastlines()
-    m.drawcountries(linewidth=0.5, color='black')
-
-    # 5. 画港口
-    px, py = m([c[0] for c in coords.values()], [c[1] for c in coords.values()])
-    m.scatter(px, py, marker='o', color='red', zorder=10, label='Top-10 Ports')
-
-    # # 6. 用matplotlib内置函数画贝塞尔曲线航线
-    # for _, row in edges.iterrows():
-    #     u, v = row['from'], row['to']
-    #     if u not in coords or v not in coords:
-    #         continue
-    #
-    #     start_lonlat = coords[u]
-    #     end_lonlat = coords[v]
-    #
-    #     # 调用封装好的贝塞尔曲线绘制函数
-    #     draw_bezier_route(
-    #         m, ax,
-    #         start_lonlat,
-    #         end_lonlat,
-    #         control_factor=0.8,  # 调整弯曲程度（值越小越接近直线）
-    #         linewidth=2,
-    #         color='blue',
-    #         zorder=5,
-    #         fill=False  # 曲线不需要填充
-    #     )
-    #
-    plt.title('Top 10 TEU Routes with Matplotlib Bezier Curves')
-    plt.legend()
-    plt.savefig('Figure/US_top10_bezier_routes_matplotlib.png', dpi=300, bbox_inches='tight')
-    plt.show()
-
-
-
 # 处理过的函数
 def all_in_one(g, year) -> dict:
     """
@@ -1037,7 +929,15 @@ def draw_top10_TEU_edges_map():
     # 主循环（支持多年）
     for year in range(2017, 2022):  # 现在只 2017，但你可以扩到 2017–2023
         draw_year(year)
-
+def write_adjlist_attr(G, path, attr='volumeTEU', encoding='utf-8'):
+    """
+    将 DiGraph 导出成邻接表
+    """
+    path = pathlib.Path(path)
+    with path.open('w', encoding=encoding) as f:
+        f.write('source,target,weight\n')                       # 1. 属性声明
+        for u, v, d in G.edges(data=True):
+            f.write(f'{u},{v},{d.get(attr, 0)}\n')              # 2. 源 目标 值
 
 
 #regionMain
