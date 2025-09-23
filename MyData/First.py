@@ -19,6 +19,7 @@ import cartopy.feature as cfeature
 from sklearn.preprocessing import minmax_scale
 from matplotlib.ticker import ScalarFormatter
 from scipy.stats import entropy
+from heapq import nlargest
 
 # ---------- 工具函数 ----------
 def rich_club_phi(G, k):
@@ -962,6 +963,10 @@ def write_US_TEU_change_value():
             US_TEU_change_value[node] = DiGraph_2021.nodes[node]["total_TEU"]
     pathlib.Path('Figure/US_TEU_change_value.json').write_text(json.dumps(US_TEU_change_value, indent=2))
 def draw_US_TEU_change_value():
+    """
+    画出美国2017和2021的港口TEU变化量
+    :return:
+    """
     delta_file = 'Figure/US_TEU_change_value.json'
     US_TEU_change_value = json.loads(pathlib.Path(delta_file).read_text())
 
@@ -983,26 +988,98 @@ def draw_US_TEU_change_value():
     # 2. 只画美国港口（颜色+大小）
     vals = np.array(list(US_TEU_change_value.values()))
     sizes = minmax_scale(np.abs(vals),feature_range=(50, 800))  # 节点面积范围
+    colors = ['#FF4E50' if v > 0 else '#1B1B1B' for v in vals]
 
-    colors = ['red' if v > 0 else 'black' for v in vals]
-
-    for node, delta in US_TEU_change_value.items():
+    N = 10  # 可调        只画变化量前十的港口
+    top_nodes = nlargest(N, US_TEU_change_value.items(), key=lambda item: abs(item[1]))
+    for node, delta in top_nodes:
         if node not in port_coords:  # 跳过无坐标的孤立节点
             continue
         lon, lat = port_coords[node]
         x, y = world_map(lon, lat)
-        world_map.scatter(x, y, s=sizes[list(US_TEU_change_value.keys()).index(node)],
-                          c=colors[list(US_TEU_change_value.keys()).index(node)],
+        idx = list(US_TEU_change_value.keys()).index(node)  # 原索引不变
+        world_map.scatter(x, y, s=sizes[idx],
+                          c=colors[idx],
                           edgecolors='white', linewidths=0.5, zorder=10)
 
     # 3. 图例 & 保存
-    ax.scatter([], [], c='red', s=200, label='TEU increase')
-    ax.scatter([], [], c='black', s=200, label='TEU decrease')
+    ax.scatter([], [], c='#FF4E50', s=200, label='TEU increase')
+    ax.scatter([], [], c='#1B1B1B', s=200, label='TEU decrease')
+
+
+
     ax.legend(loc='lower left')
     plt.title('US Port TEU Change 2017→2021', fontsize=14, pad=10)
     fig.savefig('Figure/US_TEU_change_map.png', dpi=300, bbox_inches='tight')
     plt.show()
-draw_US_TEU_change_value()
+def write_US_BC_change_value():
+    # 读取图数据
+    DiGraph_2017 = nx.read_graphml('../Data/2017/US/US2017_Digraph.graphml')
+    DiGraph_2021 = nx.read_graphml('../Data/2021/US/US2021_Digraph.graphml')
+
+    # 计算介数中心性
+    betweenness_2017 = nx.betweenness_centrality(DiGraph_2017)
+    betweenness_2021 = nx.betweenness_centrality(DiGraph_2021)
+
+    # 计算介数中心性的变化
+    betweenness_change = {}
+    for node in set(betweenness_2017.keys()) | set(betweenness_2021.keys()):
+        if node in betweenness_2017 and node in betweenness_2021:
+            betweenness_change[node] = betweenness_2021[node] - betweenness_2017[node]
+        elif node in betweenness_2017:
+            betweenness_change[node] = -betweenness_2017[node]
+        else:
+            betweenness_change[node] = betweenness_2021[node]
+
+    # 找出变化最大的几个节点
+    N = 10  # 你可以根据需要修改这个数字
+    top_nodes = sorted(betweenness_change.items(), key=lambda item: abs(item[1]), reverse=True)[:N]
+
+    # 保存结果
+    pathlib.Path('Figure/US_BC_change_value.json').write_text(json.dumps(dict(top_nodes), indent=2))
+def draw_US_BC_change_value():
+
+    # 2. 读港口坐标
+    Port_Data = ConstructNetwork.Read_Port_Data()
+    port_coords = {
+        node: (float(d["longitude"]), float(d["latitude"]))
+        for node, d in Port_Data.items()
+        if "longitude" in d and "latitude" in d
+    }
+    delta_file = 'Figure/US_BC_change_value.json'
+    US_Betweenness_change_value = json.loads(pathlib.Path(delta_file).read_text())
+    # 画布
+    fig, ax = plt.subplots(figsize=(10, 7))
+    world_map = Basemap(resolution='l', projection='cyl', lon_0=-100, ax=ax)
+    world_map.drawmapboundary(fill_color='#D0CFD4')
+    world_map.fillcontinents(color='#EFEFEF', lake_color='#D0CFD4')
+    world_map.drawcoastlines()
+
+
+    # 只画美国港口（颜色+大小）
+    vals = np.array(list(US_Betweenness_change_value.values()))
+    sizes = minmax_scale(np.abs(vals),feature_range=(50, 800))  # 节点面积范围
+    colors = ['#FF4E50' if v > 0 else '#1B1B1B' for v in vals]
+
+    N = 10  # 可调        只画变化量前十的港口
+    top_nodes = nlargest(N, US_Betweenness_change_value.items(), key=lambda item: abs(item[1]))
+    for node, delta in top_nodes:
+        if node not in port_coords:  # 跳过无坐标的孤立节点
+            continue
+        lon, lat = port_coords[node]
+        x, y = world_map(lon, lat)
+        idx = list(US_Betweenness_change_value.keys()).index(node)  # 原索引不变
+        world_map.scatter(x, y, s=sizes[idx],
+                          c=colors[idx],
+                          edgecolors='white', linewidths=0.5, zorder=10)
+
+    # 图例 & 保存
+    ax.scatter([], [], c='#FF4E50', s=200, label='Betweenness increase')
+    ax.scatter([], [], c='#1B1B1B', s=200, label='Betweenness decrease')
+    ax.legend(loc='lower left')
+    plt.title('US Port Betweenness Change 2017→2021', fontsize=14, pad=10)
+    fig.savefig('Figure/US_Betweenness_change_map.png', dpi=300, bbox_inches='tight')
+    plt.show()
 
 
 
