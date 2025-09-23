@@ -961,6 +961,49 @@ def write_US_TEU_change_value():
             # 2017年没有的  2021年有的
             US_TEU_change_value[node] = DiGraph_2021.nodes[node]["total_TEU"]
     pathlib.Path('Figure/US_TEU_change_value.json').write_text(json.dumps(US_TEU_change_value, indent=2))
+def draw_US_TEU_change_value():
+    delta_file = 'Figure/US_TEU_change_value.json'
+    US_TEU_change_value = json.loads(pathlib.Path(delta_file).read_text())
+
+    # 2. 读港口坐标
+    Port_Data = ConstructNetwork.Read_Port_Data()
+    port_coords = {
+        node: (float(d["longitude"]), float(d["latitude"]))
+        for node, d in Port_Data.items()
+        if "longitude" in d and "latitude" in d
+    }
+
+    # 1. 画布（你的原代码）
+    fig, ax = plt.subplots(figsize=(10, 7))
+    world_map = Basemap(resolution='l', projection='cyl', lon_0=-100, ax=ax)
+    world_map.drawmapboundary(fill_color='#D0CFD4')
+    world_map.fillcontinents(color='#EFEFEF', lake_color='#D0CFD4')
+    world_map.drawcoastlines()
+
+    # 2. 只画美国港口（颜色+大小）
+    vals = np.array(list(US_TEU_change_value.values()))
+    sizes = minmax_scale(np.abs(vals),feature_range=(50, 800))  # 节点面积范围
+
+    colors = ['red' if v > 0 else 'black' for v in vals]
+
+    for node, delta in US_TEU_change_value.items():
+        if node not in port_coords:  # 跳过无坐标的孤立节点
+            continue
+        lon, lat = port_coords[node]
+        x, y = world_map(lon, lat)
+        world_map.scatter(x, y, s=sizes[list(US_TEU_change_value.keys()).index(node)],
+                          c=colors[list(US_TEU_change_value.keys()).index(node)],
+                          edgecolors='white', linewidths=0.5, zorder=10)
+
+    # 3. 图例 & 保存
+    ax.scatter([], [], c='red', s=200, label='TEU increase')
+    ax.scatter([], [], c='black', s=200, label='TEU decrease')
+    ax.legend(loc='lower left')
+    plt.title('US Port TEU Change 2017→2021', fontsize=14, pad=10)
+    fig.savefig('Figure/US_TEU_change_map.png', dpi=300, bbox_inches='tight')
+    plt.show()
+draw_US_TEU_change_value()
+
 
 
 #regionMain
