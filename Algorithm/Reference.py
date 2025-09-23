@@ -11,3 +11,6 @@ for u, v, w in G.edges(data=True):
     u_country = G.nodes[u].get('country', 'Unknown')
     v_country = G.nodes[v].get('country', 'Unknown')
     print(u, u_country, v, v_country,teu)
+
+for node, attr in G.nodes(data=True):
+    print(node, attr)

@@ -1,3 +1,4 @@
+import json
 import pathlib
 import random
 import sys
@@ -938,6 +939,28 @@ def write_adjlist_attr(G, path, attr='volumeTEU', encoding='utf-8'):
         f.write('source,target,weight\n')                       # 1. 属性声明
         for u, v, d in G.edges(data=True):
             f.write(f'{u},{v},{d.get(attr, 0)}\n')              # 2. 源 目标 值
+def write_US_TEU_change_value():
+    """
+    保存美国2017和2021的港口TEU变化量
+    :return:
+    """
+    DiGraph_2017 = nx.read_graphml('../Data/2017/US/US2017_Digraph.graphml')
+    DiGraph_2021 = nx.read_graphml('../Data/2021/US/US2021_Digraph.graphml')
+
+    US_TEU_change_value = {}        # 美国的节点TEU变化的量
+    for node, attr in DiGraph_2017.nodes(data=True):
+        if attr.get("Country", None) == "United States":
+            if DiGraph_2021.has_node(node):
+                # 2017年 2021年 都有的
+                US_TEU_change_value[node] = DiGraph_2021.nodes[node]["total_TEU"] - DiGraph_2017.nodes[node]["total_TEU"]
+            else:
+                # 2017年有的  2021年没有的
+                US_TEU_change_value[node] = - DiGraph_2017.nodes[node]["total_TEU"]
+    for node, attr in DiGraph_2021.nodes(data=True):
+        if attr.get("Country", None) == "United States" and not DiGraph_2017.has_node(node):
+            # 2017年没有的  2021年有的
+            US_TEU_change_value[node] = DiGraph_2021.nodes[node]["total_TEU"]
+    pathlib.Path('Figure/US_TEU_change_value.json').write_text(json.dumps(US_TEU_change_value, indent=2))
 
 
 #regionMain
@@ -966,6 +989,26 @@ def write_adjlist_attr(G, path, attr='volumeTEU', encoding='utf-8'):
 # df.to_csv(f'Figure/all_in_one_zero_model.csv')
 #endregion
 
+# years = range(2017, 2022)
+# for year in years:
+#     file_path = f'../Data/{year}/US/US{year}_Digraph.graphml'
+#     if not os.path.exists(file_path):
+#         print(f'⚠️ 文件不存在: {file_path}')
+#         continue
+#     G = nx.read_graphml(file_path)
+#
+#     for node in G.nodes:
+#         G.nodes[node]['in_TEU'] = G.nodes[node]['out_TEU'] = G.nodes[node]['total_TEU'] = 0
+#         TEU_in = 0
+#         TEU_out = 0
+#         for _, _, attr in G.in_edges(node, data=True):
+#             TEU_in += attr.get("volumeTEU", 0)
+#         for _, _, attr in G.out_edges(node, data=True):
+#             TEU_out += attr.get("volumeTEU", 0)
+#         G.nodes[node]['in_TEU'] = TEU_in
+#         G.nodes[node]['out_TEU'] = TEU_out
+#         G.nodes[node]['total_TEU'] = TEU_in + TEU_out
+#     nx.write_graphml(G, f'../Data/{year}/US/US{year}_Digraph.graphml')
 #region 弃用
 # def draw_top10_TEU_edges_map():
 #     # 1. 读 Top10 边
