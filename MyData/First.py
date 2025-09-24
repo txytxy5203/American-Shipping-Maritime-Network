@@ -1,3 +1,4 @@
+import heapq
 import json
 import pathlib
 import random
@@ -1080,9 +1081,68 @@ def draw_US_BC_change_value():
     plt.title('US Port Betweenness Change 2017→2021', fontsize=14, pad=10)
     fig.savefig('Figure/US_Betweenness_change_map.png', dpi=300, bbox_inches='tight')
     plt.show()
+def draw_US_top5_port_TEU_change():
+    """
+    美国TEU top5港口的TEU随时间变化的趋势图
+    """
 
+    # 读取港口坐标
+    Port_Data = ConstructNetwork.Read_Port_Data()
+    port_coords = {
+        node: (float(d["longitude"]), float(d["latitude"]))
+        for node, d in Port_Data.items()
+        if "longitude" in d and "latitude" in d
+    }
 
+    # 初始化存储每个港口每年的TEU值
+    top_teu_nodes_teu_over_years = {}
 
+    # 定义年份范围
+    years = range(2017, 2022)
+
+    # 遍历每个年份
+    for year in years:
+        file_path = f'../Data/{year}/US/US{year}_Digraph.graphml'
+        if not os.path.exists(file_path):
+            print(f'⚠️ 文件不存在: {file_path}')
+            continue
+
+        # 读取图
+        DiGraph = nx.read_graphml(file_path)
+
+        # 获取图中所有美国节点的TEU值
+        teu_values = {node: data['total_TEU'] for node, data in DiGraph.nodes(data=True) if
+                      data.get("Country") == "United States"}
+
+        # 找出TEU最大的5个节点
+        top_teu_nodes = heapq.nlargest(5, teu_values, key=teu_values.get)
+
+        # 更新字典，记录每个节点每年的TEU
+        for node in top_teu_nodes:
+            if node not in top_teu_nodes_teu_over_years:
+                top_teu_nodes_teu_over_years[node] = []
+            top_teu_nodes_teu_over_years[node].append(teu_values[node])
+
+    # 绘制Top 5 港口的TEU变化图
+    plt.figure(figsize=(12, 8))
+    markers = ['o', 's', '^', 'D', 'x']  # 不同的形状
+    colors = ['b', 'g', 'r', 'c', 'm']  # 不同的颜色
+
+    # 准备绘图数据
+    for i, node in enumerate(top_teu_nodes):
+        teu_values = top_teu_nodes_teu_over_years[node]
+        plt.plot(years, teu_values, marker=markers[i % len(markers)], color=colors[i % len(colors)], label=node)
+
+    plt.title('Top 5 US Ports TEU Over Years')
+    plt.xlabel('Year')
+    plt.ylabel('Total TEU')
+    plt.legend()
+    plt.box(True)  # 去除边框
+    plt.xticks(years)  # 设置横坐标刻度
+    plt.yticks([])  # 去除纵坐标刻度
+    plt.show()
+
+draw_US_top5_port_TEU_change()
 #regionMain
 # structure_metrics = []
 # years = range(2017, 2022)
