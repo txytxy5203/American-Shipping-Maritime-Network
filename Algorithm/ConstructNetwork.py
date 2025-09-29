@@ -39,7 +39,7 @@ class ConstructNetwork:
 
     @classmethod
     def Save_MultiDiGraph_To_Digraph(cls):
-        years = range(2017, 2022)
+        years = range(2017, 2018)
 
         for year in years:
             file_path = f'../Data/{year}/US/US{year}.graphml'

@@ -19,6 +19,7 @@ import cartopy.crs as ccrs
 import cartopy.feature as cfeature
 from sklearn.preprocessing import minmax_scale
 from matplotlib.ticker import ScalarFormatter
+from matplotlib import patheffects
 from scipy.stats import entropy
 from heapq import nlargest
 
@@ -106,52 +107,7 @@ def calc_metrics(G):
         'total_strength': total_strength
     }
 
-# # ---------- 主循环 ----------
-# for year in years:
-#     file_path = f'../Data/{year}/US/US{year}.graphml'
-#     if not os.path.exists(file_path):
-#         print(f'⚠️ 文件不存在: {file_path}')
-#         continue
-#     Multi_G = nx.read_graphml(file_path)
-#     G = nx.Graph(Multi_G)  # 无向简单图，保留权重
-#
-#     res = calc_metrics(G)
-#     res['year'] = year
-#     records.append(res)
-#
-# # ---------- 保存 ----------
-# df = pd.DataFrame(records)
-# df.to_csv('network_evolution_14metrics.csv', index=False)
-# print('✅ 已写入 network_evolution_14metrics.csv')
-# print(df)
-
-# df = pd.read_csv('network_evolution_14metrics.csv')
-#
-# # ---------- 画图 ----------
-# plt.style.use('ggplot')
-# metrics = df.columns.drop('year')
-# n = len(metrics)
-# cols = 3
-# rows = (n + cols - 1) // cols
-# fig, axs = plt.subplots(rows, cols, figsize=(15, 5*rows))
-# fig.suptitle('US Port Network Evolution ‑ 14 Metrics', fontsize=16)
-#
-# for ax, col in zip(axs.ravel(), metrics):
-#     ax.plot(df['year'], df[col], marker='o')
-#     ax.set_title(col.replace('_', ' ').title())
-#     ax.set_xlabel('Year')
-#     ax.set_ylabel(col)
-#     ax.grid(alpha=0.3)
-#
-# # 隐藏多余的空子图
-# for ax in axs.ravel()[n:]:
-#     ax.set_visible(False)
-#
-# plt.tight_layout(rect=[0, 0.03, 1, 0.97])
-# plt.savefig('network_evolution_14curves.png', dpi=300)
-# plt.show()
-
-#region Network Structure
+#region未处理的函数
 def draw_nodes_edges_picture():
     '''
     绘制网络nodes，edges数量演化图
@@ -400,9 +356,6 @@ def calculate_assortativity():
     df = pd.DataFrame(records)
     df.to_csv(f'{OUTPUT_DIR}/US_assortativity_year.csv', index=False)
     print(df)
-
-
-
 def draw_density_avgDegree_picture():
     # 1. 读数据
     df = pd.read_csv('network_evolution_14metrics.csv')
@@ -499,134 +452,35 @@ def draw_length_efficiency_picture():
 #endregion
 
 #region Node Centrality
-def top10_df(Multi_G, year):
-    G = nx.Graph(Multi_G)  # 无向加权简单图
-    # 度中心性
-    deg = nx.degree_centrality(G)
-    # 介数中心性
-    betw = nx.betweenness_centrality(Multi_G)
-    # 接近中心性
-    close = nx.closeness_centrality(Multi_G)
-    # PageRank
-    pr = nx.pagerank(Multi_G)
+def write_US_port_centrality():
+    G = nx.read_graphml(f'../Data/2017/US/US2017_Digraph.graphml')
+    metrics = {}
 
-    # 强度   1.TEU作为强度   2.交易次数作为强度
-    # 1.TEU
-    total_TEU_strength   = {}   # 所有邻边
-    out_TEU_strength     = {}   # 仅起点
-    in_TEU_strength      = {}   # 仅终点
+    bc_unweighted = nx.betweenness_centrality(G)
+    bc = nx.betweenness_centrality(G, weight='volumeTEU')
+    cc_unweighted = nx.closeness_centrality(G)
 
-    # 2.交易次数
-    total_times_strength = {}
-    out_times_strength = {}
-    in_times_strength = {}
-    for n in Multi_G.nodes:
-        total_TEU_strength[n] = 0.
-        out_TEU_strength[n]   = 0.
-        in_TEU_strength[n]    = 0.
-
-        total_times_strength[n] = 0.
-        out_times_strength[n]   = 0.
-        in_times_strength[n]    = 0.
-    # 遍历所有多重边
-    for u, v, key, data in Multi_G.edges(keys=True, data=True):
-        # 1.TEU
-        w = data.get('volumeTEU', 1.0)
-        total_TEU_strength[u] += w
-        total_TEU_strength[v] += w
-        out_TEU_strength[u]   += w
-        in_TEU_strength[v]    += w
-
-        # 2.交易次数
-        total_times_strength[u] += 1
-        total_times_strength[v] += 1
-        out_times_strength[u]   += 1
-        in_times_strength[v]    += 1
-
-    # ---------- 统一 DataFrame ----------
-    df = pd.DataFrame({
-        'year': year,
-        'port': list(deg.keys()),
-        'degree': list(deg.values()),
-        'total_TEU_strength': [total_TEU_strength[n] for n in deg],
-        'out_TEU_strength': [out_TEU_strength[n] for n in deg],
-        'in_TEU_strength': [in_TEU_strength[n] for n in deg],
-        'total_times_strength': [total_times_strength[n] for n in deg],
-        'out_times_strength': [out_times_strength[n] for n in deg],
-        'in_times_strength': [in_times_strength[n] for n in deg],
-        'betweenness': list(betw.values()),
-        'closeness': list(close.values()),
-        'pagerank': list(pr.values())
-    })
-
-    # 对每种中心性取 TOP10
-    top10_list = []
-    cols = ['degree', 'total_TEU_strength', 'out_TEU_strength','in_TEU_strength',
-            'total_times_strength', 'out_times_strength', 'in_times_strength',
-            'betweenness', 'closeness', 'pagerank']
-    for col in cols:
-        top10 = (df[['year', 'port', col]]
-                 .rename(columns={col: 'value'})
-                 .assign(metric=col)
-                 .sort_values('value', ascending=False)
-                 .head(10))
-        top10_list.append(top10)
-
-    return pd.concat(top10_list, ignore_index=True)
-def port_appearance_in_top10_across_centrality_metrics():
-    # 1. 读入真实 top10 表（列：year, port, metric）
-    df = pd.read_csv('Figure/centrality_top10.csv')
-
-    # 2. 10 个真实指标列表（与你的列名完全一致）
-    real_metrics = [
-        'degree', 'total_TEU_strength', 'out_TEU_strength', 'in_TEU_strength',
-        'total_times_strength', 'out_times_strength', 'in_times_strength',
-        'betweenness', 'closeness', 'pagerank'
-    ]
-
-    # 3. 过滤 + 统计出现次数
-    heatmap_df = (
-        df[df['metric'].isin(real_metrics)]  # 只保留 10 个真指标
-        .assign(count=1)  # 每行算 1 次出现
-        .pivot_table(index='port', columns='year', values='count',
-                     aggfunc='sum', fill_value=0)
-    )
-
-    # 4. 按出现总频次降序排列，方便阅读
-    heatmap_df = heatmap_df.loc[
-        heatmap_df.sum(axis=1).sort_values(ascending=False).index
-    ]
-
-    # 5. 画热力图
-    plt.figure(figsize=(10, 6))
-    sns.heatmap(
-        heatmap_df,
-        cmap='Blues',
-        linewidths=.5,
-        linecolor='gray',
-        annot=True,
-        fmt='g',
-        cbar_kws={'label': 'Times in Top10'}
-    )
-    plt.title('Top10 Port Presence Across 10 Centrality Metrics (2017–2021)', fontsize=14, pad=15)
-    plt.xlabel('Year')
-    plt.ylabel('Port')
-    plt.tight_layout()
-    plt.savefig('Figure/real_port_top10_heatmap.png', dpi=300, bbox_inches='tight')
-    plt.show()
-
-    # 6. 导出频次汇总表（港口 × 总出现次数）
-    freq_summary = (
-        heatmap_df.sum(axis=1)
-        .rename('total_times')
-        .to_frame()
-        .sort_values('total_times', ascending=False)
-    )
-    freq_summary.to_csv('real_port_top10_frequency.csv', index=True)
-    print(freq_summary.head())
+    for node, attr in G.nodes(data=True):
+        if attr.get('Country') != 'United States':
+            continue
+        deg_in = G.in_degree(node)
+        deg_out = G.out_degree(node)
+        deg_total = G.degree(node)
+        metrics[node] = {
+            'degree_in': deg_in,
+            'degree_out': deg_out,
+            'degree_total': deg_total,
+            'bc_unweighted': bc_unweighted[node],
+            'cc_unweighted': cc_unweighted[node]
+        }
+    # 3. 保存 JSON
+    out_file = 'Figure/US_port_centrality.json'
+    pathlib.Path(out_file).write_text(json.dumps(metrics, indent=2))
+    print(f'✅ 已保存 → {out_file}')
 #endregion
 
-# 处理过的函数
+
+#regionNetwork Structure
 def all_in_one(g, year) -> dict:
     """
     统一计算相应的基础指标
@@ -991,18 +845,32 @@ def draw_US_TEU_change_value():
     sizes = minmax_scale(np.abs(vals),feature_range=(50, 800))  # 节点面积范围
     colors = ['#FF4E50' if v > 0 else '#1B1B1B' for v in vals]
 
-    N = 10  # 可调        只画变化量前十的港口
-    top_nodes = nlargest(N, US_TEU_change_value.items(), key=lambda item: abs(item[1]))
-    for node, delta in top_nodes:
-        if node not in port_coords:  # 跳过无坐标的孤立节点
+    #region只画top10
+    # N = 10  # 可调        只画变化量前十的港口
+    # top_nodes = nlargest(N, US_TEU_change_value.items(), key=lambda item: abs(item[1]))
+    # for node, delta in top_nodes:
+    #     if node not in port_coords:  # 跳过无坐标的孤立节点
+    #         continue
+    #     lon, lat = port_coords[node]
+    #     x, y = world_map(lon, lat)
+    #     idx = list(US_TEU_change_value.keys()).index(node)  # 原索引不变
+    #     world_map.scatter(x, y, s=sizes[idx],
+    #                       c=colors[idx],
+    #                       edgecolors='white', linewidths=0.5, zorder=10)
+    #endregion
+
+    # 只画 ΔTEU > 0 或则 < 0 的所有美国港口
+    for node, delta in US_TEU_change_value.items():
+        if delta < 0:  # 负增长或零变化，跳过
+            continue
+        if node not in port_coords:  # 无坐标，跳过
             continue
         lon, lat = port_coords[node]
         x, y = world_map(lon, lat)
-        idx = list(US_TEU_change_value.keys()).index(node)  # 原索引不变
+        idx = list(US_TEU_change_value.keys()).index(node)
         world_map.scatter(x, y, s=sizes[idx],
-                          c=colors[idx],
+                          c=colors[idx],  # 正增长颜色（红）
                           edgecolors='white', linewidths=0.5, zorder=10)
-
     # 3. 图例 & 保存
     ax.scatter([], [], c='#FF4E50', s=200, label='TEU increase')
     ax.scatter([], [], c='#1B1B1B', s=200, label='TEU decrease')
@@ -1011,7 +879,7 @@ def draw_US_TEU_change_value():
 
     ax.legend(loc='lower left')
     plt.title('US Port TEU Change 2017→2021', fontsize=14, pad=10)
-    fig.savefig('Figure/US_TEU_change_map.png', dpi=300, bbox_inches='tight')
+    fig.savefig('Figure/US_TEU_change_map_1.png', dpi=300, bbox_inches='tight')
     plt.show()
 def write_US_BC_change_value():
     # 读取图数据
@@ -1073,26 +941,24 @@ def draw_US_BC_change_value():
         world_map.scatter(x, y, s=sizes[idx],
                           c=colors[idx],
                           edgecolors='white', linewidths=0.5, zorder=10)
+        # 在循环里
+        dx = 6
+        dy = 4
+        x_text, y_text = world_map(lon + dx, lat - dy)
+        ax.text(x_text, y_text, node, color='white', fontsize=8, ha='center', va='center',
+                path_effects=[patheffects.withStroke(linewidth=2, foreground='black')])
 
     # 图例 & 保存
     ax.scatter([], [], c='#FF4E50', s=200, label='Betweenness increase')
     ax.scatter([], [], c='#1B1B1B', s=200, label='Betweenness decrease')
     ax.legend(loc='lower left')
-    plt.title('US Port Betweenness Change 2017→2021', fontsize=14, pad=10)
-    fig.savefig('Figure/US_Betweenness_change_map.png', dpi=300, bbox_inches='tight')
+    plt.title('Port Betweenness Change 2017→2021', fontsize=14, pad=10)
+    fig.savefig('Figure/Betweenness_change_map.png', dpi=300, bbox_inches='tight')
     plt.show()
 def draw_US_top5_port_TEU_change():
     """
     美国TEU top5港口的TEU随时间变化的趋势图
     """
-
-    # 读取港口坐标
-    Port_Data = ConstructNetwork.Read_Port_Data()
-    port_coords = {
-        node: (float(d["longitude"]), float(d["latitude"]))
-        for node, d in Port_Data.items()
-        if "longitude" in d and "latitude" in d
-    }
 
     # 初始化存储每个港口每年的TEU值
     top_teu_nodes_teu_over_years = {}
@@ -1124,7 +990,7 @@ def draw_US_top5_port_TEU_change():
             top_teu_nodes_teu_over_years[node].append(teu_values[node])
 
     # 绘制Top 5 港口的TEU变化图
-    plt.figure(figsize=(12, 8))
+    fig = plt.figure(figsize=(12, 8))
     markers = ['o', 's', '^', 'D', 'x']  # 不同的形状
     colors = ['b', 'g', 'r', 'c', 'm']  # 不同的颜色
 
@@ -1139,16 +1005,35 @@ def draw_US_top5_port_TEU_change():
     plt.legend()
     plt.box(True)  # 去除边框
     plt.xticks(years)  # 设置横坐标刻度
-    plt.yticks([])  # 去除纵坐标刻度
-    plt.show()
 
-draw_US_top5_port_TEU_change()
+    fig.savefig('Figure/US_top5_port_TEU_change.png', dpi=300, bbox_inches='tight')
+    plt.show()
+#endregion
+
+write_US_port_centrality()
+
+# path = '../Data/Port/country_continent.json'
+# with open(path, 'r', encoding='utf-8') as f:
+#     port_continent = json.load(f)
+#
+# years = range(2017, 2022)
+# for year in years:
+#     file_path = f'../Data/{year}/US/US{year}_Digraph.graphml'
+#     if not os.path.exists(file_path):
+#         print(f'⚠️ 文件不存在: {file_path}')
+#         continue
+#     G = nx.read_graphml(file_path)
+#     # for node, attr in G.nodes(data=True):
+#     #     if node[:2] in port_continent.keys():
+#     #         attr['continent'] = port_continent[node[:2]]["continent_code"]
+#     #
+#     # nx.write_graphml(G, f'../Data/{year}/US/US{year}_Digraph.graphml')
 #regionMain
 # structure_metrics = []
 # years = range(2017, 2022)
 #
 # for year in years:
-#     file_path = f'../Data/{year}/US/US{year}.graphml'
+#     file_path = f'../Data/{year}/US/US{year}_Digraph.graphml'
 #     if not os.path.exists(file_path):
 #         print(f'⚠️ 文件不存在: {file_path}')
 #         continue
@@ -1169,7 +1054,8 @@ draw_US_top5_port_TEU_change()
 # df.to_csv(f'Figure/all_in_one_zero_model.csv')
 #endregion
 
-# years = range(2017, 2022)
+#region加上一些属性
+# years = range(2017, 2018)
 # for year in years:
 #     file_path = f'../Data/{year}/US/US{year}_Digraph.graphml'
 #     if not os.path.exists(file_path):
@@ -1189,59 +1075,4 @@ draw_US_top5_port_TEU_change()
 #         G.nodes[node]['out_TEU'] = TEU_out
 #         G.nodes[node]['total_TEU'] = TEU_in + TEU_out
 #     nx.write_graphml(G, f'../Data/{year}/US/US{year}_Digraph.graphml')
-#region 弃用
-# def draw_top10_TEU_edges_map():
-#     # 1. 读 Top10 边
-#     top10_edges = pd.read_csv('Figure/US_top10_node_pairs_by_TEU_year.csv')
-#
-#     # 2. 读港口坐标
-#     Port_Data = ConstructNetwork.Read_Port_Data()
-#     port_coords = {
-#         node: (float(Port_Data[node]["longitude"]),
-#                float(Port_Data[node]["latitude"]))
-#         for node in Port_Data
-#         if "longitude" in Port_Data[node] and "latitude" in Port_Data[node]
-#     }
-#
-#     years = range(2017, 2018)
-#     for year in years:
-#         curr_year_port = set()
-#         for idx, row in top10_edges.iterrows():
-#             from_port = row['from']
-#             to_port   = row['to']
-#             teu       = row['total_TEU']
-#             y = row['year']
-#             if y == year:
-#                 curr_year_port.add(from_port)
-#                 curr_year_port.add(to_port)
-#
-#
-#         # ------------ 3  绘制世界地图 ------------
-#         world_map = Basemap(resolution='l')
-#
-#         world_map.drawmapboundary(fill_color='#D0CFD4')
-#         world_map.fillcontinents(color='#EFEFEF', lake_color='#D0CFD4')
-#         world_map.drawcoastlines()
-#
-#         # ------------ 4  画港口 ------------
-#         port_lon = [port_coords[node][0] for node in curr_year_port]
-#         port_lat = [port_coords[node][1] for node in curr_year_port]
-#         px, py = world_map(port_lon, port_lat)
-#         world_map.scatter(px, py, marker='o', color='red', zorder=10, label='Port')
-#
-#         # ------------ 5  画 Top10 边 ------------
-#         for _, row in top10_edges.iterrows():
-#             from_port, to_port = row['from'], row['to']
-#             if from_port in port_coords and to_port in port_coords:
-#                 x1, y1 = world_map(port_coords[from_port][0], port_coords[from_port][1])
-#                 x2, y2 = world_map(port_coords[to_port][0], port_coords[to_port][1])
-#                 world_map.plot([x1, x2], [y1, y2],
-#                                linewidth=2,
-#                                color='blue',
-#                                zorder=5)
-#
-#         # ------------ 6  保存并展示 ------------
-#         plt.title('Top 10 TEU Links on World Map')
-#         plt.legend()
-#         plt.savefig(f'Figure/Top10/US_top10_edges_worldmap_{year}.png', dpi=300, bbox_inches='tight')
-#         plt.show()
+#endregion
