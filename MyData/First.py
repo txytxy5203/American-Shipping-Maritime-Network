@@ -453,29 +453,53 @@ def draw_length_efficiency_picture():
 
 #region Node Centrality
 def write_US_port_centrality():
-    G = nx.read_graphml(f'../Data/2017/US/US2017_Digraph.graphml')
-    metrics = {}
+    """
+    每一年美国港口的中心性指标json文件
+    包括：   'degree_in',
+            'degree_out',
+            'degree_total',
+            'teu_in',
+            'teu_out',
+            'teu_total',
+            'bc_unweighted',
+            'bc_weighted',
+            'cc_unweighted'
+    :return:
+    """
+    result = {}
+    years = range(2017, 2022)
+    for year in years:
+        G = nx.read_graphml(f'../Data/{year}/US/US{year}_Digraph.graphml')
+        metrics = {}
 
-    bc_unweighted = nx.betweenness_centrality(G)
-    bc = nx.betweenness_centrality(G, weight='volumeTEU')
-    cc_unweighted = nx.closeness_centrality(G)
+        bc_unweighted = nx.betweenness_centrality(G)
+        bc = nx.betweenness_centrality(G, weight='volumeTEU')
+        cc_unweighted = nx.closeness_centrality(G)
 
-    for node, attr in G.nodes(data=True):
-        if attr.get('Country') != 'United States':
-            continue
-        deg_in = G.in_degree(node)
-        deg_out = G.out_degree(node)
-        deg_total = G.degree(node)
-        metrics[node] = {
-            'degree_in': deg_in,
-            'degree_out': deg_out,
-            'degree_total': deg_total,
-            'bc_unweighted': bc_unweighted[node],
-            'cc_unweighted': cc_unweighted[node]
-        }
+        for node, attr in G.nodes(data=True):
+            if attr.get('Country') != 'United States':
+                continue
+            deg_in = G.in_degree(node)
+            deg_out = G.out_degree(node)
+            deg_total = G.degree(node)
+            teu_in = G.nodes[node]['in_TEU']
+            teu_out = G.nodes[node]['out_TEU']
+            teu_total = G.nodes[node]['total_TEU']
+            metrics[node] = {
+                'degree_in': deg_in,
+                'degree_out': deg_out,
+                'degree_total': deg_total,
+                'teu_in': teu_in,
+                'teu_out': teu_out,
+                'teu_total': teu_total,
+                'bc_unweighted': bc_unweighted[node],
+                'bc_weighted': bc[node],
+                'cc_unweighted': cc_unweighted[node]
+            }
+        result[year] = metrics
     # 3. 保存 JSON
     out_file = 'Figure/US_port_centrality.json'
-    pathlib.Path(out_file).write_text(json.dumps(metrics, indent=2))
+    pathlib.Path(out_file).write_text(json.dumps(result, indent=2))
     print(f'✅ 已保存 → {out_file}')
 #endregion
 
