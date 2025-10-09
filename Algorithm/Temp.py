@@ -12,7 +12,7 @@ from ConstructNetwork import *
 
 
 
-with open('../Data/Port/country_continent.json', 'r', encoding='utf-8') as f:
-    country_dict = json.load(f)
-txy = "tanxueyou"
-print(txy[:2])
+date_str = "2017-01-01 00:00:00.000"
+month_str = int(date_str[5:7])  # 输出："01"
+print(month_str)
+print(type(month_str))
