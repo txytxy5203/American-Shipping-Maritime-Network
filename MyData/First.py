@@ -1037,26 +1037,11 @@ def write_US_port_centrality():
 #endregion
 
 
-ConstructNetwork.Save_Network_USExport_Season(2017, "Spring")
-ConstructNetwork.Save_Network_USExport_Season(2017, "Summer")
-ConstructNetwork.Save_Network_USExport_Season(2017, "Autumn")
 
-ConstructNetwork.Save_Network_USExport_Season(2018, "Spring")
-ConstructNetwork.Save_Network_USExport_Season(2018, "Summer")
-ConstructNetwork.Save_Network_USExport_Season(2018, "Autumn")
-
-ConstructNetwork.Save_Network_USExport_Season(2019, "Spring")
-ConstructNetwork.Save_Network_USExport_Season(2019, "Summer")
-ConstructNetwork.Save_Network_USExport_Season(2019, "Autumn")
-
-ConstructNetwork.Save_Network_USExport_Season(2020, "Spring")
-ConstructNetwork.Save_Network_USExport_Season(2020, "Summer")
-ConstructNetwork.Save_Network_USExport_Season(2020, "Autumn")
-
-ConstructNetwork.Save_Network_USExport_Season(2021, "Spring")
-ConstructNetwork.Save_Network_USExport_Season(2021, "Summer")
-ConstructNetwork.Save_Network_USExport_Season(2021, "Autumn")
-
+ConstructNetwork.Save_Network_USImport_Season_Winter(2017)
+ConstructNetwork.Save_Network_USImport_Season_Winter(2018)
+ConstructNetwork.Save_Network_USImport_Season_Winter(2019)
+ConstructNetwork.Save_Network_USImport_Season_Winter(2020)
 
 # path = '../Data/Port/country_continent.json'
 # with open(path, 'r', encoding='utf-8') as f:
