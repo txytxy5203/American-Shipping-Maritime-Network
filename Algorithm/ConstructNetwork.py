@@ -212,7 +212,7 @@ class ConstructNetwork:
         nx.write_graphml(G, '../Data/' + str(year) + '/US/Season/Winter/USImport' + str(year) + '_Winter' + '.graphml')
 
     @classmethod
-    def Save_Network_USExport_Season_Winter(cls, year: int, season: str) -> None:
+    def Save_Network_USExport_Season_Winter(cls, year: int) -> None:
 
         last = [12]
         next = [1, 2]

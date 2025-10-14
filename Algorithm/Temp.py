@@ -10,142 +10,133 @@ import powerlaw
 from ConstructNetwork import *
 
 
-def Save_Network_USExport_Season(cls, year: int, season: str) -> None:
+#regioncombine Export and Import to Total
+years = range(2017, 2022)
+seasons = ['Spring','Summer','Autumn','Winter']
+for year in years:
+    for season in seasons:
+        G_Im = nx.read_graphml(f'../Data/{year}/US/Season/{season}/USImport{year}_{season}.graphml')
+        G_Ex = nx.read_graphml(f'../Data/{year}/US/Season/{season}/USExport{year}_{season}.graphml')
 
-    last = [12]
-    next = [1,2]
+        # 合并两个图
+        G_combined = nx.compose(G_Im, G_Ex)
 
-    port_data = cls.Read_Port_Data()
-    HSCode = Read.read_USExpHSCode()
+        print("N:", G_combined.number_of_nodes())
+        print("M:", G_combined.number_of_edges())
 
-    # 过滤数据，只保留美国的港口
-    us_data = {
-        port_code: info
-        for port_code, info in port_data.items()
-        if "United States" in info.get("country_english", "")
-    }
-    us_data_dict = {value["english_name"]: key for key, value in us_data.items()}
+        # 使用 GraphML 保存图
+        nx.write_graphml(G_combined, f'../Data/{year}/US/Season/{season}/US{year}_{season}.graphml')
+#endregion
 
-    G = nx.MultiDiGraph()
-    for y in [year, year + 1]:
-        # 因为Winter横跨两年
-        US_data_path = 'D:/PortData/' + str(y) + '/USExport' + str(y) + '.csv'
+#region允许多边的图——>Digraph
+years = range(2017, 2022)
+seasons = ['Spring','Summer','Autumn','Winter']
 
-        # nrows = 1000000
-        DataFrame = pd.read_csv(US_data_path, header=None)
-        DataFrame.columns = ['panjivaRecordId', 'billOfLadingNumber', 'shpmtDate', 'shpCountry', 'shpmtDestination',
-                             'portOfUnlading', 'portOfLading', 'portOfLadingCountry', 'portOfUnladingCountry',
-                             'vessel', 'volumeTEU', 'weightKg', 'valueOfGoodsUSD']
-        # 剔除重复数据
-        DataFrame = DataFrame.drop_duplicates()
-        # 将 相关列转换为字符串类型
-        DataFrame['portOfUnlading'] = DataFrame['portOfUnlading'].astype(str)
-        DataFrame['portOfLading'] = DataFrame['portOfLading'].astype(str)
-        DataFrame['panjivaRecordId'] = DataFrame['panjivaRecordId'].astype(str)
-        DataFrame['portOfUnladingCountry'] = DataFrame['portOfUnladingCountry'].astype(str)
-        DataFrame['shpmtDate'] = DataFrame['shpmtDate'].astype(str)
+for year in years:
+    for season in seasons:
+        file_path = f'../Data/{year}/US/Season/{season}/US{year}_{season}.graphml'
+        if not os.path.exists(file_path):
+            print(f'⚠️ 文件不存在: {file_path}')
+            continue
+        Multi_G = nx.read_graphml(file_path)
 
-        print("DataFrame加载完毕")
+        # 假设 G 是 MultiDiGraph，边有 volumeTEU 属性
+        D = nx.DiGraph()  # 目标简单有向图
+        D.add_nodes_from(Multi_G.nodes(data=True))  # 1. 先拷节点属性
 
-        print(f"原始DataFrame大小:{len(DataFrame)}")
-        Origin_Len = len(DataFrame)
-        # # 剔除重复数据
-        # 删除 'panjivaRecordId' 列重复的行，只保留第一次出现的行
-        DataFrame = DataFrame.drop_duplicates(subset=['panjivaRecordId'], keep='first')
-        print(f"剔除重复数据后DataFrame大小:{len(DataFrame)}")
+        # 2. 把平行边的 TEU 累加
+        for u, v, data in Multi_G.edges(data=True):
+            teu = data.get('volumeTEU', 0)
+            if D.has_edge(u, v):
+                D[u][v]['volumeTEU'] += teu
+            else:
+                D.add_edge(u, v, volumeTEU=teu)
 
-        # 检查 volumeTEU、weightKg、valueOfGoodsUSD 字段中的空值数量
-        null_counts = DataFrame.isnull().sum()
-        print("每个字段的null值情况：")
-        print(null_counts / len(DataFrame))
+        # 使用 GraphML 保存图
+        nx.write_graphml(D, f'../Data/{year}/US/Season/{season}/US{year}_{season}_Digraph.graphml')
+#endregion
 
-        # 1 使用均值填充 TEU
-        DataFrame.fillna({'volumeTEU': DataFrame['volumeTEU'].mean()}, inplace=True)
-        # 2 删除 某某 列为空的行
-        DataFrame = DataFrame.dropna(subset=['portOfUnlading', 'portOfLading'])
+#region给节点加上 in_TEU out_TEU total_TEU
+# years = range(2017, 2022)
+# seasons = ['Spring','Summer','Autumn','Winter']
+# for year in years:
+#     for season in seasons:
+#         file_path = f'../Data/{year}/US/Season/{season}/US{year}_{season}_Digraph.graphml'
+#         if not os.path.exists(file_path):
+#             print(f'⚠️ 文件不存在: {file_path}')
+#             continue
+#         G = nx.read_graphml(file_path)
+#
+#         for node in G.nodes:
+#             G.nodes[node]['in_TEU'] = G.nodes[node]['out_TEU'] = G.nodes[node]['total_TEU'] = 0
+#             TEU_in = 0
+#             TEU_out = 0
+#             for _, _, attr in G.in_edges(node, data=True):
+#                 TEU_in += attr.get("volumeTEU", 0)
+#             for _, _, attr in G.out_edges(node, data=True):
+#                 TEU_out += attr.get("volumeTEU", 0)
+#             G.nodes[node]['in_TEU'] = TEU_in
+#             G.nodes[node]['out_TEU'] = TEU_out
+#             G.nodes[node]['total_TEU'] = TEU_in + TEU_out
+#         nx.write_graphml(G, f'../Data/{year}/US/Season/{season}/US{year}_{season}_Digraph.graphml')
+#endregion
 
-        print(f"剔除不能使用的数据后DataFrame大小:{len(DataFrame)}({len(DataFrame) / Origin_Len * 100:.2f}%)")
-        print("DataFrame处理完毕")
+#region给node加上洲属性
+# path = '../Data/Port/country_continent.json'
+# with open(path, 'r', encoding='utf-8') as f:
+#     port_continent = json.load(f)
+# years = range(2017, 2022)
+# seasons = ['Spring','Summer','Autumn','Winter']
+# for year in years:
+#     for season in seasons:
+#         file_path = f'../Data/{year}/US/Season/{season}/US{year}_{season}_Digraph.graphml'
+#         if not os.path.exists(file_path):
+#             print(f'⚠️ 文件不存在: {file_path}')
+#             continue
+#         G = nx.read_graphml(file_path)
+#         for node, attr in G.nodes(data=True):
+#             if node[:2] in port_continent.keys():
+#                 attr['continent'] = port_continent[node[:2]]["continent_code"]
+#             else:
+#                 print(node)
+#         nx.write_graphml(G, f'../Data/{year}/US/Season/{season}/US{year}_{season}_Digraph.graphml')
+#endregion
 
-        error_port = set()
-        timer = 0
-        # 计数用 记录有多少数据能够在 标准表中找到
-        USIndex = 0
-        OriIndex = 0
-
-        for index, row in DataFrame.iterrows():
-            timer += 1
-            if timer / len(DataFrame) > 0.01:
-                print('构建网络当前进度：{:.2%}'.format(index / len(DataFrame)))
-                timer = 0
-
-            # 过滤季节
-            month = int(row['shpmtDate'][5:7])  # 这里就直接字符串切片了
-            if (y == year and month not in last) or (y == year + 1 and month not in next):
-                continue
-
-            # 声明港口唯一代码
-            UnLading_Code = str()
-            Lading_Code = str()
-
-            # 声明一个 是否匹配 的bool值
-            match = False
-
-            portOfLading = row['portOfLading'].lower()
-            for us_port in us_data_dict.keys():
-                us_port_deal = us_port.lower().split(',', 1)[0]
-                if us_port_deal in portOfLading:
-                    USIndex += 1
-                    match = True
-                    # 将港口代码赋值给Lading_Code即可
-                    Lading_Code = us_data_dict[us_port]
-                    break
-            # 如果没有找到匹配的港口 则 continue
-            if not match:
-                error_port.add(portOfLading)
-                continue
-
-            # 声明一个 是否匹配 的bool值
-            match = False
-
-            portOfUnlading = row['portOfUnlading'].lower()
-            portOfUnlading = re.sub(r'[^a-zA-Z]', '', portOfUnlading)
-            portOfUnlading_country = row['portOfUnladingCountry'].lower()
-
-            for port in port_data:
-                port_name = port_data[port]["english_name"].lower()
-                port_name = re.sub(r'[^a-zA-Z]', '', port_name)
-                port_country = port_data[port]["country_english"].lower()
-                if port_name in portOfUnlading and portOfUnlading_country == port_country:
-                    OriIndex += 1
-                    match = True
-                    UnLading_Code = port
-                    break
-            if not match:
-                error_port.add(portOfUnlading)
-                continue
-
-            # 注意这里的字符串是 str 类型
-            if row['panjivaRecordId'] not in HSCode.keys():
-                continue
-            if HSCode[row['panjivaRecordId']] is None:
-                continue
-
-            # 创建一个字典来存储边的属性
-            edge_attrs = {
-                'volumeTEU': row['volumeTEU'],
-                'HSCode': HSCode[row['panjivaRecordId']],
-                'year': y,
-                'month': month
-            }
-            # 给 edge 和 node 添加属性
-            G.add_edge(Lading_Code, UnLading_Code, **edge_attrs)
-            G.nodes[Lading_Code]['Country'] = port_data[Lading_Code]["country_english"]
-            G.nodes[UnLading_Code]['Country'] = port_data[UnLading_Code]["country_english"]
-
-    # 使用 GraphML 保存图
-    nx.write_graphml(G, '../Data/' + str(year) + '/US/Season/Winter/USExport' + str(year) + '_Winter' + '.graphml')
-
-    print(USIndex / len(DataFrame))
-    print(OriIndex / len(DataFrame))
-    print("数据的最终利用率", G.number_of_edges() / Origin_Len)
+#region画图程序模板
+# # 1. 读取数据
+# df = pd.read_csv('Figure/all_in_one_Digraph.csv')
+# # 4. 创建画布和坐标轴
+# fig, ax = plt.subplots(figsize=(12, 6))  # 宽12英寸，高6英寸
+# # 5. 绘制折线图
+# # 绘制edges折线
+# ax.plot(df['time'], df['M'],
+#         label='Edges',
+#         color='blue',
+#         marker='o',  # 数据点标记
+#         linestyle='-',  # 线条样式
+#         linewidth=2,    # 线条宽度
+#         markersize=6)   # 标记大小
+# # 绘制nodes折线
+# ax.plot(df['time'], df['N'],
+#         label='Nodes',
+#         color='red',
+#         marker='s',  # 方形标记
+#         linestyle='--', # 虚线
+#         linewidth=2,
+#         markersize=6)
+# # 6. 设置坐标轴标签和标题
+# ax.set_xlabel('Time', fontsize=12)
+# ax.set_ylabel('Numbers', fontsize=12)
+# ax.set_title('Changes in the number of edges and nodes in the network over time', fontsize=14, pad=20)
+# # 7. 设置坐标轴刻度
+# ax.tick_params(axis='x', rotation=45)  # x轴标签旋转45度，避免重叠
+# ax.tick_params(axis='both', which='major', labelsize=10)
+# # 9. 添加图例
+# ax.legend(fontsize=10, loc='best')  # loc='best' 自动选择最佳位置
+# # 10. 调整布局，避免标签被截断
+# plt.tight_layout()
+# # 11. 保存图片（可选）
+# plt.savefig('Figure/Season/edges_nodes_time_series.png', dpi=300, bbox_inches='tight')
+# # 12. 显示图表
+# plt.show()
+#endregion

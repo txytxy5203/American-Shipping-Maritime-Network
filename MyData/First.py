@@ -455,7 +455,7 @@ def draw_length_efficiency_picture():
 
 
 #regionNetwork Structure
-def all_in_one(g, year) -> dict:
+def all_in_one(g, year, season) -> dict:
     """
     统一计算相应的基础指标
     :param g: 是一个无向无多边的简单图
@@ -509,7 +509,7 @@ def all_in_one(g, year) -> dict:
         entropy = np.nan
 
     return {
-        "year": year,
+        "time": f"{year}{season}",
         "N": N,
         "M": M,
         "avg_clustering": avg_clustering,
@@ -1037,73 +1037,124 @@ def write_US_port_centrality():
 #endregion
 
 
+# 把所有的度分布图都放在一起
+# 节点中信心指标全部列表
 
-ConstructNetwork.Save_Network_USImport_Season_Winter(2017)
-ConstructNetwork.Save_Network_USImport_Season_Winter(2018)
-ConstructNetwork.Save_Network_USImport_Season_Winter(2019)
-ConstructNetwork.Save_Network_USImport_Season_Winter(2020)
 
-# path = '../Data/Port/country_continent.json'
-# with open(path, 'r', encoding='utf-8') as f:
-#     port_continent = json.load(f)
-#
-# years = range(2017, 2022)
-# for year in years:
-#     file_path = f'../Data/{year}/US/US{year}_Digraph.graphml'
-#     if not os.path.exists(file_path):
-#         print(f'⚠️ 文件不存在: {file_path}')
-#         continue
-#     G = nx.read_graphml(file_path)
-#     # for node, attr in G.nodes(data=True):
-#     #     if node[:2] in port_continent.keys():
-#     #         attr['continent'] = port_continent[node[:2]]["continent_code"]
-#     #
-#     # nx.write_graphml(G, f'../Data/{year}/US/US{year}_Digraph.graphml')
+
 #regionMain
 # structure_metrics = []
 # years = range(2017, 2022)
-#
+# seasons = ['Spring','Summer','Autumn','Winter']
 # for year in years:
-#     file_path = f'../Data/{year}/US/US{year}_Digraph.graphml'
-#     if not os.path.exists(file_path):
-#         print(f'⚠️ 文件不存在: {file_path}')
-#         continue
-#     Multi_G = nx.read_graphml(file_path)
-#     G = nx.Graph(Multi_G)
+#     for season in seasons:
+#         file_path = f'../Data/{year}/US/Season/{season}/US{year}_{season}_Digraph.graphml'
+#         if not os.path.exists(file_path):
+#             print(f'⚠️ 文件不存在: {file_path}')
+#             continue
+#         DiGraph = nx.read_graphml(file_path)
+#         G = nx.Graph(DiGraph)
 #
+#         # G_null = G.copy()
+#         # nx.double_edge_swap(G_null, nswap=20000, max_tries=100000)
+#         # G_null.remove_edges_from(nx.selfloop_edges(G_null))
 #
-#     G_null = G.copy()
-#     nx.double_edge_swap(G_null, nswap=20000, max_tries=100000)
-#     G_null.remove_edges_from(nx.selfloop_edges(G_null))
-#
-#     result_year = all_in_one(G_null, year)
-#     structure_metrics.append(result_year)
-#     print(f"{year} is already down!")
+#         result_year = all_in_one(G, year, season)
+#         structure_metrics.append(result_year)
+#         print(f"{year} is already down!")
 #
 # # 保存成csv
 # df = pd.DataFrame(structure_metrics)
-# df.to_csv(f'Figure/all_in_one_zero_model.csv')
+# df.to_csv(f'Figure/all_in_one_Digraph.csv', index=False)
 #endregion
 
-#region加上一些属性
-# years = range(2017, 2018)
-# for year in years:
-#     file_path = f'../Data/{year}/US/US{year}_Digraph.graphml'
-#     if not os.path.exists(file_path):
-#         print(f'⚠️ 文件不存在: {file_path}')
-#         continue
-#     G = nx.read_graphml(file_path)
-#
-#     for node in G.nodes:
-#         G.nodes[node]['in_TEU'] = G.nodes[node]['out_TEU'] = G.nodes[node]['total_TEU'] = 0
-#         TEU_in = 0
-#         TEU_out = 0
-#         for _, _, attr in G.in_edges(node, data=True):
-#             TEU_in += attr.get("volumeTEU", 0)
-#         for _, _, attr in G.out_edges(node, data=True):
-#             TEU_out += attr.get("volumeTEU", 0)
-#         G.nodes[node]['in_TEU'] = TEU_in
-#         G.nodes[node]['out_TEU'] = TEU_out
-#         G.nodes[node]['total_TEU'] = TEU_in + TEU_out
-#     nx.write_graphml(G, f'../Data/{year}/US/US{year}_Digraph.graphml')
-#endregion
+def draw_edges_nodes_time_series():
+    # 1. 读取数据
+    df = pd.read_csv('Figure/all_in_one_Digraph.csv')
+    # 4. 创建画布和坐标轴
+    fig, ax1 = plt.subplots(figsize=(12, 6))  # 宽12英寸，高6英寸
+    # 2. 创建右侧Y轴（与左侧Y轴共享X轴，实现双轴对齐）
+    ax2 = ax1.twinx()  # 关键：生成与ax1共享X轴的第二个Y轴
+
+    # -------------------------- 4. 绘制双折线（分别绑定左右Y轴） --------------------------
+    # -------------------------- 左侧Y轴：Nodes（假设N列是Nodes数量） --------------------------
+    line1 = ax1.plot(
+        df['time'],  # X轴：时间
+        df['N'],     # Y轴：Nodes数量（绑定左侧ax1）
+        label='Nodes',  # 图例名称
+        color='red',  # 颜色（可选：用十六进制色更精准，这里是深蓝色）
+        marker='o',       # 数据点标记（圆形）
+        linestyle='-',    # 线条样式（实线）
+        linewidth=2.5,    # 线条宽度（加粗更清晰）
+        markersize=7      # 数据点大小
+    )
+
+    # -------------------------- 右侧Y轴：Edges（假设M列是Edges数量） --------------------------
+    line2 = ax2.plot(
+        df['time'],  # X轴：时间（与左侧共享，无需重复设置）
+        df['M'],     # Y轴：Edges数量（绑定右侧ax2）
+        label='Edges',  # 图例名称
+        color='blue',  # 颜色（深红色，与左侧区分明显）
+        marker='s',       # 数据点标记（方形，与圆形区分）
+        linestyle='--',   # 线条样式（虚线，与实线区分）
+        linewidth=2.5,    # 线条宽度（与左侧一致，保持美观）
+        markersize=7      # 数据点大小（与左侧一致）
+    )
+
+    # -------------------------- 5. 美化双轴标签与标题 --------------------------
+    # -------------------------- 左侧Y轴（ax1）设置 --------------------------
+    ax1.set_xlabel('Time', fontsize=12, fontweight='bold')  # X轴标签（加粗）
+    ax1.set_ylabel('Number of Nodes',  # 左侧Y轴标签（明确对应Nodes）
+                   color='red',    # 标签颜色与线条颜色一致
+                   fontsize=12,
+                   fontweight='bold')
+    ax1.tick_params(axis='y',  # 左侧Y轴刻度设置
+                    colors='red',  # 刻度颜色与线条一致
+                    labelsize=10)      # 刻度文字大小
+
+    # -------------------------- 右侧Y轴（ax2）设置 --------------------------
+    ax2.set_ylabel('Number of Edges',  # 右侧Y轴标签（明确对应Edges）
+                   color='blue',    # 标签颜色与线条颜色一致
+                   fontsize=12,
+                   fontweight='bold')
+    ax2.tick_params(axis='y',  # 右侧Y轴刻度设置
+                    colors='blue',  # 刻度颜色与线条一致
+                    labelsize=10)      # 刻度文字大小
+
+    # -------------------------- 标题与X轴刻度 --------------------------
+    ax1.set_title(
+        'Changes in the Number of Edges and Nodes in the Network Over Time',
+        fontsize=14,
+        fontweight='bold',
+        pad=20  # 标题与图表的间距（避免拥挤）
+    )
+    ax1.tick_params(axis='x', rotation=45)  # X轴时间标签旋转45度，避免文字重叠
+
+    # -------------------------- 6. 合并双轴图例（关键：避免图例重复） --------------------------
+    # 提取左右轴的图例，合并为一个（放在图表右侧，不遮挡数据）
+    lines1, labels1 = ax1.get_legend_handles_labels()  # 左侧轴图例
+    lines2, labels2 = ax2.get_legend_handles_labels()  # 右侧轴图例
+    ax1.legend(
+        lines1 + lines2,  # 合并图例线条
+        labels1 + labels2,  # 合并图例文字
+        fontsize=11,
+        loc='upper right',  # 图例位置（右上，不遮挡数据）
+        frameon=True,       # 显示图例边框
+        fancybox=True,      # 边框圆角
+        shadow=True         # 边框阴影（更立体）
+    )
+
+    # -------------------------- 7. 调整布局与保存 --------------------------
+    # 自动调整布局（避免标签、图例被截断）
+    plt.tight_layout()
+
+    # 保存图片（dpi=300为高清，bbox_inches='tight'避免裁剪边缘）
+    plt.savefig(
+        'Figure/Season/edges_nodes_time_series.png',
+        dpi=300,
+        bbox_inches='tight',
+        facecolor='white'  # 背景色为白色（避免保存后背景透明）
+    )
+
+    # 显示图表（运行时弹出窗口）
+    plt.show()
