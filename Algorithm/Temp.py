@@ -10,50 +10,50 @@ import powerlaw
 from ConstructNetwork import *
 
 
-#regioncombine Export and Import to Total
-years = range(2017, 2022)
-seasons = ['Spring','Summer','Autumn','Winter']
-for year in years:
-    for season in seasons:
-        G_Im = nx.read_graphml(f'../Data/{year}/US/Season/{season}/USImport{year}_{season}.graphml')
-        G_Ex = nx.read_graphml(f'../Data/{year}/US/Season/{season}/USExport{year}_{season}.graphml')
-
-        # 合并两个图
-        G_combined = nx.compose(G_Im, G_Ex)
-
-        print("N:", G_combined.number_of_nodes())
-        print("M:", G_combined.number_of_edges())
-
-        # 使用 GraphML 保存图
-        nx.write_graphml(G_combined, f'../Data/{year}/US/Season/{season}/US{year}_{season}.graphml')
-#endregion
+# #regioncombine Export and Import to Total
+# years = range(2017, 2022)
+# seasons = ['Spring','Summer','Autumn','Winter']
+# for year in years:
+#     for season in seasons:
+#         G_Im = nx.read_graphml(f'../Data/{year}/US/Season/{season}/USImport{year}_{season}.graphml')
+#         G_Ex = nx.read_graphml(f'../Data/{year}/US/Season/{season}/USExport{year}_{season}.graphml')
+#
+#         # 合并两个图
+#         G_combined = nx.compose(G_Im, G_Ex)
+#
+#         print("N:", G_combined.number_of_nodes())
+#         print("M:", G_combined.number_of_edges())
+#
+#         # 使用 GraphML 保存图
+#         nx.write_graphml(G_combined, f'../Data/{year}/US/Season/{season}/US{year}_{season}.graphml')
+# #endregion
 
 #region允许多边的图——>Digraph
-years = range(2017, 2022)
-seasons = ['Spring','Summer','Autumn','Winter']
-
-for year in years:
-    for season in seasons:
-        file_path = f'../Data/{year}/US/Season/{season}/US{year}_{season}.graphml'
-        if not os.path.exists(file_path):
-            print(f'⚠️ 文件不存在: {file_path}')
-            continue
-        Multi_G = nx.read_graphml(file_path)
-
-        # 假设 G 是 MultiDiGraph，边有 volumeTEU 属性
-        D = nx.DiGraph()  # 目标简单有向图
-        D.add_nodes_from(Multi_G.nodes(data=True))  # 1. 先拷节点属性
-
-        # 2. 把平行边的 TEU 累加
-        for u, v, data in Multi_G.edges(data=True):
-            teu = data.get('volumeTEU', 0)
-            if D.has_edge(u, v):
-                D[u][v]['volumeTEU'] += teu
-            else:
-                D.add_edge(u, v, volumeTEU=teu)
-
-        # 使用 GraphML 保存图
-        nx.write_graphml(D, f'../Data/{year}/US/Season/{season}/US{year}_{season}_Digraph.graphml')
+# years = range(2017, 2022)
+# seasons = ['Spring','Summer','Autumn','Winter']
+#
+# for year in years:
+#     for season in seasons:
+#         file_path = f'../Data/{year}/US/Season/{season}/US{year}_{season}.graphml'
+#         if not os.path.exists(file_path):
+#             print(f'⚠️ 文件不存在: {file_path}')
+#             continue
+#         Multi_G = nx.read_graphml(file_path)
+#
+#         # 假设 G 是 MultiDiGraph，边有 volumeTEU 属性
+#         D = nx.DiGraph()  # 目标简单有向图
+#         D.add_nodes_from(Multi_G.nodes(data=True))  # 1. 先拷节点属性
+#
+#         # 2. 把平行边的 TEU 累加
+#         for u, v, data in Multi_G.edges(data=True):
+#             teu = data.get('volumeTEU', 0)
+#             if D.has_edge(u, v):
+#                 D[u][v]['volumeTEU'] += teu
+#             else:
+#                 D.add_edge(u, v, volumeTEU=teu)
+#
+#         # 使用 GraphML 保存图
+#         nx.write_graphml(D, f'../Data/{year}/US/Season/{season}/US{year}_{season}_Digraph.graphml')
 #endregion
 
 #region给节点加上 in_TEU out_TEU total_TEU
@@ -140,16 +140,3 @@ for year in years:
 # # 12. 显示图表
 # plt.show()
 #endregion
-
-
-for year in years:
-    for season in seasons:
-        if year == 2021 and season == 'Summer':  # 因为2021年的数据只到8月份
-            continue
-        file_path = f'../Data/{year}/US/Season/{season}/US{year}_{season}_Digraph.graphml'
-        if not os.path.exists(file_path):
-            print(f'⚠️ 文件不存在: {file_path}')
-            continue
-        G = nx.read_graphml(file_path)
-        total_teu = sum(float(d.get('volumeTEU', 0)) for _, _, d in G.edges(data=True))
-        records.append({'time': f"{year}_{season}", 'total_TEU': total_teu})

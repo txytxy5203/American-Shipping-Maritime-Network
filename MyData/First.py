@@ -1333,4 +1333,81 @@ def write_US_port_centrality():
 # df.to_csv(f'Figure/all_in_one_Digraph.csv', index=False)
 #endregion
 
+def draw_top5_countries_trading_with_the_US():
+    """
+    与美国交易TEU最多的top5国家除了中国
+    :return:
+    """
+    df = pd.read_csv('InputData/country_teu.csv')
+    record = {}
+    # 定义函数：获取每行最大的n个值（最多5个）及其列名
+    def get_top5(row):
+        # 排除第一列（time列），处理剩余数值列
+        value_columns = row.index[1:]  # 获取除time外的列名
+        values = row[value_columns]  # 获取对应的值
 
+        # 按值降序排序，取前5个（不足5个则取全部）
+        sorted_values = values.sort_values(ascending=False).head(5)
+
+        # 提取列名和值，用NaN填充不足5个的位置
+        top_names = list(sorted_values.index) + [np.nan] * (5 - len(sorted_values))
+        top_values = list(sorted_values.values) + [np.nan] * (5 - len(sorted_values))
+
+        top = {key: value for key, value in zip(top_names, top_values)}
+        # 组合结果：时间 + 列名 + 值
+        record[row['time']] = top
+
+
+    # 应用函数到每一行
+    df.apply(get_top5, axis=1)
+
+    # -------------------------- 1. 国家样式配置 --------------------------
+    country_styles = {
+        'China': {'color': '#E74C3C', 'marker': 'o', 'linestyle': '-'},  # 红色+圆形+实线
+        'South Korea': {'color': '#3498DB', 'marker': 's', 'linestyle': '--'},  # 蓝色+方形+虚线
+        'Japan': {'color': '#F39C12', 'marker': '^', 'linestyle': '-.'},  # 橙色+三角形+点线
+        'Germany': {'color': '#2ECC71', 'marker': 'D', 'linestyle': ':'},  # 绿色+菱形+点线
+        'Belgium': {'color': '#9B59B6', 'marker': 'p', 'linestyle': '-'},  # 紫色+五边形+实线
+        'Vietnam': {'color': '#1ABC9C', 'marker': '*', 'linestyle': '--'},  # 青色+星形+虚线
+        'Canada': {'color': '#F1C40F', 'marker': 'h', 'linestyle': '-.'},  # 黄色+六边形+点线
+        'Singapore': {'color': '#34495E', 'marker': 'X', 'linestyle': '-'}  # 深灰色+X形标记+实线
+    }
+    fig, ax = plt.subplots(figsize=(12, 6))  # 宽12英寸，高6英寸
+    years = range(2017, 2022)
+    seasons = ['Spring','Summer','Autumn','Winter']
+    for country, attr in country_styles.items():
+        if country == 'China':
+            continue
+        time_line = []
+        value_line = []
+        for year in years:
+            for season in seasons:
+                if (year == 2021 and
+                        (season == 'Summer' or season == 'Autumn' or season == 'Winter')):
+                    continue
+                time = f'{year}_{season}'
+                if country in record[time]:
+                    time_line.append(time)
+                    value_line.append(record[time][country])
+                # 5. 绘制折线图
+                # 绘制edges折线
+        ax.plot(time_line, value_line,
+                label=country,
+                color=country_styles[country]['color'],
+                marker=country_styles[country]['marker'],  # 数据点标记
+                linestyle=country_styles[country]['linestyle'],  # 线条样式
+                linewidth=2,    # 线条宽度
+                markersize=6)   # 标记大小
+    # 6. 设置坐标轴标签和标题
+    ax.set_xlabel('Time', fontsize=12)
+    ax.set_ylabel('TEU', fontsize=12)
+    ax.set_title('Chart of TEU changes for the top five countries trading with the United States', fontsize=14, pad=20)
+    # 7. 设置坐标轴刻度
+    ax.tick_params(axis='x', rotation=45)  # x轴标签旋转45度，避免重叠
+    ax.tick_params(axis='both', which='major', labelsize=10)
+    # 9. 添加图例
+    ax.legend(fontsize=10, loc='best')  # loc='best' 自动选择最佳位置
+    # 10. 调整布局，避免标签被截断
+    plt.tight_layout()
+    plt.savefig('Figure/Season/Chart of TEU changes for the top five countries trading with the United States.png', dpi=300, bbox_inches='tight')
+    plt.show()
