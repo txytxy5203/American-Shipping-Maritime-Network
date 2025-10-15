@@ -522,82 +522,263 @@ def all_in_one(g, year, season) -> dict:
         "spectral_radius": spectral_radius,
         "mcc_sizes": mcc_sizes
     }
-def draw_total_TEU():
+def draw_edges_nodes_time_series():
     """
-    画出总的TEU变化图   有点丑下次记得修改
+    根据 all in one 的数据画出 edges和nodes变化图
     :return:
     """
-    YEARS = range(2017, 2022)  # 一年一个单位
-    DATA_DIR = '../Data'
-    OUTPUT_DIR = 'Figure'
-    os.makedirs(OUTPUT_DIR, exist_ok=True)
+    # 1. 读取数据
+    df = pd.read_csv('Figure/all_in_one_Digraph.csv')
+    # 4. 创建画布和坐标轴
+    fig, ax1 = plt.subplots(figsize=(12, 6))  # 宽12英寸，高6英寸
+    # 2. 创建右侧Y轴（与左侧Y轴共享X轴，实现双轴对齐）
+    ax2 = ax1.twinx()  # 关键：生成与ax1共享X轴的第二个Y轴
 
+    # -------------------------- 4. 绘制双折线（分别绑定左右Y轴） --------------------------
+    # -------------------------- 左侧Y轴：Nodes（假设N列是Nodes数量） --------------------------
+    ax1.plot(
+        df['time'],  # X轴：时间
+        df['N'],     # Y轴：Nodes数量（绑定左侧ax1）
+        label='Nodes',  # 图例名称
+        color='red',  # 颜色（可选：用十六进制色更精准，这里是深蓝色）
+        marker='o',       # 数据点标记（圆形）
+        linestyle='-',    # 线条样式（实线）
+        linewidth=2.5,    # 线条宽度（加粗更清晰）
+        markersize=7      # 数据点大小
+    )
+
+    # -------------------------- 右侧Y轴：Edges（假设M列是Edges数量） --------------------------
+    ax2.plot(
+        df['time'],  # X轴：时间（与左侧共享，无需重复设置）
+        df['M'],     # Y轴：Edges数量（绑定右侧ax2）
+        label='Edges',  # 图例名称
+        color='blue',  # 颜色（深红色，与左侧区分明显）
+        marker='s',       # 数据点标记（方形，与圆形区分）
+        linestyle='--',   # 线条样式（虚线，与实线区分）
+        linewidth=2.5,    # 线条宽度（与左侧一致，保持美观）
+        markersize=7      # 数据点大小（与左侧一致）
+    )
+
+    # -------------------------- 5. 美化双轴标签与标题 --------------------------
+    # -------------------------- 左侧Y轴（ax1）设置 --------------------------
+    ax1.set_xlabel('Time', fontsize=12, fontweight='bold')  # X轴标签（加粗）
+    ax1.set_ylabel('Number of Nodes',  # 左侧Y轴标签（明确对应Nodes）
+                   color='red',    # 标签颜色与线条颜色一致
+                   fontsize=12,
+                   fontweight='bold')
+    ax1.tick_params(axis='y',  # 左侧Y轴刻度设置
+                    colors='red',  # 刻度颜色与线条一致
+                    labelsize=10)      # 刻度文字大小
+
+    # -------------------------- 右侧Y轴（ax2）设置 --------------------------
+    ax2.set_ylabel('Number of Edges',  # 右侧Y轴标签（明确对应Edges）
+                   color='blue',    # 标签颜色与线条颜色一致
+                   fontsize=12,
+                   fontweight='bold')
+    ax2.tick_params(axis='y',  # 右侧Y轴刻度设置
+                    colors='blue',  # 刻度颜色与线条一致
+                    labelsize=10)      # 刻度文字大小
+
+    # -------------------------- 标题与X轴刻度 --------------------------
+    ax1.set_title(
+        'Changes in the Number of Edges and Nodes in the Network Over Time',
+        fontsize=14,
+        fontweight='bold',
+        pad=20  # 标题与图表的间距（避免拥挤）
+    )
+    ax1.tick_params(axis='x', rotation=45)  # X轴时间标签旋转45度，避免文字重叠
+
+    # -------------------------- 6. 合并双轴图例（关键：避免图例重复） --------------------------
+    # 提取左右轴的图例，合并为一个（放在图表右侧，不遮挡数据）
+    lines1, labels1 = ax1.get_legend_handles_labels()  # 左侧轴图例
+    lines2, labels2 = ax2.get_legend_handles_labels()  # 右侧轴图例
+    ax1.legend(
+        lines1 + lines2,  # 合并图例线条
+        labels1 + labels2,  # 合并图例文字
+        fontsize=11,
+        loc='upper right',  # 图例位置（右上，不遮挡数据）
+        frameon=True,       # 显示图例边框
+        fancybox=True,      # 边框圆角
+        shadow=True         # 边框阴影（更立体）
+    )
+
+    # -------------------------- 7. 调整布局与保存 --------------------------
+    # 自动调整布局（避免标签、图例被截断）
+    plt.tight_layout()
+
+    # 保存图片（dpi=300为高清，bbox_inches='tight'避免裁剪边缘）
+    plt.savefig(
+        'Figure/Season/edges_nodes_time_series.png',
+        dpi=300,
+        bbox_inches='tight',
+        facecolor='white'  # 背景色为白色（避免保存后背景透明）
+    )
+
+    # 显示图表（运行时弹出窗口）
+    plt.show()
+def draw_total_teu():
+    """
+    画出总的TEU变化图
+    :return:
+    """
+    years = range(2017, 2022)  # 一年一个单位
+    seasons = ['Spring', 'Summer', 'Autumn', 'Winter']
     records = []
-    for y in YEARS:
-        path = f'{DATA_DIR}/{y}/US/US{y}.graphml'
-        if not os.path.exists(path):
-            print(f'⚠️ 文件不存在: {path}')
-            continue
-        G = nx.read_graphml(path)
-        total_teu = sum(float(d.get('volumeTEU', 0)) for _, _, d in G.edges(data=True))
-        records.append({'year': y, 'total_TEU': total_teu})
+
+    for year in years:
+        for season in seasons:
+            if year == 2021 and season == 'Summer':  # 因为2021年的数据只到8月份
+                continue
+            file_path = f'../Data/{year}/US/Season/{season}/US{year}_{season}_Digraph.graphml'
+            if not os.path.exists(file_path):
+                print(f'⚠️ 文件不存在: {file_path}')
+                continue
+            G = nx.read_graphml(file_path)
+            total_teu = sum(float(d.get('volumeTEU', 0)) for _, _, d in G.edges(data=True))
+            records.append({'time': f"{year}_{season}", 'total_TEU': total_teu})
 
     df = pd.DataFrame(records)
-    df.to_csv(f'{OUTPUT_DIR}/US_total_TEU_year.csv', index=False)
 
-    fig, ax = plt.subplots(figsize=(7, 4))
-    sns.set_style('whitegrid')
-    sns.lineplot(data=df, x='year', y='total_TEU', marker='o', lw=2.5)
-
-    # 1. 强制整年横坐标
-    ax.set_xticks(list(YEARS))
-
-    # 2. 纵轴刻度：2×10⁷、3×10⁷ …
-    ax.yaxis.set_major_formatter(ScalarFormatter(useMathText=True))
-    ax.ticklabel_format(style='sci', axis='y', scilimits=(7, 7))
-
-    # 3. 其余不变
-    plt.title('Total TEU Flow of U.S. Port Network (2017–2021)', fontsize=14)
-    plt.xlabel('Year')
-    plt.ylabel('Total TEU')
+    # 4. 创建画布和坐标轴
+    fig, ax = plt.subplots(figsize=(12, 6))  # 宽12英寸，高6英寸
+    # 5. 绘制折线图
+    ax.plot(df['time'], df['total_TEU'],
+            label='TEU',
+            color='blue',
+            marker='o',  # 数据点标记
+            linestyle='-',  # 线条样式
+            linewidth=2,  # 线条宽度
+            markersize=6)  # 标记大小
+    # 6. 设置坐标轴标签和标题
+    ax.set_xlabel('Time', fontsize=12)
+    ax.set_ylabel('TEU', fontsize=12)
+    ax.set_title('Changes in the TEU in the network over time', fontsize=14, pad=20)
+    # 7. 设置坐标轴刻度
+    ax.tick_params(axis='x', rotation=45)  # x轴标签旋转45度，避免重叠
+    ax.tick_params(axis='both', which='major', labelsize=10)
+    # 9. 添加图例
+    ax.legend(fontsize=10, loc='best')  # loc='best' 自动选择最佳位置
+    # 10. 调整布局，避免标签被截断
     plt.tight_layout()
-    plt.savefig(f'{OUTPUT_DIR}/US_total_TEU_year.png', dpi=300, bbox_inches='tight')
-
+    # 11. 保存图片（可选）
+    plt.savefig('Figure/Season/teu_time_series.png', dpi=300, bbox_inches='tight')
+    # 12. 显示图表
     plt.show()
+def draw_total_teu_and_us_cn_teu():
+    """
+    美国的总体teu 和 与中国交易的teu 变化趋势图
+    :return:
+    """
+    # 中美贸易变化图
+    years = range(2017, 2022)  # 一年一个单位
+    seasons = ['Spring', 'Summer', 'Autumn', 'Winter']
+    us_cn_records = []
+    total_records = []
+
+    for year in years:
+        for season in seasons:
+            if year == 2021 and season == 'Summer':  # 因为2021年的数据只到8月份
+                continue
+            file_path = f'../Data/{year}/US/Season/{season}/US{year}_{season}_Digraph.graphml'
+            if not os.path.exists(file_path):
+                print(f'⚠️ 文件不存在: {file_path}')
+                continue
+            G = nx.read_graphml(file_path)
+            us_cn_teu = 0
+            total_teu = 0
+            for u, v, data in G.edges(data=True):
+                u_country = G.nodes[u].get('Country', 'Unknown')
+                v_country = G.nodes[v].get('Country', 'Unknown')
+                # 总量teu
+                total_teu += data['volumeTEU']
+                # 中美teu
+                if (u_country == 'United States' and v_country == 'China' or
+                        u_country == 'China' and v_country == 'United States'):
+                    us_cn_teu += data['volumeTEU']
+
+            total_records.append({
+                'time': f"{year}_{season}",
+                'total_teu': total_teu}
+            )
+            us_cn_records.append({
+                'time': f"{year}_{season}",
+                'us_cn_teu': us_cn_teu
+            })
+    df_us_cn = pd.DataFrame(us_cn_records)
+    df = pd.DataFrame(total_records)
+    # 4. 创建画布和坐标轴
+    fig, ax = plt.subplots(figsize=(12, 6))  # 宽12英寸，高6英寸
+    # 5. 绘制折线图
+    ax.plot(df_us_cn['time'], df_us_cn['us_cn_teu'],
+            label='us and cn teu',
+            color='blue',
+            marker='o',  # 数据点标记
+            linestyle='-',  # 线条样式
+            linewidth=2,  # 线条宽度
+            markersize=6)  # 标记大小
+    ax.plot(df['time'], df['total_teu'],
+            label='total teu',
+            color='red',
+            marker='o',  # 数据点标记
+            linestyle='-',  # 线条样式
+            linewidth=2,  # 线条宽度
+            markersize=6)  # 标记大小
+    # 6. 设置坐标轴标签和标题
+    ax.set_xlabel('Time', fontsize=12)
+    ax.set_ylabel('TEU', fontsize=12)
+    ax.set_title('Changes in the TEU', fontsize=14, pad=20)
+    # 7. 设置坐标轴刻度
+    ax.tick_params(axis='x', rotation=45)  # x轴标签旋转45度，避免重叠
+    ax.tick_params(axis='both', which='major', labelsize=10)
+    # 9. 添加图例
+    ax.legend(fontsize=10, loc='best')  # loc='best' 自动选择最佳位置
+    # 10. 调整布局，避免标签被截断
+    plt.tight_layout()
+    # 11. 保存图片（可选）
+    plt.savefig('Figure/Season/total_teu_and_us_cn_teu_time_series.png', dpi=300, bbox_inches='tight')
+    # 12. 显示图表
+    plt.show()
+
 def calculate_US_top10_node_pairs_by_TEU_year():
-    YEARS = range(2017, 2022)
-    DATA_DIR = '../Data'
-    OUTPUT_DIR = 'Figure'
-    os.makedirs(OUTPUT_DIR, exist_ok=True)
+    """
+    计算出每一个时间段的的TEU最大的edges （nodes之间的TEU 包含了两个方向）
+    :return:
+    """
+    years = range(2017, 2022)
+    seasons = ['Spring','Summer','Autumn','Winter']
+    top_edges = []
 
-    all_rows = []
+    for year in years:
+        for season in seasons:
+            if year == 2021 and season == 'Summer':                 # 因为2021年的数据只到8月份
+                continue
+            file_path = f'../Data/{year}/US/Season/{season}/US{year}_{season}_Digraph.graphml'
+            if not os.path.exists(file_path):
+                print(f'⚠️ 文件不存在: {file_path}')
+                continue
+            G = nx.read_graphml(file_path)
 
-    for y in YEARS:
-        G = nx.read_graphml(f'{DATA_DIR}/{y}/US/US{y}.graphml')
 
-        # 用 MultiGraph 方便累加
-        MG = nx.MultiGraph(G)
+            # 按节点对累加 TEU
+            flows = {}
+            for u, v, d in G.edges(data=True):
+                pair = tuple(sorted([u, v]))  # 无向，排序去重
+                flows[pair] = flows.get(pair, 0) + float(d.get('volumeTEU', 0))
 
-        # 按节点对累加 TEU
-        flows = {}
-        for u, v, d in MG.edges(data=True):
-            pair = tuple(sorted([u, v]))  # 无向，排序去重
-            flows[pair] = flows.get(pair, 0) + float(d.get('volumeTEU', 0))
+            # 转成 DataFrame
+            data = [{'time': f"{year}_{season}", 'from': pair[0], 'to': pair[1], 'total_TEU': teu}
+                    for pair, teu in flows.items()]
 
-        # 转成 DataFrame
-        data = [{'year': y, 'from': pair[0], 'to': pair[1], 'total_TEU': teu}
-                for pair, teu in flows.items()]
-
-        # 当年 Top
-        top = pd.DataFrame(data).sort_values('total_TEU', ascending=False).head(30)
-        all_rows.append(top)
-    df = pd.concat(all_rows, ignore_index=True)
-    df.to_csv(f'{OUTPUT_DIR}/US_top10_node_pairs_by_TEU_year.csv', index=False)
+            # 当年 Top
+            top = pd.DataFrame(data).sort_values('total_TEU', ascending=False).head(30)
+            top_edges.append(top)
+    df = pd.concat(top_edges, ignore_index=True)
+    df.to_csv(f'InputData/US_top_edges_by_TEU.csv', index=False)
 def draw_top10_TEU_edges_map():
-    def draw_year(year):
+    def draw_year(time):
         """
         绘图函数（只建一次地图，复用）
-        :param year:
+        :param time:
         :return:
         """
         fig, ax = plt.subplots(figsize=(10, 7))
@@ -607,13 +788,13 @@ def draw_top10_TEU_edges_map():
         world_map.drawcoastlines()
 
         # ---------- 画港口 ----------
-        ports = year_to_ports.get(year, set())
+        ports = year_to_ports.get(time, set())
         if ports:
             lon = [shift_lon(port_coords[p][0]) for p in ports]
             lat = [port_coords[p][1] for p in ports]
             x, y = world_map(lon, lat)
             # 按 TEU 总和决定大小
-            sizes = [year_to_node_size[year].get(p, base_sz) for p in ports]
+            sizes = [year_to_node_size[time].get(p, base_sz) for p in ports]
 
             # 拆成两套索引
             us_idx = [i for i, p in enumerate(ports) if p.startswith('US')]
@@ -636,8 +817,8 @@ def draw_top10_TEU_edges_map():
                                       zorder=10, label='Foreign Port')
 
         # ---------- 画边（带 TEU→透明度映射） ----------
-        edges = year_to_edges.get(year, [])
-        widths = year_to_edge_width[year]  # 线宽 Series
+        edges = year_to_edges.get(time, [])
+        widths = year_to_edge_width[time]  # 线宽 Series
         teus = edges['total_TEU']  # 原始 TEU
         # 透明度映射：TEU 最小→0.35，最大→1.0
         alphas = 0.5 + 0.5 * (teus - teus.min()) / (
@@ -659,9 +840,9 @@ def draw_top10_TEU_edges_map():
             bx, by = bezier([x1, y1], [cx1, cy1], [cx2, cy2], [x2, y2], num=100)
             world_map.plot(bx, by, linewidth=w, color='blue', zorder=5, alpha=alpha)
 
-        ax.set_title(f'Top 30 TEU Links – {year}')
+        ax.set_title(f'Top 30 TEU Links – {time}')
         ax.legend()
-        fig.savefig(f'Figure/Top10/US_top30_edges_worldmap_{year}.svg',
+        fig.savefig(f'Figure/Season/TopTeuEdges/US_top30_edges_worldmap_{time}.svg',
                     dpi=300, bbox_inches='tight')
         # plt.show()
         plt.close(fig)  # 防止内存泄漏
@@ -707,13 +888,13 @@ def draw_top10_TEU_edges_map():
         # 1. 读 Top10 边
 
 
-    top30_edges = pd.read_csv('Figure/US_top10_node_pairs_by_TEU_year.csv')
+    top30_edges = pd.read_csv('InputData/US_top_edges_by_TEU.csv')
     # 2. 读港口坐标
     Port_Data = ConstructNetwork.Read_Port_Data()
     port_coords = {
-        node: (float(d["longitude"]), float(d["latitude"]))
-        for node, d in Port_Data.items()
-        if "longitude" in d and "latitude" in d
+        node: (float(info["longitude"]), float(info["latitude"]))
+        for node, info in Port_Data.items()
+        if "longitude" in info and "latitude" in info
     }
 
     # 按年份分组，提前建好 {year: set_of_ports} 和 {year: edges}
@@ -729,11 +910,11 @@ def draw_top10_TEU_edges_map():
     base_sz = 20  # 最小点
     max_sz = 200  # 最大点
 
-    for year, group in top30_edges.groupby('year'):  # 按照year分成若干份DataFrame
+    for season, group in top30_edges.groupby('time'):  # 按照time分成若干份DataFrame
         # 港口和连接
         ports = set(group['from']).union(set(group['to']))
-        year_to_ports[year] = {p for p in ports if p in port_coords}
-        year_to_edges[year] = group[
+        year_to_ports[season] = {p for p in ports if p in port_coords}
+        year_to_edges[season] = group[
             (group['from'].isin(port_coords)) & (group['to'].isin(port_coords))
             ]
 
@@ -741,7 +922,7 @@ def draw_top10_TEU_edges_map():
         # 1. 边宽：按 TEU 占比线性映射
         teu = group['total_TEU']
         share = (teu - teu.min()) / (teu.max() - teu.min()) if teu.max() != teu.min() else 0
-        year_to_edge_width[year] = base_lw + share * (max_lw - base_lw)
+        year_to_edge_width[season] = base_lw + share * (max_lw - base_lw)
 
         # 2. 节点大小：把每条边的 TEU 累加到两端港口
         node_teus = {}
@@ -755,11 +936,18 @@ def draw_top10_TEU_edges_map():
             for n in node_teus:
                 sh = (node_teus[n] - min_t) / (max_t - min_t) if max_t != min_t else 0
                 node_teus[n] = base_sz + sh * (max_sz - base_sz)
-        year_to_node_size[year] = node_teus
+        year_to_node_size[season] = node_teus
 
     # 主循环（支持多年）
-    for year in range(2017, 2022):  # 现在只 2017，但你可以扩到 2017–2023
-        draw_year(year)
+    for year in range(2017, 2022):
+        for season in ['Spring','Summer','Autumn','Winter']:
+            if year == 2021 and season == 'Summer':                 # 因为2021年的数据只到8月份
+                continue
+            file_path = f'../Data/{year}/US/Season/{season}/US{year}_{season}_Digraph.graphml'
+            if not os.path.exists(file_path):
+                print(f'⚠️ 文件不存在: {file_path}')
+                continue
+            draw_year(f"{year}_{season}")
 def write_adjlist_attr(G, path, attr='volumeTEU', encoding='utf-8'):
     """
     将 DiGraph 导出成邻接表
@@ -1048,6 +1236,8 @@ def write_US_port_centrality():
 # seasons = ['Spring','Summer','Autumn','Winter']
 # for year in years:
 #     for season in seasons:
+#         if year == 2021 and season == 'Summer':                 # 因为2021年的数据只到8月份
+#             continue
 #         file_path = f'../Data/{year}/US/Season/{season}/US{year}_{season}_Digraph.graphml'
 #         if not os.path.exists(file_path):
 #             print(f'⚠️ 文件不存在: {file_path}')
@@ -1068,93 +1258,78 @@ def write_US_port_centrality():
 # df.to_csv(f'Figure/all_in_one_Digraph.csv', index=False)
 #endregion
 
-def draw_edges_nodes_time_series():
-    # 1. 读取数据
-    df = pd.read_csv('Figure/all_in_one_Digraph.csv')
-    # 4. 创建画布和坐标轴
-    fig, ax1 = plt.subplots(figsize=(12, 6))  # 宽12英寸，高6英寸
-    # 2. 创建右侧Y轴（与左侧Y轴共享X轴，实现双轴对齐）
-    ax2 = ax1.twinx()  # 关键：生成与ax1共享X轴的第二个Y轴
-
-    # -------------------------- 4. 绘制双折线（分别绑定左右Y轴） --------------------------
-    # -------------------------- 左侧Y轴：Nodes（假设N列是Nodes数量） --------------------------
-    line1 = ax1.plot(
-        df['time'],  # X轴：时间
-        df['N'],     # Y轴：Nodes数量（绑定左侧ax1）
-        label='Nodes',  # 图例名称
-        color='red',  # 颜色（可选：用十六进制色更精准，这里是深蓝色）
-        marker='o',       # 数据点标记（圆形）
-        linestyle='-',    # 线条样式（实线）
-        linewidth=2.5,    # 线条宽度（加粗更清晰）
-        markersize=7      # 数据点大小
-    )
-
-    # -------------------------- 右侧Y轴：Edges（假设M列是Edges数量） --------------------------
-    line2 = ax2.plot(
-        df['time'],  # X轴：时间（与左侧共享，无需重复设置）
-        df['M'],     # Y轴：Edges数量（绑定右侧ax2）
-        label='Edges',  # 图例名称
-        color='blue',  # 颜色（深红色，与左侧区分明显）
-        marker='s',       # 数据点标记（方形，与圆形区分）
-        linestyle='--',   # 线条样式（虚线，与实线区分）
-        linewidth=2.5,    # 线条宽度（与左侧一致，保持美观）
-        markersize=7      # 数据点大小（与左侧一致）
-    )
-
-    # -------------------------- 5. 美化双轴标签与标题 --------------------------
-    # -------------------------- 左侧Y轴（ax1）设置 --------------------------
-    ax1.set_xlabel('Time', fontsize=12, fontweight='bold')  # X轴标签（加粗）
-    ax1.set_ylabel('Number of Nodes',  # 左侧Y轴标签（明确对应Nodes）
-                   color='red',    # 标签颜色与线条颜色一致
-                   fontsize=12,
-                   fontweight='bold')
-    ax1.tick_params(axis='y',  # 左侧Y轴刻度设置
-                    colors='red',  # 刻度颜色与线条一致
-                    labelsize=10)      # 刻度文字大小
-
-    # -------------------------- 右侧Y轴（ax2）设置 --------------------------
-    ax2.set_ylabel('Number of Edges',  # 右侧Y轴标签（明确对应Edges）
-                   color='blue',    # 标签颜色与线条颜色一致
-                   fontsize=12,
-                   fontweight='bold')
-    ax2.tick_params(axis='y',  # 右侧Y轴刻度设置
-                    colors='blue',  # 刻度颜色与线条一致
-                    labelsize=10)      # 刻度文字大小
-
-    # -------------------------- 标题与X轴刻度 --------------------------
-    ax1.set_title(
-        'Changes in the Number of Edges and Nodes in the Network Over Time',
-        fontsize=14,
-        fontweight='bold',
-        pad=20  # 标题与图表的间距（避免拥挤）
-    )
-    ax1.tick_params(axis='x', rotation=45)  # X轴时间标签旋转45度，避免文字重叠
-
-    # -------------------------- 6. 合并双轴图例（关键：避免图例重复） --------------------------
-    # 提取左右轴的图例，合并为一个（放在图表右侧，不遮挡数据）
-    lines1, labels1 = ax1.get_legend_handles_labels()  # 左侧轴图例
-    lines2, labels2 = ax2.get_legend_handles_labels()  # 右侧轴图例
-    ax1.legend(
-        lines1 + lines2,  # 合并图例线条
-        labels1 + labels2,  # 合并图例文字
-        fontsize=11,
-        loc='upper right',  # 图例位置（右上，不遮挡数据）
-        frameon=True,       # 显示图例边框
-        fancybox=True,      # 边框圆角
-        shadow=True         # 边框阴影（更立体）
-    )
-
-    # -------------------------- 7. 调整布局与保存 --------------------------
-    # 自动调整布局（避免标签、图例被截断）
-    plt.tight_layout()
-
-    # 保存图片（dpi=300为高清，bbox_inches='tight'避免裁剪边缘）
-    plt.savefig(
-        'Figure/Season/edges_nodes_time_series.png',
-        dpi=300,
-        bbox_inches='tight',
-        facecolor='white'  # 背景色为白色（避免保存后背景透明）
-    )
-
-    # 显示图表（运行时弹出窗口）
-    plt.show()
+# years = range(2017, 2022)  # 一年一个单位
+# seasons = ['Spring', 'Summer', 'Autumn', 'Winter']
+# records = []
+#
+# for year in years:
+#     for season in seasons:
+#         if year == 2021 and season == 'Summer':  # 因为2021年的数据只到8月份
+#             continue
+#         file_path = f'../Data/{year}/US/Season/{season}/US{year}_{season}_Digraph.graphml'
+#         if not os.path.exists(file_path):
+#             print(f'⚠️ 文件不存在: {file_path}')
+#             continue
+#         G = nx.read_graphml(file_path)
+#
+#         country_teu = {}
+#         for u, v, data in G.edges(data=True):
+#             u_country = G.nodes[u].get('Country', 'Unknown')
+#             v_country = G.nodes[v].get('Country', 'Unknown')
+#
+#             # 只处理涉及美国的边
+#             if u_country == 'United States' and v_country != 'United States':
+#                 target_country = v_country
+#             elif v_country == 'United States' and u_country != 'United States':
+#                 target_country = u_country
+#             else:
+#                 # 跳过不涉及美国的边或美国与美国之间的边
+#                 print("均不是美国")
+#                 continue
+#
+#             # 确保volumeTEU是数值类型
+#             try:
+#                 teu = float(data.get('volumeTEU', 0))
+#             except (ValueError, TypeError):
+#                 print("数值有问题")
+#                 teu = 0  # 处理无效数值的情况
+#
+#             # 关键修正：检查字典中是否已有该国家，没有则初始化
+#             if target_country in country_teu:
+#                 country_teu[target_country] += teu
+#             else:
+#                 country_teu[target_country] = teu
+#         # 将结果添加到记录中
+#         records.append({
+#             'time': f"{year}_{season}",
+#             'country_teu': country_teu
+#         })
+#         print(f"✅ 已处理: {year}_{season}")
+# for record in records:
+#     print(record)
+# # 1. 处理每条记录，将国家-TEU字典拆分为键值对
+# expanded_records = []
+# for record in records:
+#     # 以time为基础创建新字典
+#     expanded = {'time': record['time']}
+#     # 加入每个国家的TEU数据
+#     for country, teu in record['country_teu'].items():
+#         expanded[country] = teu
+#     expanded_records.append(expanded)
+#
+# # 2. 转换为DataFrame（缺失的国家数据会自动填充为NaN）
+# df = pd.DataFrame(expanded_records)
+#
+# # 3. 将NaN填充为0（表示该季节与该国无贸易数据）
+# df = df.fillna(0)
+#
+# # 4. 调整列顺序：确保time在第一列
+# columns = ['time'] + [col for col in df.columns if col != 'time']
+# df = df[columns]
+#
+# # 5. 显示结果
+# print("转换后的DataFrame：")
+# print(df.head())
+#
+# # 6. 保存为CSV（可选）
+# df.to_csv('InputData/country_teu.csv', index=False)

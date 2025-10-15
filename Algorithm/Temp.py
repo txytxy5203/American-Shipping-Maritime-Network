@@ -140,3 +140,16 @@ for year in years:
 # # 12. 显示图表
 # plt.show()
 #endregion
+
+
+for year in years:
+    for season in seasons:
+        if year == 2021 and season == 'Summer':  # 因为2021年的数据只到8月份
+            continue
+        file_path = f'../Data/{year}/US/Season/{season}/US{year}_{season}_Digraph.graphml'
+        if not os.path.exists(file_path):
+            print(f'⚠️ 文件不存在: {file_path}')
+            continue
+        G = nx.read_graphml(file_path)
+        total_teu = sum(float(d.get('volumeTEU', 0)) for _, _, d in G.edges(data=True))
+        records.append({'time': f"{year}_{season}", 'total_TEU': total_teu})

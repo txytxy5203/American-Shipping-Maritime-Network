@@ -38,6 +38,27 @@ class ConstructNetwork:
         return ''.join([c for c in normalized if ord(c) < 128])
 
     @classmethod
+    def change_hk_tw_am_to_china(cls):
+        """
+        把香港 台湾 澳门 的国家属性改成China
+        :return:
+        """
+        years = range(2017, 2022)  # 一年一个单位
+        seasons = ['Spring', 'Summer', 'Autumn', 'Winter']
+        for year in years:
+            for season in seasons:
+                file_path = f'../Data/{year}/US/Season/{season}/US{year}_{season}_Digraph.graphml'
+                if not os.path.exists(file_path):
+                    print(f'⚠️ 文件不存在: {file_path}')
+                    continue
+                G = nx.read_graphml(file_path)
+                for node, attr in G.nodes(data=True):
+                    country = attr.get('Country')
+                    if country in ['Hong Kong', 'Taiwan', 'Macau']:
+                        attr['Country'] = 'China'
+                        print(f"change the {node}")
+                nx.write_graphml(G, file_path)
+    @classmethod
     def Save_MultiDiGraph_To_Digraph(cls):
         years = range(2017, 2018)
 
