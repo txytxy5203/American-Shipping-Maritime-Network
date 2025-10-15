@@ -738,7 +738,82 @@ def draw_total_teu_and_us_cn_teu():
     plt.savefig('Figure/Season/total_teu_and_us_cn_teu_time_series.png', dpi=300, bbox_inches='tight')
     # 12. 显示图表
     plt.show()
+def write_country_teu():
+    years = range(2017, 2022)  # 一年一个单位
+    seasons = ['Spring', 'Summer', 'Autumn', 'Winter']
+    records = []
 
+    for year in years:
+        for season in seasons:
+            if year == 2021 and season == 'Summer':  # 因为2021年的数据只到8月份
+                continue
+            file_path = f'../Data/{year}/US/Season/{season}/US{year}_{season}_Digraph.graphml'
+            if not os.path.exists(file_path):
+                print(f'⚠️ 文件不存在: {file_path}')
+                continue
+            G = nx.read_graphml(file_path)
+
+            country_teu = {}
+            for u, v, data in G.edges(data=True):
+                u_country = G.nodes[u].get('Country', 'Unknown')
+                v_country = G.nodes[v].get('Country', 'Unknown')
+
+                # 只处理涉及美国的边
+                if u_country == 'United States' and v_country != 'United States':
+                    target_country = v_country
+                elif v_country == 'United States' and u_country != 'United States':
+                    target_country = u_country
+                else:
+                    # 跳过不涉及美国的边或美国与美国之间的边
+                    print("均不是美国")
+                    continue
+
+                # 确保volumeTEU是数值类型
+                try:
+                    teu = float(data.get('volumeTEU', 0))
+                except (ValueError, TypeError):
+                    print("数值有问题")
+                    teu = 0  # 处理无效数值的情况
+
+                # 关键修正：检查字典中是否已有该国家，没有则初始化
+                if target_country in country_teu:
+                    country_teu[target_country] += teu
+                else:
+                    country_teu[target_country] = teu
+            # 将结果添加到记录中
+            records.append({
+                'time': f"{year}_{season}",
+                'country_teu': country_teu
+            })
+            print(f"✅ 已处理: {year}_{season}")
+    for record in records:
+        print(record)
+    # 1. 处理每条记录，将国家-TEU字典拆分为键值对
+    expanded_records = []
+    for record in records:
+        # 以time为基础创建新字典
+        expanded = {'time': record['time']}
+        # 加入每个国家的TEU数据
+        for country, teu in record['country_teu'].items():
+            expanded[country] = teu
+        expanded_records.append(expanded)
+
+    # 2. 转换为DataFrame（缺失的国家数据会自动填充为NaN）
+    df = pd.DataFrame(expanded_records)
+
+    # 3. 将NaN填充为0（表示该季节与该国无贸易数据）
+    df = df.fillna(0)
+
+    # 4. 调整列顺序：确保time在第一列
+    columns = ['time'] + [col for col in df.columns if col != 'time']
+    df = df[columns]
+
+    # 5. 显示结果
+    print("转换后的DataFrame：")
+    print(df.head())
+
+    # 6. 保存为CSV（可选）
+    df.to_csv('InputData/country_teu.csv', index=False)
 def calculate_US_top10_node_pairs_by_TEU_year():
     """
     计算出每一个时间段的的TEU最大的edges （nodes之间的TEU 包含了两个方向）
@@ -1258,78 +1333,4 @@ def write_US_port_centrality():
 # df.to_csv(f'Figure/all_in_one_Digraph.csv', index=False)
 #endregion
 
-# years = range(2017, 2022)  # 一年一个单位
-# seasons = ['Spring', 'Summer', 'Autumn', 'Winter']
-# records = []
-#
-# for year in years:
-#     for season in seasons:
-#         if year == 2021 and season == 'Summer':  # 因为2021年的数据只到8月份
-#             continue
-#         file_path = f'../Data/{year}/US/Season/{season}/US{year}_{season}_Digraph.graphml'
-#         if not os.path.exists(file_path):
-#             print(f'⚠️ 文件不存在: {file_path}')
-#             continue
-#         G = nx.read_graphml(file_path)
-#
-#         country_teu = {}
-#         for u, v, data in G.edges(data=True):
-#             u_country = G.nodes[u].get('Country', 'Unknown')
-#             v_country = G.nodes[v].get('Country', 'Unknown')
-#
-#             # 只处理涉及美国的边
-#             if u_country == 'United States' and v_country != 'United States':
-#                 target_country = v_country
-#             elif v_country == 'United States' and u_country != 'United States':
-#                 target_country = u_country
-#             else:
-#                 # 跳过不涉及美国的边或美国与美国之间的边
-#                 print("均不是美国")
-#                 continue
-#
-#             # 确保volumeTEU是数值类型
-#             try:
-#                 teu = float(data.get('volumeTEU', 0))
-#             except (ValueError, TypeError):
-#                 print("数值有问题")
-#                 teu = 0  # 处理无效数值的情况
-#
-#             # 关键修正：检查字典中是否已有该国家，没有则初始化
-#             if target_country in country_teu:
-#                 country_teu[target_country] += teu
-#             else:
-#                 country_teu[target_country] = teu
-#         # 将结果添加到记录中
-#         records.append({
-#             'time': f"{year}_{season}",
-#             'country_teu': country_teu
-#         })
-#         print(f"✅ 已处理: {year}_{season}")
-# for record in records:
-#     print(record)
-# # 1. 处理每条记录，将国家-TEU字典拆分为键值对
-# expanded_records = []
-# for record in records:
-#     # 以time为基础创建新字典
-#     expanded = {'time': record['time']}
-#     # 加入每个国家的TEU数据
-#     for country, teu in record['country_teu'].items():
-#         expanded[country] = teu
-#     expanded_records.append(expanded)
-#
-# # 2. 转换为DataFrame（缺失的国家数据会自动填充为NaN）
-# df = pd.DataFrame(expanded_records)
-#
-# # 3. 将NaN填充为0（表示该季节与该国无贸易数据）
-# df = df.fillna(0)
-#
-# # 4. 调整列顺序：确保time在第一列
-# columns = ['time'] + [col for col in df.columns if col != 'time']
-# df = df[columns]
-#
-# # 5. 显示结果
-# print("转换后的DataFrame：")
-# print(df.head())
-#
-# # 6. 保存为CSV（可选）
-# df.to_csv('InputData/country_teu.csv', index=False)
+
