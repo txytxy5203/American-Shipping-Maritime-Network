@@ -3,14 +3,12 @@ import networkx as nx
 import pandas as pd
 import numpy as np
 import sys
-
-from scipy.cluster.hierarchy import weighted
-
 sys.path.append('../Algorithm')
 import re
 import json
 import powerlaw
 from ConstructNetwork import *
+from collections import deque
 
 
 # #regioncombine Export and Import to Total
@@ -145,46 +143,117 @@ from ConstructNetwork import *
 #endregion
 
 
-# G = nx.DiGraph()
-# edge_list = [
-#     ('A', 'B',{ 'weight': 1}),     # 节点1-2
-#     ('B', 'A', {'weight': 1}),      # 节点3-1
-#     ('A', 'C', {'weight': 2}),       # 节点3-1
-#     ('C', 'A', {'weight': 2}),       # 节点3-1
-#     ('B', 'C', {'weight': 1}),       # 节点3-1
-#     ('C', 'B', {'weight': 1}),       # 节点3-1
-# ]
-# G.add_edges_from(edge_list)
-#
-# N = G.number_of_nodes()
-#
-# weighted_bc = nx.betweenness_centrality(G, weight='weight')
-# bc = nx.betweenness_centrality(G)
-# # cc = nx.closeness_centrality(G)
-# print(weighted_bc)
-# print(bc)
 
 
-# 创建一个示例图
-G = nx.DiGraph()
-edges = [
-    (1, 2, {'volumeTEU': 1}),
-    (1, 3, {'volumeTEU': 2}),
-    (2, 3, {'volumeTEU': 3}),
-    (2, 4, {'volumeTEU': 4}),
-    (3, 4, {'volumeTEU': 2}),
-    (4, 5, {'volumeTEU': 3}),
-    (4, 6, {'volumeTEU': 4}),
-    (5, 6, {'volumeTEU': 4}),
-    (5, 7, {'volumeTEU': 3}),
-    (6, 7, {'volumeTEU': 2}),
-]
-G.add_edges_from(edges)
 
-pagerank_scores = nx.pagerank(
-    G,
-    alpha=0.85,             # 阻尼系数d（默认0.85）
-    weight='volumeTEU',     # 使用权重属性（无权重时省略）
-    tol=1e-6                # 收敛阈值（默认1e-6）
-)
-print(pagerank_scores)
+
+def weighted_k_core(G, k, weight='volumeTEU', degree_type='total'):
+    """
+    计算加权有向图的k-核（支持加权度、加权入度、加权出度）
+
+    参数:
+        G: 有向图 (nx.DiGraph)
+        k: k-核的阶数
+        weight: 边的权重属性名称（默认'weight'）
+        degree_type: 加权度类型
+            'total'：加权度（总权重和）
+            'in'：加权入度（入边权重和）
+            'out'：加权出度（出边权重和）
+
+    返回:
+        子图 (nx.DiGraph)：满足条件的k-核
+    """
+    # 复制原图避免修改输入
+    H = G.copy()
+    n = H.number_of_nodes()
+    if n == 0:
+        return H
+
+    # 1. 初始化节点的加权度
+    def get_weighted_degree(node):
+        if degree_type == 'total':
+            deg = sum(data.get(weight, 1.0) for _,_, data in H.edges(node, data=True))
+            return deg
+        elif degree_type == 'in':
+            return sum(data.get(weight, 1.0) for _, _, data in H.in_edges(node, data=True))
+        elif degree_type == 'out':
+            return sum(data.get(weight, 1.0) for _, _, data in H.out_edges(node, data=True))
+        else:
+            raise ValueError("degree_type必须是'total'、'in'或'out'")
+
+    # 计算初始加权度
+    weighted_degrees = {node: get_weighted_degree(node) for node in H.nodes()}
+
+    # 2. 迭代剥离加权度 < k 的节点
+    # 使用队列存储待处理节点（加权度 < k）
+    queue = deque([node for node, deg in weighted_degrees.items() if deg < k])
+
+    while queue:
+        u = queue.popleft()
+        if u not in H.nodes():  # 已被移除
+            continue
+
+        # 记录与u相连的节点（用于后续更新加权度）
+        neighbors = list(H.neighbors(u))  # 获取u的所有邻居
+
+        # 移除节点u
+        H.remove_node(u)
+
+        # 3. 更新邻居的加权度，并检查是否需要加入队列
+        for v in neighbors:
+            if v not in H.nodes():
+                continue
+            # 重新计算v的加权度
+            new_deg = get_weighted_degree(v)
+            old_deg = weighted_degrees[v]
+            weighted_degrees[v] = new_deg
+            # 若v的加权度从≥k变为<k，加入队列
+            if old_deg >= k and new_deg < k:
+                queue.append(v)
+    return H
+
+
+# -------------------------- 示例用法 --------------------------
+if __name__ == "__main__":
+    # 创建带权重的有向图
+    # G = nx.DiGraph()
+    # edges = [
+    #     (1, 2, {'weight': 1}),
+    #     (1, 3, {'weight': 1}),
+    #     (2, 4, {'weight': 1}),
+    #     (3, 4, {'weight': 1}),
+    #     (4, 2, {'weight': 1}),
+    #     (5, 3, {'weight': 1}),
+    #     (2, 3, {'weight': 1}),
+    #     (1, 4, {'weight': 1}),
+    #     (2, 6, {'weight': 1})
+    # ]
+    # G.add_edges_from(edges)
+    G = nx.les_miserables_graph()
+
+
+
+    k = 1
+    core_number_dict = {}
+    max_weight = max(dict(nx.degree(G, weight='weight')).values())
+
+    while k < max_weight + 2:
+
+        k_core_total = weighted_k_core(G, k=k, degree_type='total')
+        for node in k_core_total:
+            core_number_dict[node] = k
+
+        k += 1
+
+    print(core_number_dict)
+    print(nx.core_number(G))
+
+
+    # k_core_in = weighted_k_core(G, k=2, degree_type='in')
+    # print(k_core_in.nodes())
+    # print(k_core_in.edges(), "\n")
+    #
+    #
+    # k_core_out = weighted_k_core(G, k=2, degree_type='out')
+    # print(k_core_out.nodes())
+    # print(k_core_out.edges())

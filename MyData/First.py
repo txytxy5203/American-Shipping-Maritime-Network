@@ -32,7 +32,6 @@ def rich_club_phi(G, k):
     if nk < 2:
         return np.nan
     return 2 * H.number_of_edges() / (nk * (nk - 1))
-
 def calc_metrics(G):
     """计算 14 个网络基本指标"""
     # 基础规模
@@ -106,6 +105,71 @@ def calc_metrics(G):
         'global_efficiency': eff,
         'total_strength': total_strength
     }
+def weighted_k_core(G, k, weight='volumeTEU', degree_type='total'):
+    """
+    计算加权有向图的k-核（支持加权度、加权入度、加权出度）
+
+    参数:
+        G: 有向图 (nx.DiGraph)
+        k: k-核的阶数
+        weight: 边的权重属性名称（默认'weight'）
+        degree_type: 加权度类型
+            'total'：加权度（总权重和）
+            'in'：加权入度（入边权重和）
+            'out'：加权出度（出边权重和）
+
+    返回:
+        子图 (nx.DiGraph)：满足条件的k-核
+    """
+    # 复制原图避免修改输入
+    H = G.copy()
+    n = H.number_of_nodes()
+    if n == 0:
+        return H
+
+    # 1. 初始化节点的加权度
+    def get_weighted_degree(node):
+        if degree_type == 'total':
+            deg = sum(data.get(weight, 1.0) for _,_, data in H.edges(node, data=True))
+            return deg
+        elif degree_type == 'in':
+            return sum(data.get(weight, 1.0) for _, _, data in H.in_edges(node, data=True))
+        elif degree_type == 'out':
+            return sum(data.get(weight, 1.0) for _, _, data in H.out_edges(node, data=True))
+        else:
+            raise ValueError("degree_type必须是'total'、'in'或'out'")
+
+    # 计算初始加权度
+    weighted_degrees = {node: get_weighted_degree(node) for node in H.nodes()}
+
+    # 2. 迭代剥离加权度 < k 的节点
+    # 使用队列存储待处理节点（加权度 < k）
+    queue = deque([node for node, deg in weighted_degrees.items() if deg < k])
+
+    while queue:
+        u = queue.popleft()
+        if u not in H.nodes():  # 已被移除
+            continue
+
+        # 记录与u相连的节点（用于后续更新加权度）
+        neighbors = list(H.neighbors(u))  # 获取u的所有邻居
+
+        # 移除节点u
+        H.remove_node(u)
+
+        # 3. 更新邻居的加权度，并检查是否需要加入队列
+        for v in neighbors:
+            if v not in H.nodes():
+                continue
+            # 重新计算v的加权度
+            new_deg = get_weighted_degree(v)
+            old_deg = weighted_degrees[v]
+            weighted_degrees[v] = new_deg
+            # 若v的加权度从≥k变为<k，加入队列
+            if old_deg >= k and new_deg < k:
+                queue.append(v)
+    return H
+
 
 #region未处理的函数
 def draw_nodes_edges_picture():
@@ -1455,6 +1519,7 @@ def freight_traffic_network_layer():
     weighted_dc_record = {}
     weighted_bc_record = {}
     weighted_ec_record = {}
+    weighted_pagerank_record = {}
 
     years = range(2017, 2022)
     seasons = ['Spring','Summer','Autumn','Winter']
@@ -1491,13 +1556,24 @@ def freight_traffic_network_layer():
             # weighted betweenness centrality
             weighted_bc_record[time] = nx.betweenness_centrality(DiGraph, weight='volumeTEU')
 
+            # weighted pagerank scores
+            weighted_pagerank_record[time] = nx.pagerank(
+                DiGraph,
+                alpha=0.85,
+                weight='volumeTEU',
+                tol=1e-6
+            )
+
             # # weighted eigen centrality  加权特征向量中心性 暂时计算不了  迭代不出来解
             # weighted_ec_record = nx.eigenvector_centrality(DiGraph, weight='volumeTEU', max_iter=100000, tol= 1e-5)
 
     pathlib.Path('InputData/ports_weighted_degree_centrality.json').write_text(json.dumps(weighted_dc_record, indent=2))
     pathlib.Path('InputData/ports_weighted_betweenness_centrality.json').write_text(json.dumps(weighted_bc_record, indent=2))
+    pathlib.Path('InputData/ports_weighted_pagerank_scores.json').write_text(json.dumps(weighted_pagerank_record, indent=2))
+
     # pathlib.Path('InputData/ports_weighted_eigenvector_centrality.json').write_text(json.dumps(weighted_ec_record, indent=2))
 freight_traffic_network_layer()
+
 # record = {}
 # years = range(2017, 2022)
 # seasons = ['Spring','Summer','Autumn','Winter']
