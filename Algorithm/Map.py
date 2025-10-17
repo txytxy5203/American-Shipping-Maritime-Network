@@ -97,7 +97,7 @@ def draw_world_ports_in_out_degree_heat_map(g, type:str) ->None:
                  for node in g.nodes()
                  if "latitude" in Port_Data[node].keys() and "longitude" in Port_Data[node].keys()]
     elif type == "all":
-        coord = [(float(Port_Data[node]["longitude"]), float(Port_Data[node]["latitude"]), g.degree(node), node)
+        coord = [(float(Port_Data[node]["longitude"]), float(Port_Data[node]["latitude"]), g.weighted_degree(node), node)
                  for node in g.nodes()
                  if "latitude" in Port_Data[node].keys() and "longitude" in Port_Data[node].keys()]
 

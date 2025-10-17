@@ -58,7 +58,7 @@ def graph_draw(graph):
     plt.figure(figsize=(10, 10))  # 展示整体的网络
     # plt.figure(figsize=(3, 3)) # 展示大象网络
     nx.draw(graph,
-            node_size=[10 * graph.degree(n) for n in graph],
+            node_size=[10 * graph.weighted_degree(n) for n in graph],
             node_color=[graph.depth[n] for n in graph],
             alpha=0.8,
             font_size=4,

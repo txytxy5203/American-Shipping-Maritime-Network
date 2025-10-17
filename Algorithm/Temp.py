@@ -3,6 +3,9 @@ import networkx as nx
 import pandas as pd
 import numpy as np
 import sys
+
+from scipy.cluster.hierarchy import weighted
+
 sys.path.append('../Algorithm')
 import re
 import json
@@ -140,3 +143,48 @@ from ConstructNetwork import *
 # # 12. 显示图表
 # plt.show()
 #endregion
+
+
+# G = nx.DiGraph()
+# edge_list = [
+#     ('A', 'B',{ 'weight': 1}),     # 节点1-2
+#     ('B', 'A', {'weight': 1}),      # 节点3-1
+#     ('A', 'C', {'weight': 2}),       # 节点3-1
+#     ('C', 'A', {'weight': 2}),       # 节点3-1
+#     ('B', 'C', {'weight': 1}),       # 节点3-1
+#     ('C', 'B', {'weight': 1}),       # 节点3-1
+# ]
+# G.add_edges_from(edge_list)
+#
+# N = G.number_of_nodes()
+#
+# weighted_bc = nx.betweenness_centrality(G, weight='weight')
+# bc = nx.betweenness_centrality(G)
+# # cc = nx.closeness_centrality(G)
+# print(weighted_bc)
+# print(bc)
+
+
+# 创建一个示例图
+G = nx.DiGraph()
+edges = [
+    (1, 2, {'volumeTEU': 1}),
+    (1, 3, {'volumeTEU': 2}),
+    (2, 3, {'volumeTEU': 3}),
+    (2, 4, {'volumeTEU': 4}),
+    (3, 4, {'volumeTEU': 2}),
+    (4, 5, {'volumeTEU': 3}),
+    (4, 6, {'volumeTEU': 4}),
+    (5, 6, {'volumeTEU': 4}),
+    (5, 7, {'volumeTEU': 3}),
+    (6, 7, {'volumeTEU': 2}),
+]
+G.add_edges_from(edges)
+
+pagerank_scores = nx.pagerank(
+    G,
+    alpha=0.85,             # 阻尼系数d（默认0.85）
+    weight='volumeTEU',     # 使用权重属性（无权重时省略）
+    tol=1e-6                # 收敛阈值（默认1e-6）
+)
+print(pagerank_scores)

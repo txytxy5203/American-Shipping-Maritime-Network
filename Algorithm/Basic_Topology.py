@@ -135,10 +135,10 @@ def draw_degree_cluster(g, is_mean=False):
         # 存放 度 和 聚类系数 之间的关系
         degree_cluster = {}
         for node in g:
-            if g.degree(node) in degree_cluster.keys():
-                degree_cluster[g.degree(node)] += nx.clustering(g, node)
+            if g.weighted_degree(node) in degree_cluster.keys():
+                degree_cluster[g.weighted_degree(node)] += nx.clustering(g, node)
             else:
-                degree_cluster[g.degree(node)] = nx.clustering(g, node)
+                degree_cluster[g.weighted_degree(node)] = nx.clustering(g, node)
 
         degree_frequency_numbers = nx.degree_histogram(g)  # 度的频数
         degree_cluster = {key: value / degree_frequency_numbers[key] for key, value in degree_cluster.items()}
@@ -153,7 +153,7 @@ def draw_degree_cluster(g, is_mean=False):
         degree = []
         cluster = []
         for node in g:
-            degree.append(g.degree[node])
+            degree.append(g.weighted_degree[node])
             cluster.append(nx.clustering(g, node))
 
         plt.scatter(degree, cluster, marker='^', c='blue')
@@ -174,7 +174,7 @@ def draw_degree_knn(g, is_mean=False):
     else:
         node_knn = nx.average_neighbor_degree(g)
         # 一个由 tuple 组成的 list   tuple中的第一个元素表示度值 第二个为Knn
-        degree_knn = [(g.degree[key], value) for key, value in node_knn.items()]
+        degree_knn = [(g.weighted_degree[key], value) for key, value in node_knn.items()]
 
         plt.scatter([data[0] for data in degree_knn], [data[1] for data in degree_knn], marker='s', c='red')
         plt.xlabel("K")
@@ -194,10 +194,10 @@ def draw_degree_betweenness_centrality(g, is_mean=False):
         # 存放 度 和 中介中心性 之间的关系
         degree_betweenness_centrality = {}
         for node in g:
-            if g.degree(node) in degree_betweenness_centrality.keys():
-                degree_betweenness_centrality[g.degree(node)] += degree_betweenness[node]
+            if g.weighted_degree(node) in degree_betweenness_centrality.keys():
+                degree_betweenness_centrality[g.weighted_degree(node)] += degree_betweenness[node]
             else:
-                degree_betweenness_centrality[g.degree(node)] = degree_betweenness[node]
+                degree_betweenness_centrality[g.weighted_degree(node)] = degree_betweenness[node]
 
         degree_frequency_numbers = nx.degree_histogram(g)  # 度的频数
         degree_betweenness_centrality = {key: value / degree_frequency_numbers[key] for key, value in
@@ -210,7 +210,7 @@ def draw_degree_betweenness_centrality(g, is_mean=False):
         plt.show()
     else:
         degree_betweenness = nx.betweenness_centrality(g)
-        node_BC = [(g.degree[key], value) for key, value in degree_betweenness.items()]
+        node_BC = [(g.weighted_degree[key], value) for key, value in degree_betweenness.items()]
 
         plt.scatter([data[0] for data in node_BC], [data[1] for data in node_BC], marker='^', c='blue')
         plt.xlabel("K")
@@ -266,7 +266,7 @@ def zero_model(g):
     :param g: 传入一个图
     :return:  返回一个零模型随机图  近似拥有相同度分布 因为删去了 平行边 和 自环
     '''
-    degree = list(dict(g.degree()).values())
+    degree = list(dict(g.weighted_degree()).values())
 
     # 零模型
     g1 = nx.configuration_model(degree)  # 保持度分布不变 随机重连
@@ -318,7 +318,7 @@ def draw_participation_coefficient(g,communities):
             P = 1
             # 这里是P值的公式 其实就是 熵的概念
             for i in temp:
-                P -= (i / g.degree[node]) ** 2
+                P -= (i / g.weighted_degree[node]) ** 2
             P_dict[node] = P
 
     P_value = list(P_dict.values())
@@ -440,7 +440,7 @@ def draw_strength_frequency_distribution(g):
     '''
     N = g.number_of_nodes()
     # 计算每个节点的强度
-    port_strengths = {node: val for (node, val) in g.degree(weight='weight')}
+    port_strengths = {node: val for (node, val) in g.weighted_degree(weight='weight')}
 
     strengths = port_strengths.values()
     # 统计每个强度出现的次数

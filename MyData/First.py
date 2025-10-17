@@ -26,7 +26,7 @@ from heapq import nlargest
 # ---------- 工具函数 ----------
 def rich_club_phi(G, k):
     """无权无向 rich-club coefficient @ degree k"""
-    rich = [n for n, d in G.degree() if d >= k]
+    rich = [n for n, d in G.weighted_degree() if d >= k]
     H = G.subgraph(rich)
     nk = len(rich)
     if nk < 2:
@@ -45,8 +45,8 @@ def calc_metrics(G):
 
     # 度 & 强度（交易次数）
     # 后续再加上交易TEU的强度
-    degrees = [d for _, d in G.degree()]
-    strengths = [d for _, d in G.degree(weight='weight')]
+    degrees = [d for _, d in G.weighted_degree()]
+    strengths = [d for _, d in G.weighted_degree(weight='weight')]
     avg_degree = np.mean(degrees)
     avg_strength = np.mean(strengths)
 
@@ -814,6 +814,84 @@ def write_country_teu():
 
     # 6. 保存为CSV（可选）
     df.to_csv('InputData/country_teu.csv', index=False)
+def draw_top5_countries_trading_with_the_US():
+    """
+    与美国交易TEU最多的top5国家除了中国
+    :return:
+    """
+    df = pd.read_csv('InputData/country_teu.csv')
+    record = {}
+    # 定义函数：获取每行最大的n个值（最多5个）及其列名
+    def get_top5(row):
+        # 排除第一列（time列），处理剩余数值列
+        value_columns = row.index[1:]  # 获取除time外的列名
+        values = row[value_columns]  # 获取对应的值
+
+        # 按值降序排序，取前5个（不足5个则取全部）
+        sorted_values = values.sort_values(ascending=False).head(5)
+
+        # 提取列名和值，用NaN填充不足5个的位置
+        top_names = list(sorted_values.index) + [np.nan] * (5 - len(sorted_values))
+        top_values = list(sorted_values.values) + [np.nan] * (5 - len(sorted_values))
+
+        top = {key: value for key, value in zip(top_names, top_values)}
+
+        record[row['time']] = top
+
+
+    # 应用函数到每一行
+    df.apply(get_top5, axis=1)
+
+    # -------------------------- 1. 国家样式配置 --------------------------
+    country_styles = {
+        'China': {'color': '#E74C3C', 'marker': 'o', 'linestyle': '-'},  # 红色+圆形+实线
+        'South Korea': {'color': '#3498DB', 'marker': 's', 'linestyle': '--'},  # 蓝色+方形+虚线
+        'Japan': {'color': '#F39C12', 'marker': '^', 'linestyle': '-.'},  # 橙色+三角形+点线
+        'Germany': {'color': '#2ECC71', 'marker': 'D', 'linestyle': ':'},  # 绿色+菱形+点线
+        'Belgium': {'color': '#9B59B6', 'marker': 'p', 'linestyle': '-'},  # 紫色+五边形+实线
+        'Vietnam': {'color': '#1ABC9C', 'marker': '*', 'linestyle': '--'},  # 青色+星形+虚线
+        'Canada': {'color': '#F1C40F', 'marker': 'h', 'linestyle': '-.'},  # 黄色+六边形+点线
+        'Singapore': {'color': '#34495E', 'marker': 'X', 'linestyle': '-'}  # 深灰色+X形标记+实线
+    }
+    fig, ax = plt.subplots(figsize=(12, 6))  # 宽12英寸，高6英寸
+    years = range(2017, 2022)
+    seasons = ['Spring','Summer','Autumn','Winter']
+    for country, attr in country_styles.items():
+        if country == 'China':
+            continue
+        time_line = []
+        value_line = []
+        for year in years:
+            for season in seasons:
+                if (year == 2021 and
+                        (season == 'Summer' or season == 'Autumn' or season == 'Winter')):
+                    continue
+                time = f'{year}_{season}'
+                if country in record[time]:
+                    time_line.append(time)
+                    value_line.append(record[time][country])
+                # 5. 绘制折线图
+                # 绘制edges折线
+        ax.plot(time_line, value_line,
+                label=country,
+                color=country_styles[country]['color'],
+                marker=country_styles[country]['marker'],  # 数据点标记
+                linestyle=country_styles[country]['linestyle'],  # 线条样式
+                linewidth=2,    # 线条宽度
+                markersize=6)   # 标记大小
+    # 6. 设置坐标轴标签和标题
+    ax.set_xlabel('Time', fontsize=12)
+    ax.set_ylabel('TEU', fontsize=12)
+    ax.set_title('Chart of TEU changes for the top five countries trading with the United States', fontsize=14, pad=20)
+    # 7. 设置坐标轴刻度
+    ax.tick_params(axis='x', rotation=45)  # x轴标签旋转45度，避免重叠
+    ax.tick_params(axis='both', which='major', labelsize=10)
+    # 9. 添加图例
+    ax.legend(fontsize=10, loc='best')  # loc='best' 自动选择最佳位置
+    # 10. 调整布局，避免标签被截断
+    plt.tight_layout()
+    plt.savefig('Figure/Season/Chart of TEU changes for the top five countries trading with the United States.png', dpi=300, bbox_inches='tight')
+    plt.show()
 def calculate_US_top10_node_pairs_by_TEU_year():
     """
     计算出每一个时间段的的TEU最大的edges （nodes之间的TEU 包含了两个方向）
@@ -1277,7 +1355,7 @@ def write_US_port_centrality():
                 continue
             deg_in = G.in_degree(node)
             deg_out = G.out_degree(node)
-            deg_total = G.degree(node)
+            deg_total = G.weighted_degree(node)
             teu_in = G.nodes[node]['in_TEU']
             teu_out = G.nodes[node]['out_TEU']
             teu_total = G.nodes[node]['total_TEU']
@@ -1333,81 +1411,107 @@ def write_US_port_centrality():
 # df.to_csv(f'Figure/all_in_one_Digraph.csv', index=False)
 #endregion
 
-def draw_top5_countries_trading_with_the_US():
+def physical_network_layer():
     """
-    与美国交易TEU最多的top5国家除了中国
+    考虑无向无权的拓扑网络  计算dc bc cc
     :return:
     """
-    df = pd.read_csv('InputData/country_teu.csv')
-    record = {}
-    # 定义函数：获取每行最大的n个值（最多5个）及其列名
-    def get_top5(row):
-        # 排除第一列（time列），处理剩余数值列
-        value_columns = row.index[1:]  # 获取除time外的列名
-        values = row[value_columns]  # 获取对应的值
-
-        # 按值降序排序，取前5个（不足5个则取全部）
-        sorted_values = values.sort_values(ascending=False).head(5)
-
-        # 提取列名和值，用NaN填充不足5个的位置
-        top_names = list(sorted_values.index) + [np.nan] * (5 - len(sorted_values))
-        top_values = list(sorted_values.values) + [np.nan] * (5 - len(sorted_values))
-
-        top = {key: value for key, value in zip(top_names, top_values)}
-        # 组合结果：时间 + 列名 + 值
-        record[row['time']] = top
-
-
-    # 应用函数到每一行
-    df.apply(get_top5, axis=1)
-
-    # -------------------------- 1. 国家样式配置 --------------------------
-    country_styles = {
-        'China': {'color': '#E74C3C', 'marker': 'o', 'linestyle': '-'},  # 红色+圆形+实线
-        'South Korea': {'color': '#3498DB', 'marker': 's', 'linestyle': '--'},  # 蓝色+方形+虚线
-        'Japan': {'color': '#F39C12', 'marker': '^', 'linestyle': '-.'},  # 橙色+三角形+点线
-        'Germany': {'color': '#2ECC71', 'marker': 'D', 'linestyle': ':'},  # 绿色+菱形+点线
-        'Belgium': {'color': '#9B59B6', 'marker': 'p', 'linestyle': '-'},  # 紫色+五边形+实线
-        'Vietnam': {'color': '#1ABC9C', 'marker': '*', 'linestyle': '--'},  # 青色+星形+虚线
-        'Canada': {'color': '#F1C40F', 'marker': 'h', 'linestyle': '-.'},  # 黄色+六边形+点线
-        'Singapore': {'color': '#34495E', 'marker': 'X', 'linestyle': '-'}  # 深灰色+X形标记+实线
-    }
-    fig, ax = plt.subplots(figsize=(12, 6))  # 宽12英寸，高6英寸
+    dc_record = {}
+    bc_record = {}
+    cc_record = {}
+    core_number_record = {}
     years = range(2017, 2022)
     seasons = ['Spring','Summer','Autumn','Winter']
-    for country, attr in country_styles.items():
-        if country == 'China':
-            continue
-        time_line = []
-        value_line = []
-        for year in years:
-            for season in seasons:
-                if (year == 2021 and
-                        (season == 'Summer' or season == 'Autumn' or season == 'Winter')):
-                    continue
-                time = f'{year}_{season}'
-                if country in record[time]:
-                    time_line.append(time)
-                    value_line.append(record[time][country])
-                # 5. 绘制折线图
-                # 绘制edges折线
-        ax.plot(time_line, value_line,
-                label=country,
-                color=country_styles[country]['color'],
-                marker=country_styles[country]['marker'],  # 数据点标记
-                linestyle=country_styles[country]['linestyle'],  # 线条样式
-                linewidth=2,    # 线条宽度
-                markersize=6)   # 标记大小
-    # 6. 设置坐标轴标签和标题
-    ax.set_xlabel('Time', fontsize=12)
-    ax.set_ylabel('TEU', fontsize=12)
-    ax.set_title('Chart of TEU changes for the top five countries trading with the United States', fontsize=14, pad=20)
-    # 7. 设置坐标轴刻度
-    ax.tick_params(axis='x', rotation=45)  # x轴标签旋转45度，避免重叠
-    ax.tick_params(axis='both', which='major', labelsize=10)
-    # 9. 添加图例
-    ax.legend(fontsize=10, loc='best')  # loc='best' 自动选择最佳位置
-    # 10. 调整布局，避免标签被截断
-    plt.tight_layout()
-    plt.savefig('Figure/Season/Chart of TEU changes for the top five countries trading with the United States.png', dpi=300, bbox_inches='tight')
-    plt.show()
+    for year in years:
+        for season in seasons:
+            if year == 2021 and season == 'Summer':                 # 因为2021年的数据只到8月份
+                continue
+            file_path = f'../Data/{year}/US/Season/{season}/US{year}_{season}_Digraph.graphml'
+            time = f"{year}_{season}"
+            if not os.path.exists(file_path):
+                print(f'⚠️ 文件不存在: {file_path}')
+                continue
+            DiGraph = nx.read_graphml(file_path)
+            G = nx.Graph(DiGraph)
+
+            dc_dict = nx.degree_centrality(G)
+            bc_dict = nx.betweenness_centrality(G)
+            cc_dict = nx.closeness_centrality(G)
+            dc_record[time] = dc_dict
+            bc_record[time] = bc_dict
+            cc_record[time] = cc_dict
+            core_number_record[time] = nx.core_number(G)
+
+    pathlib.Path('InputData/ports_degree_centrality.json').write_text(json.dumps(dc_record, indent=2))
+    pathlib.Path('InputData/ports_betweenness_centrality.json').write_text(json.dumps(bc_record, indent=2))
+    pathlib.Path('InputData/ports_closeness_centrality.json').write_text(json.dumps(cc_record, indent=2))
+    pathlib.Path('InputData/ports_core_number_centrality.json').write_text(json.dumps(record, indent=2))
+
+def freight_traffic_network_layer():
+    """
+    考虑一个DiGraph网络  权重为TEU
+    :return:
+    """
+    weighted_dc_record = {}
+    weighted_bc_record = {}
+    weighted_ec_record = {}
+
+    years = range(2017, 2022)
+    seasons = ['Spring','Summer','Autumn','Winter']
+    for year in years:
+        for season in seasons:
+            if year == 2021 and season == 'Summer':                 # 因为2021年的数据只到8月份
+                continue
+            file_path = f'../Data/{year}/US/Season/{season}/US{year}_{season}_Digraph.graphml'
+            time = f"{year}_{season}"
+            if not os.path.exists(file_path):
+                print(f'⚠️ 文件不存在: {file_path}')
+                continue
+            DiGraph = nx.read_graphml(file_path)
+
+            N = DiGraph.number_of_nodes()
+            weighted_degree = dict(DiGraph.degree(weight='volumeTEU'))
+            weighted_in_degree = dict(DiGraph.in_degree(weight='volumeTEU'))
+            weighted_out_degree = dict(DiGraph.out_degree(weight='volumeTEU'))
+
+            dc = {node: d / (N - 1) for node, d in weighted_degree.items()}
+            in_dc = {node: d / (N - 1) for node, d in weighted_in_degree.items()}
+            out_dc = {node: d / (N - 1) for node, d in weighted_out_degree.items()}
+
+            # weighted node centrality
+            node_dc = {}
+            for node in DiGraph.nodes():
+                node_dc[node] = {
+                    'dc': dc[node],
+                    'in_dc': in_dc[node],
+                    'out_dc': out_dc[node]
+                }
+            weighted_dc_record[time] = node_dc
+
+            # weighted betweenness centrality
+            weighted_bc_record[time] = nx.betweenness_centrality(DiGraph, weight='volumeTEU')
+
+            # # weighted eigen centrality  加权特征向量中心性 暂时计算不了  迭代不出来解
+            # weighted_ec_record = nx.eigenvector_centrality(DiGraph, weight='volumeTEU', max_iter=100000, tol= 1e-5)
+
+    pathlib.Path('InputData/ports_weighted_degree_centrality.json').write_text(json.dumps(weighted_dc_record, indent=2))
+    pathlib.Path('InputData/ports_weighted_betweenness_centrality.json').write_text(json.dumps(weighted_bc_record, indent=2))
+    # pathlib.Path('InputData/ports_weighted_eigenvector_centrality.json').write_text(json.dumps(weighted_ec_record, indent=2))
+freight_traffic_network_layer()
+# record = {}
+# years = range(2017, 2022)
+# seasons = ['Spring','Summer','Autumn','Winter']
+# for year in years:
+#     for season in seasons:
+#         if year == 2021 and season == 'Summer':                 # 因为2021年的数据只到8月份
+#             continue
+#         file_path = f'../Data/{year}/US/Season/{season}/US{year}_{season}_Digraph.graphml'
+#         time = f"{year}_{season}"
+#         if not os.path.exists(file_path):
+#             print(f'⚠️ 文件不存在: {file_path}')
+#             continue
+#         DiGraph = nx.read_graphml(file_path)
+#         G = nx.Graph(DiGraph)
+#         record[time] = nx.core_number(G)
+#
+# pathlib.Path('InputData/ports_core_number_centrality.json').write_text(json.dumps(record, indent=2))
