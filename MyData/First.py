@@ -1705,65 +1705,68 @@ def draw_USLSA_USLGB_USNWK_weighted_degree_centrality_trend_chart():
             record[time] = target_teu / total_teu
     print(record)
 
+def CNYTN_CNSHN_CNNBO_out_dc_and_in_dc_trend_chart():
+    """
+    这三个中国港口的 out_dc / in_dc  之比趋势图
+    :return:
+    """
+    # 假设你已计算中国3港的平均in_dc和out_dc（16个季度的平均值，减少波动）
+    target_ports = ['CNSHA', 'CNYTN', 'CNNBO']
+    file_path = 'InputData/ports_weighted_degree_centrality.json'
+    degree_centrality = json.loads(pathlib.Path(file_path).read_text())
 
-# 假设你已计算中国3港的平均in_dc和out_dc（16个季度的平均值，减少波动）
-cn_ports = ['CNSHA', 'CNYTN', 'CNNBO']
-file_path = 'InputData/ports_weighted_degree_centrality.json'
-degree_centrality = json.loads(pathlib.Path(file_path).read_text())
+    # 3. 提取每个港口在各时间段的 out_dc/in_dc 比值
+    # 存储结构：{港口: {时间: 比值}}
+    ratio_data = {port: {} for port in target_ports}
+    all_times = list(degree_centrality.keys())
 
-# 3. 提取每个港口在各时间段的 out_dc/in_dc 比值
-# 存储结构：{港口: {时间: 比值}}
-ratio_data = {port: {} for port in target_ports}
-all_times = sorted(degree_centrality.keys())  # 按时间排序
+    for time in all_times:
+        ports_data = degree_centrality[time]  # 该时间段的所有港口数据
+        for port in target_ports:
+            if port in ports_data:  # 确保港口在该时间段存在
+                metrics = ports_data[port]
+                in_dc = metrics.get('in_dc', 0.0)
+                out_dc = metrics.get('out_dc', 0.0)
 
-for time in all_times:
-    ports_data = degree_centrality[time]  # 该时间段的所有港口数据
-    for port in target_ports:
-        if port in ports_data:  # 确保港口在该时间段存在
-            metrics = ports_data[port]
-            in_dc = metrics.get('in_dc', 0.0)
-            out_dc = metrics.get('out_dc', 0.0)
+                # 避免除以0（若in_dc为0，比值设为None或一个大值）
+                if in_dc == 0:
+                    ratio = None  # 或根据需求设为np.inf
+                else:
+                    ratio = out_dc / in_dc  # 计算出口/进口比值
 
-            # 避免除以0（若in_dc为0，比值设为None或一个大值）
-            if in_dc == 0:
-                ratio = None  # 或根据需求设为np.inf
-            else:
-                ratio = out_dc / in_dc  # 计算出口/进口比值
+                ratio_data[port][time] = ratio
 
-            ratio_data[port][time] = ratio
+    # 4. 转为DataFrame（便于绘图）
+    df = pd.DataFrame(ratio_data)
 
-# 4. 转为DataFrame（便于绘图）
-df = pd.DataFrame(ratio_data)
+    # 5. 绘制折线图
+    plt.figure(figsize=(14, 7))
 
-# 5. 绘制折线图
-plt.figure(figsize=(14, 7))
+    # 为每个港口绘制比值趋势
+    markers = ['o', 's', '^']  # 不同标记区分港口
+    colors =  ['#E74C3C', '#3498DB', '#9B59B6']
 
-# 为每个港口绘制比值趋势
-markers = ['o', 's', '^']  # 不同标记区分港口
-colors = ['#ff7f0e', '#2ca02c', '#d62728']  # 橙色、绿色、红色
+    for i, port in enumerate(target_ports):
+        plt.plot(
+            df.index, df[port],
+            marker=markers[i],
+            color=colors[i],
+            label=port,
+            linewidth=2,
+            markersize=6
+        )
 
-for i, port in enumerate(target_ports):
-    plt.plot(
-        df.index, df[port],
-        marker=markers[i],
-        color=colors[i],
-        label=port,
-        linewidth=2,
-        markersize=6
-    )
+    # 美化图表
+    plt.axhline(y=1, color='gray', linestyle='--', alpha=0.5, label='=1')  # 参考线：1表示双向均衡
+    plt.xlabel('Time', fontsize=12)
+    plt.ylabel('out_dc/in_dc', fontsize=12)
+    plt.title(' out_dc/in_dc trend chart', fontsize=14)
+    plt.legend(fontsize=10)
+    plt.xticks(rotation=45)  # 时间标签旋转，避免重叠
+    plt.tight_layout()
 
-# 美化图表
-plt.axhline(y=1, color='gray', linestyle='--', alpha=0.5, label='比值=1（均衡）')  # 参考线：1表示双向均衡
-plt.xlabel('时间段', fontsize=12)
-plt.ylabel('out_dc/in_dc 比值', fontsize=12)
-plt.title('中国三港 out_dc/in_dc 比值随时间变化（出口导向趋势）', fontsize=14)
-plt.legend(fontsize=10)
-plt.grid(alpha=0.3)
-plt.xticks(rotation=45)  # 时间标签旋转，避免重叠
-plt.tight_layout()
+    # 保存图片
+    plt.savefig('Figure/Season/CNYTN_CNSHN_CNNBO_out_dc_and_in_dc trend chart.png', dpi=300, bbox_inches='tight')
 
-# 保存图片
-# plt.savefig('中国港口_out_in_ratio趋势.png', dpi=300, bbox_inches='tight')
-
-# 显示图表
-plt.show()
+    # 显示图表
+    plt.show()
