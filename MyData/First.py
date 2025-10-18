@@ -22,6 +22,8 @@ from matplotlib.ticker import ScalarFormatter
 from matplotlib import patheffects
 from scipy.stats import entropy
 from heapq import nlargest
+from collections import deque
+
 
 # ---------- 工具函数 ----------
 def rich_club_phi(G, k):
@@ -1390,91 +1392,6 @@ def draw_US_top5_port_TEU_change():
 #endregion
 
 #region Node Centrality
-def write_US_port_centrality():
-    """
-    每一年美国港口的中心性指标json文件
-    包括：   'degree_in',
-            'degree_out',
-            'degree_total',
-            'teu_in',
-            'teu_out',
-            'teu_total',
-            'bc_unweighted',
-            'bc_weighted',
-            'cc_unweighted'
-    :return:
-    """
-    result = {}
-    years = range(2017, 2022)
-    for year in years:
-        G = nx.read_graphml(f'../Data/{year}/US/US{year}_Digraph.graphml')
-        metrics = {}
-
-        bc_unweighted = nx.betweenness_centrality(G)
-        bc = nx.betweenness_centrality(G, weight='volumeTEU')
-        cc_unweighted = nx.closeness_centrality(G)
-
-        for node, attr in G.nodes(data=True):
-            if attr.get('Country') != 'United States':
-                continue
-            deg_in = G.in_degree(node)
-            deg_out = G.out_degree(node)
-            deg_total = G.weighted_degree(node)
-            teu_in = G.nodes[node]['in_TEU']
-            teu_out = G.nodes[node]['out_TEU']
-            teu_total = G.nodes[node]['total_TEU']
-            metrics[node] = {
-                'degree_in': deg_in,
-                'degree_out': deg_out,
-                'degree_total': deg_total,
-                'teu_in': teu_in,
-                'teu_out': teu_out,
-                'teu_total': teu_total,
-                'bc_unweighted': bc_unweighted[node],
-                'bc_weighted': bc[node],
-                'cc_unweighted': cc_unweighted[node]
-            }
-        result[year] = metrics
-    # 3. 保存 JSON
-    out_file = 'Figure/US_port_centrality.json'
-    pathlib.Path(out_file).write_text(json.dumps(result, indent=2))
-    print(f'✅ 已保存 → {out_file}')
-#endregion
-
-
-# 把所有的度分布图都放在一起
-# 节点中信心指标全部列表
-
-
-
-#regionMain
-# structure_metrics = []
-# years = range(2017, 2022)
-# seasons = ['Spring','Summer','Autumn','Winter']
-# for year in years:
-#     for season in seasons:
-#         if year == 2021 and season == 'Summer':                 # 因为2021年的数据只到8月份
-#             continue
-#         file_path = f'../Data/{year}/US/Season/{season}/US{year}_{season}_Digraph.graphml'
-#         if not os.path.exists(file_path):
-#             print(f'⚠️ 文件不存在: {file_path}')
-#             continue
-#         DiGraph = nx.read_graphml(file_path)
-#         G = nx.Graph(DiGraph)
-#
-#         # G_null = G.copy()
-#         # nx.double_edge_swap(G_null, nswap=20000, max_tries=100000)
-#         # G_null.remove_edges_from(nx.selfloop_edges(G_null))
-#
-#         result_year = all_in_one(G, year, season)
-#         structure_metrics.append(result_year)
-#         print(f"{year} is already down!")
-#
-# # 保存成csv
-# df = pd.DataFrame(structure_metrics)
-# df.to_csv(f'Figure/all_in_one_Digraph.csv', index=False)
-#endregion
-
 def physical_network_layer():
     """
     考虑无向无权的拓扑网络  计算dc bc cc
@@ -1510,7 +1427,6 @@ def physical_network_layer():
     pathlib.Path('InputData/ports_betweenness_centrality.json').write_text(json.dumps(bc_record, indent=2))
     pathlib.Path('InputData/ports_closeness_centrality.json').write_text(json.dumps(cc_record, indent=2))
     pathlib.Path('InputData/ports_core_number_centrality.json').write_text(json.dumps(record, indent=2))
-
 def freight_traffic_network_layer():
     """
     考虑一个DiGraph网络  权重为TEU
@@ -1572,9 +1488,65 @@ def freight_traffic_network_layer():
     pathlib.Path('InputData/ports_weighted_pagerank_scores.json').write_text(json.dumps(weighted_pagerank_record, indent=2))
 
     # pathlib.Path('InputData/ports_weighted_eigenvector_centrality.json').write_text(json.dumps(weighted_ec_record, indent=2))
-freight_traffic_network_layer()
+#region美国的港口中心性变化趋势图
+# file_path = 'InputData/ports_degree_centrality.json'
+# degree_centrality = json.loads(pathlib.Path(file_path).read_text())
+# time = list(degree_centrality.keys())
+# ports = ['USHOU','USNWK', 'USSAV', 'USNFK', 'USNOL','USCHA','USNYK','USLSA']
+# # ports = ['USHOU','USNWK', 'USSAV']
+# value = {port : [] for port in ports}
+#
+# for _, data in degree_centrality.items():
+#     sorted_asc = dict(sorted(data.items(), key=lambda x: x[1], reverse=True))
+#     for port in ports:
+#         value[port].append(sorted_asc[port])
+# # 绘制折线图
+# plt.figure(figsize=(10, 6))
+# for port in ports:
+#     print(port, value[port])
+#     plt.plot(time, value[port], marker='o', label=port)  # 每个港口一条线，带标记点
+#
+# plt.xlabel("Time", fontsize=12)
+# plt.ylabel("degree centrality", fontsize=12)
+# plt.title("", fontsize=14)
+# plt.legend()  # 显示港口标签
+# plt.show()
+#endregion
 
-# record = {}
+#region非美国港口中心性变化趋势图
+# # port_target = ['BEANT', 'NLROT', 'CNSHA', 'SGSGP', 'KRBUS',
+# #                'BSFRT', 'DEHAM', 'HKHKG', 'DEBHN', 'MXATM', 'CNYTN']
+# port_target = ['BEANT', 'NLROT', 'CNSHA', 'SGSGP', 'KRBUS']
+# value = {port: [] for port in port_target}
+# port_data = ConstructNetwork.Read_Port_Data()
+# file_path = 'InputData/ports_core_number_centrality.json'
+# degree_centrality = json.loads(pathlib.Path(file_path).read_text())
+# time = list(degree_centrality.keys())
+# for _, data in degree_centrality.items():
+#     sorted_asc = dict(sorted(data.items(), key=lambda x: x[1], reverse=True))
+#     foreign_ports = {port:value for port,value in sorted_asc.items() if port_data[port]['country_english'] != "United States"}
+#     print(foreign_ports)
+#     for port in port_target:
+#         value[port].append(foreign_ports[port])
+# # 绘制折线图
+# plt.figure(figsize=(10, 6))
+# for node in port_target:
+#     plt.plot(time, value[node], marker='o', label=node)  # 每个港口一条线，带标记点
+#
+# plt.xlabel("Time", fontsize=12)
+# plt.ylabel("degree centrality", fontsize=12)
+# plt.title("", fontsize=14)
+# plt.legend()  # 显示港口标签
+# plt.show()
+#endregion
+#endregion
+
+
+#region 计算加权core number   算法太慢了，算不了，要优化
+# total_record = {}
+# in_record = {}
+# out_record = {}
+#
 # years = range(2017, 2022)
 # seasons = ['Spring','Summer','Autumn','Winter']
 # for year in years:
@@ -1587,7 +1559,211 @@ freight_traffic_network_layer()
 #             print(f'⚠️ 文件不存在: {file_path}')
 #             continue
 #         DiGraph = nx.read_graphml(file_path)
-#         G = nx.Graph(DiGraph)
-#         record[time] = nx.core_number(G)
 #
-# pathlib.Path('InputData/ports_core_number_centrality.json').write_text(json.dumps(record, indent=2))
+#         print(f"{year}{season} loaded")
+#
+#         # 加权k-core
+#         k = 1
+#         core_number_dict = {}
+#         max_weight = max(dict(nx.degree(DiGraph, weight='volumeTEU')).values())
+#
+#         while k < max_weight + 2:
+#             k_core_total = weighted_k_core(DiGraph, k=k, degree_type='total')
+#             for node in k_core_total:
+#                 core_number_dict[node] = k
+#             k += 1
+#         total_record[time] = core_number_dict
+#         print(core_number_dict)
+#
+# pathlib.Path('InputData/ports_weighted_core_number_centrality.json').write_text(json.dumps(total_record, indent=2))
+#endregion
+
+
+
+#regionMain
+# structure_metrics = []
+# years = range(2017, 2022)
+# seasons = ['Spring','Summer','Autumn','Winter']
+# for year in years:
+#     for season in seasons:
+#         if year == 2021 and season == 'Summer':                 # 因为2021年的数据只到8月份
+#             continue
+#         file_path = f'../Data/{year}/US/Season/{season}/US{year}_{season}_Digraph.graphml'
+#         if not os.path.exists(file_path):
+#             print(f'⚠️ 文件不存在: {file_path}')
+#             continue
+#         DiGraph = nx.read_graphml(file_path)
+#         G = nx.Graph(DiGraph)
+#
+#         # G_null = G.copy()
+#         # nx.double_edge_swap(G_null, nswap=20000, max_tries=100000)
+#         # G_null.remove_edges_from(nx.selfloop_edges(G_null))
+#
+#         result_year = all_in_one(G, year, season)
+#         structure_metrics.append(result_year)
+#         print(f"{year} is already down!")
+#
+# # 保存成csv
+# df = pd.DataFrame(structure_metrics)
+# df.to_csv(f'Figure/all_in_one_Digraph.csv', index=False)
+#endregion
+
+
+def write_weighted_dc_sorted_ports_by_time():
+    """
+    按照weighted dc排名的港口图
+    :return:
+    """
+    file_path = 'InputData/ports_weighted_degree_centrality.json'
+    degree_centrality = json.loads(pathlib.Path(file_path).read_text())
+    # 1. 对每个时间段的港口按dc降序排序，提取港口名称列表
+    sorted_ports_by_time = {}
+    for time, data in degree_centrality.items():
+        # 按dc降序排序，取港口名称（如['USLSA', 'USLGB', 'CNSHA']）
+        sorted_ports = [port for port, metrics in sorted(data.items(), key=lambda x: x[1]['dc'], reverse=True)]
+        sorted_ports_by_time[time] = sorted_ports
+    # 2. 确定最大排名数（即所有时间段中港口数量最多的那个，保证行数足够）
+    max_rank = max(len(ports) for ports in sorted_ports_by_time.values())
+    # 3. 构建数据：行=排名（1,2,3...），列=时间段，值=港口名称
+    rank_data = {}
+    for time, ports in sorted_ports_by_time.items():
+        # 为每个时间段填充港口名称，不足max_rank的用空值补充
+        rank_data[time] = ports + [None] * (max_rank - len(ports))
+    # 4. 转为DataFrame，行索引设为排名（1开始）
+    df = pd.DataFrame(rank_data, index=range(1, max_rank + 1))
+    # 5. 保存为CSV（index_label='排名'，明确行含义）
+    df.to_csv('Figure/Season/weighted_dc_sorted_ports_by_time.csv', index_label='排名')
+def draw_USLSA_USLGB_USNWK_weighted_degree_centrality_trend_chart():
+    """
+    美国这三个港口的加权中心性变化趋势图
+    :return:
+    """
+    file_path = 'InputData/ports_weighted_degree_centrality.json'
+    degree_centrality = json.loads(pathlib.Path(file_path).read_text())
+    # 2. 提取目标港口的dc数据（按时间排序）
+    target_ports = ['USLSA', 'USLGB', 'USNWK']
+
+    # 收集数据：{港口: {时间: dc值}}
+    port_data = {port: {} for port in target_ports}
+    for time, ports in degree_centrality.items():
+        for port in target_ports:
+            if port in ports:  # 确保港口在该时间段存在
+                port_data[port][time] = ports[port]['dc']
+
+    # 3. 转为DataFrame并按时间排序（关键：保证x轴时间顺序正确）
+    df = pd.DataFrame(index=list(degree_centrality.keys()))
+
+    # 填充每个港口的dc值
+    for port in target_ports:
+        df[port] = [port_data[port].get(time, None) for time in list(degree_centrality.keys())]
+
+    # 4. 绘制折线图
+    plt.figure(figsize=(12, 6))
+
+    # 为每个港口绘制折线
+    markers = ['o', 's', '^']  # 不同标记区分港口
+    for i, port in enumerate(target_ports):
+        plt.plot(
+            df.index, df[port],
+            marker=markers[i],  # 标记样式
+            label=port,         # 图例标签
+            linewidth=2,        # 线宽
+            markersize=6        # 标记大小
+        )
+
+    # 美化图表
+    plt.xlabel('Time', fontsize=12)
+    plt.ylabel('weighted degree centrality', fontsize=12)
+    plt.title('USLSA,USLGB,USNWK weighted degree centrality trend chart', fontsize=14)
+    plt.legend(fontsize=10)  # 显示图例
+    plt.xticks(rotation=45)  # 时间标签旋转45度，避免重叠
+    plt.tight_layout()       # 自动调整布局
+
+    # 5. 保存图片（可选）
+    plt.savefig('Figure/Season/USLSA,USLGB,USNWK dc值变化趋势.png', dpi=300, bbox_inches='tight')
+    # 显示图表
+    plt.show()
+
+
+    # 占据了美国多少的TEU
+    record = {}
+    years = range(2017, 2022)
+    seasons = ['Spring','Summer','Autumn','Winter']
+    for year in years:
+        for season in seasons:
+            if year == 2021 and season == 'Summer':                 # 因为2021年的数据只到8月份
+                continue
+            time = f"{year}_{season}"
+            file_path = f'../Data/{year}/US/Season/{season}/US{year}_{season}_Digraph.graphml'
+            if not os.path.exists(file_path):
+                print(f'⚠️ 文件不存在: {file_path}')
+                continue
+            DiGraph = nx.read_graphml(file_path)
+
+            total_teu = sum(float(d.get('volumeTEU', 0)) for _, _, d in DiGraph.edges(data=True))
+            target_teu = sum(float(DiGraph.nodes[p].get('total_TEU', 0)) for p in target_ports)
+            record[time] = target_teu / total_teu
+    print(record)
+
+
+# 假设你已计算中国3港的平均in_dc和out_dc（16个季度的平均值，减少波动）
+cn_ports = ['CNSHA', 'CNYTN', 'CNNBO']
+file_path = 'InputData/ports_weighted_degree_centrality.json'
+degree_centrality = json.loads(pathlib.Path(file_path).read_text())
+
+# 3. 提取每个港口在各时间段的 out_dc/in_dc 比值
+# 存储结构：{港口: {时间: 比值}}
+ratio_data = {port: {} for port in target_ports}
+all_times = sorted(degree_centrality.keys())  # 按时间排序
+
+for time in all_times:
+    ports_data = degree_centrality[time]  # 该时间段的所有港口数据
+    for port in target_ports:
+        if port in ports_data:  # 确保港口在该时间段存在
+            metrics = ports_data[port]
+            in_dc = metrics.get('in_dc', 0.0)
+            out_dc = metrics.get('out_dc', 0.0)
+
+            # 避免除以0（若in_dc为0，比值设为None或一个大值）
+            if in_dc == 0:
+                ratio = None  # 或根据需求设为np.inf
+            else:
+                ratio = out_dc / in_dc  # 计算出口/进口比值
+
+            ratio_data[port][time] = ratio
+
+# 4. 转为DataFrame（便于绘图）
+df = pd.DataFrame(ratio_data)
+
+# 5. 绘制折线图
+plt.figure(figsize=(14, 7))
+
+# 为每个港口绘制比值趋势
+markers = ['o', 's', '^']  # 不同标记区分港口
+colors = ['#ff7f0e', '#2ca02c', '#d62728']  # 橙色、绿色、红色
+
+for i, port in enumerate(target_ports):
+    plt.plot(
+        df.index, df[port],
+        marker=markers[i],
+        color=colors[i],
+        label=port,
+        linewidth=2,
+        markersize=6
+    )
+
+# 美化图表
+plt.axhline(y=1, color='gray', linestyle='--', alpha=0.5, label='比值=1（均衡）')  # 参考线：1表示双向均衡
+plt.xlabel('时间段', fontsize=12)
+plt.ylabel('out_dc/in_dc 比值', fontsize=12)
+plt.title('中国三港 out_dc/in_dc 比值随时间变化（出口导向趋势）', fontsize=14)
+plt.legend(fontsize=10)
+plt.grid(alpha=0.3)
+plt.xticks(rotation=45)  # 时间标签旋转，避免重叠
+plt.tight_layout()
+
+# 保存图片
+# plt.savefig('中国港口_out_in_ratio趋势.png', dpi=300, bbox_inches='tight')
+
+# 显示图表
+plt.show()

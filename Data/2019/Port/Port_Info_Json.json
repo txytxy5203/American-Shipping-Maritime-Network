@@ -17430,7 +17430,7 @@
         "english_name": "hong kong",
         "port_code": "HKHKG",
         "country": "中国香港",
-        "country_english": "Hong Kong",
+        "country_english": "China",
         "longitude": 114.109497,
         "latitude": 22.396428,
         "isLocation": true
@@ -27310,7 +27310,7 @@
         "english_name": "macau",
         "port_code": "MOMAC",
         "country": "中国澳门",
-        "country_english": "Macau",
+        "country_english": "China",
         "longitude": 113.543873,
         "latitude": 22.198745,
         "isLocation": true
@@ -37096,7 +37096,7 @@
         "english_name": "keelung",
         "port_code": "TWKEE",
         "country": "中国台湾",
-        "country_english": "Taiwan",
+        "country_english": "China",
         "longitude": 121.7391833,
         "latitude": 25.1276033,
         "isLocation": true
@@ -37106,7 +37106,7 @@
         "english_name": "kaohsiung",
         "port_code": "TWKAO",
         "country": "中国台湾",
-        "country_english": "Taiwan",
+        "country_english": "China",
         "longitude": 120.3014353,
         "latitude": 22.6272784,
         "isLocation": true
@@ -37116,7 +37116,7 @@
         "english_name": "suao",
         "port_code": "TWSUO",
         "country": "中国台湾",
-        "country_english": "Taiwan",
+        "country_english": "China",
         "longitude": 121.8343163,
         "latitude": 24.6195693,
         "isLocation": true
@@ -37126,7 +37126,7 @@
         "english_name": "taichung",
         "port_code": "TWTCH",
         "country": "中国台湾",
-        "country_english": "Taiwan",
+        "country_english": "China",
         "longitude": 120.6736482,
         "latitude": 24.1477358,
         "isLocation": true
@@ -37136,7 +37136,7 @@
         "english_name": "taipei",
         "port_code": "TWTP",
         "country": "中国台湾",
-        "country_english": "Taiwan",
+        "country_english": "China",
         "longitude": 121.5654177,
         "latitude": 25.0329694,
         "isLocation": true
@@ -37146,7 +37146,7 @@
         "english_name": "hualian",
         "port_code": "TWHLN",
         "country": "中国台湾",
-        "country_english": "Taiwan",
+        "country_english": "China",
         "longitude": 121.6015714,
         "latitude": 23.9871589,
         "isLocation": true
@@ -37156,7 +37156,7 @@
         "english_name": "taoyuan",
         "port_code": "TWTAO",
         "country": "中国台湾",
-        "country_english": "Taiwan",
+        "country_english": "China",
         "longitude": 121.3009798,
         "latitude": 24.9936281,
         "isLocation": true
