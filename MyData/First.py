@@ -1876,16 +1876,48 @@ def write_all_countries_teu():
     combined_df = pd.concat([df_total, df2_filtered], axis=1)
     combined_df.to_csv('InputData/all_country_teu.csv', index=False)
 
-df = pd.read_csv('InputData/all_country_teu.csv')
 
-# 步骤1：排除time列（第一列），同时保留total_teu和其他列
-# 方法：筛选列时排除第一列（df.columns[0]即'time'）
-df_filtered = df.drop(columns=df.columns[0])  # 等价于 df.drop(columns='time')
+def draw_country_teu_correlation_heatmap():
+    """
+    画top国家的TEU相关系数图
+    :return:
+    """
+    df = pd.read_csv('InputData/all_country_teu.csv')
+    # 定义需要保留的国家列名（与你的DataFrame列名一致）
+    target_countries = ['total_TEU',
+        'South Korea', 'Japan', 'Germany',
+        'Belgium', 'Vietnam', 'Canada', 'Singapore', 'China'
+    ]
+    # 只保留目标国家的列
+    df_filtered = df[target_countries]
+    print(df_filtered)
 
-# 步骤2：计算total_teu与其他列的相关系数
-# 提取total_teu列，与其他列做相关性分析
-corr_with_total_teu = df_filtered.corr()['total_teu']
+    # 2. 计算相关系数矩阵
+    # ----------------------
+    # 计算皮尔逊相关系数（线性相关），返回矩阵
+    corr_matrix = df_filtered.corr()
 
-# 打印结果（排除total_teu自身的相关性）
-print("total_teu与其他列的相关系数：")
-print(corr_with_total_teu.drop('total_teu'))  # 移除自身的1.0相关性
+    # ----------------------
+    # 3. 绘制热力图
+    # ----------------------
+    plt.figure(figsize=(10, 8))  # 设置图大小
+
+    # 绘制热力图
+    sns.heatmap(
+        corr_matrix,
+        annot=True,  # 显示相关系数数值
+        cmap='RdYlBu_r',  # 配色方案（红=正相关，蓝=负相关）
+        vmin=-1, vmax=1,  # 颜色范围（-1到1）
+        center=0,  # 中间值为0
+        square=True,  # 单元格为正方形
+        linewidths=0.5,  # 单元格边框宽度
+        fmt='.2f'  # 数值保留2位小数
+    )
+
+    # 设置标题和字体
+    plt.title('Correlation Heatmap of TEU Flows Between Countries', fontsize=14, pad=20)
+    plt.tight_layout()  # 调整布局
+
+    # 保存图片
+    plt.savefig('Figure/Season/country_teu_correlation_heatmap.png', dpi=300, bbox_inches='tight')
+    plt.show()
