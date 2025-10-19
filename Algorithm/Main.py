@@ -186,6 +186,29 @@ for year in range(2017, 2022):
 # machinery = [84, 85, 86, 87, 88, 89]
 # precision_instrument = [90, 91, 92, 94, 95, 96]
 # special_other = [68, 69, 70, 93, 97, 98, 99]
+
+
+# 定义分类映射关系：键为类别名称，值为该类别包含的数字列表
+# category_mapping = {
+#     'animal_plant': [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14],
+#     'grease': [15, 16, 17, 18, 19, 20, 21, 22, 23, 24],
+#     'minerals': [25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38],
+#     'rubber_plastics': [39, 40, 41, 42, 43],
+#     'pulpwood': [44, 45, 46, 47, 48, 49],
+#     'textile': [50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67],
+#     'metal': [71, 72, 73, 74, 75, 76, 77, 78, 79, 80, 81, 82, 83],
+#     'machinery': [84, 85, 86, 87, 88, 89],
+#     'precision_instrument': [90, 91, 92, 94, 95, 96],
+#     'special_other': [68, 69, 70, 93, 97, 98, 99]
+# }
+#
+# # 创建反向映射：数字 -> 类别（提高查询效率）
+# number_to_category = {}
+# for category, numbers in category_mapping.items():
+#     for num in numbers:
+#         number_to_category[num] = category
+
+
 #
 # # 将所有列表组织成字典，键为类别名称，值为对应的列表
 # category_dict = {

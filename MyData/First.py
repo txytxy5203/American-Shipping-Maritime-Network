@@ -1434,7 +1434,6 @@ def freight_traffic_network_layer():
     """
     weighted_dc_record = {}
     weighted_bc_record = {}
-    weighted_ec_record = {}
     weighted_pagerank_record = {}
 
     years = range(2017, 2022)
@@ -1488,30 +1487,242 @@ def freight_traffic_network_layer():
     pathlib.Path('InputData/ports_weighted_pagerank_scores.json').write_text(json.dumps(weighted_pagerank_record, indent=2))
 
     # pathlib.Path('InputData/ports_weighted_eigenvector_centrality.json').write_text(json.dumps(weighted_ec_record, indent=2))
-#region美国的港口中心性变化趋势图
-# file_path = 'InputData/ports_degree_centrality.json'
-# degree_centrality = json.loads(pathlib.Path(file_path).read_text())
-# time = list(degree_centrality.keys())
-# ports = ['USHOU','USNWK', 'USSAV', 'USNFK', 'USNOL','USCHA','USNYK','USLSA']
-# # ports = ['USHOU','USNWK', 'USSAV']
-# value = {port : [] for port in ports}
-#
-# for _, data in degree_centrality.items():
-#     sorted_asc = dict(sorted(data.items(), key=lambda x: x[1], reverse=True))
-#     for port in ports:
-#         value[port].append(sorted_asc[port])
-# # 绘制折线图
-# plt.figure(figsize=(10, 6))
-# for port in ports:
-#     print(port, value[port])
-#     plt.plot(time, value[port], marker='o', label=port)  # 每个港口一条线，带标记点
-#
-# plt.xlabel("Time", fontsize=12)
-# plt.ylabel("degree centrality", fontsize=12)
-# plt.title("", fontsize=14)
-# plt.legend()  # 显示港口标签
-# plt.show()
-#endregion
+
+def write_weighted_dc_sorted_ports_by_time():
+    """
+    按照weighted dc排名的港口图
+    :return:
+    """
+    file_path = 'InputData/ports_weighted_degree_centrality.json'
+    degree_centrality = json.loads(pathlib.Path(file_path).read_text())
+    # 1. 对每个时间段的港口按dc降序排序，提取港口名称列表
+    sorted_ports_by_time = {}
+    for time, data in degree_centrality.items():
+        # 按dc降序排序，取港口名称（如['USLSA', 'USLGB', 'CNSHA']）
+        sorted_ports = [port for port, metrics in sorted(data.items(), key=lambda x: x[1]['dc'], reverse=True)]
+        sorted_ports_by_time[time] = sorted_ports
+    # 2. 确定最大排名数（即所有时间段中港口数量最多的那个，保证行数足够）
+    max_rank = max(len(ports) for ports in sorted_ports_by_time.values())
+    # 3. 构建数据：行=排名（1,2,3...），列=时间段，值=港口名称
+    rank_data = {}
+    for time, ports in sorted_ports_by_time.items():
+        # 为每个时间段填充港口名称，不足max_rank的用空值补充
+        rank_data[time] = ports + [None] * (max_rank - len(ports))
+    # 4. 转为DataFrame，行索引设为排名（1开始）
+    df = pd.DataFrame(rank_data, index=range(1, max_rank + 1))
+    # 5. 保存为CSV（index_label='排名'，明确行含义）
+    df.to_csv('Figure/Season/weighted_dc_sorted_ports_by_time.csv', index_label='排名')
+def draw_USLSA_USLGB_USNWK_weighted_degree_centrality_trend_chart():
+    """
+    美国这三个港口的加权中心性变化趋势图
+    :return:
+    """
+    dc_type = 'in_dc'
+    file_path = 'InputData/ports_weighted_degree_centrality.json'
+    degree_centrality = json.loads(pathlib.Path(file_path).read_text())
+    # 2. 提取目标港口的dc数据（按时间排序）
+    target_ports = ['USLSA', 'USLGB', 'USNWK']          # 美国的top3港口
+    # target_ports = ['USWAS', 'USSAV', 'USHOU', 'USNFK']
+
+    # 收集数据：{港口: {时间: dc值}}
+    port_data = {port: {} for port in target_ports}
+    for time, ports in degree_centrality.items():
+        for port in target_ports:
+            if port in ports:  # 确保港口在该时间段存在
+                port_data[port][time] = ports[port][dc_type]
+
+    # 3. 转为DataFrame并按时间排序（关键：保证x轴时间顺序正确）
+    df = pd.DataFrame(index=list(degree_centrality.keys()))
+
+    # 填充每个港口的dc值
+    for port in target_ports:
+        df[port] = [port_data[port].get(time, None) for time in list(degree_centrality.keys())]
+
+    # 4. 绘制折线图
+    plt.figure(figsize=(12, 6))
+
+    # 为每个港口绘制折线
+    markers = ['o', 's', '^', 'D']  # 不同标记区分港口
+    for i, port in enumerate(target_ports):
+        plt.plot(
+            df.index, df[port],
+            marker=markers[i],  # 标记样式
+            label=port,         # 图例标签
+            linewidth=2,        # 线宽
+            markersize=6        # 标记大小
+        )
+
+    # 美化图表
+    plt.xlabel('Time', fontsize=12)
+    plt.ylabel('weighted degree centrality', fontsize=12)
+    plt.title(f'USWAS,USSAV,USHOU,USNFK weighted {dc_type} trend chart', fontsize=14)
+    plt.legend(fontsize=10)  # 显示图例
+    plt.xticks(rotation=45)  # 时间标签旋转45度，避免重叠
+    plt.tight_layout()       # 自动调整布局
+
+    # 5. 保存图片（可选）
+    # plt.savefig(f'Figure/Season/USLSA,USLGB,USNWK{dc_type}变化趋势.png', dpi=300, bbox_inches='tight')
+    # 显示图表
+    plt.show()
+
+
+    # # 占据了美国多少的TEU
+    # record = {}
+    # years = range(2017, 2022)
+    # seasons = ['Spring','Summer','Autumn','Winter']
+    # for year in years:
+    #     for season in seasons:
+    #         if year == 2021 and season == 'Summer':                 # 因为2021年的数据只到8月份
+    #             continue
+    #         time = f"{year}_{season}"
+    #         file_path = f'../Data/{year}/US/Season/{season}/US{year}_{season}_Digraph.graphml'
+    #         if not os.path.exists(file_path):
+    #             print(f'⚠️ 文件不存在: {file_path}')
+    #             continue
+    #         DiGraph = nx.read_graphml(file_path)
+    #
+    #         total_teu = sum(float(d.get('volumeTEU', 0)) for _, _, d in DiGraph.edges(data=True))
+    #         target_teu = sum(float(DiGraph.nodes[p].get('total_TEU', 0)) for p in target_ports)
+    #         record[time] = target_teu / total_teu
+    # print(record)
+def CNYTN_CNSHN_CNNBO_out_dc_and_in_dc_trend_chart():
+    """
+    这三个中国港口的 out_dc / in_dc  之比趋势图
+    :return:
+    """
+    # 假设你已计算中国3港的平均in_dc和out_dc（16个季度的平均值，减少波动）
+    target_ports = ['CNSHA', 'CNYTN', 'CNNBO']
+    file_path = 'InputData/ports_weighted_degree_centrality.json'
+    degree_centrality = json.loads(pathlib.Path(file_path).read_text())
+
+    # 3. 提取每个港口在各时间段的 out_dc/in_dc 比值
+    # 存储结构：{港口: {时间: 比值}}
+    ratio_data = {port: {} for port in target_ports}
+    all_times = list(degree_centrality.keys())
+
+    for time in all_times:
+        ports_data = degree_centrality[time]  # 该时间段的所有港口数据
+        for port in target_ports:
+            if port in ports_data:  # 确保港口在该时间段存在
+                metrics = ports_data[port]
+                in_dc = metrics.get('in_dc', 0.0)
+                out_dc = metrics.get('out_dc', 0.0)
+
+                # 避免除以0（若in_dc为0，比值设为None或一个大值）
+                if in_dc == 0:
+                    ratio = None  # 或根据需求设为np.inf
+                else:
+                    ratio = out_dc / in_dc  # 计算出口/进口比值
+
+                ratio_data[port][time] = ratio
+
+    # 4. 转为DataFrame（便于绘图）
+    df = pd.DataFrame(ratio_data)
+
+    # 5. 绘制折线图
+    plt.figure(figsize=(14, 7))
+
+    # 为每个港口绘制比值趋势
+    markers = ['o', 's', '^']  # 不同标记区分港口
+    colors =  ['#E74C3C', '#3498DB', '#9B59B6']
+
+    for i, port in enumerate(target_ports):
+        plt.plot(
+            df.index, df[port],
+            marker=markers[i],
+            color=colors[i],
+            label=port,
+            linewidth=2,
+            markersize=6
+        )
+
+    # 美化图表
+    plt.axhline(y=1, color='gray', linestyle='--', alpha=0.5, label='=1')  # 参考线：1表示双向均衡
+    plt.xlabel('Time', fontsize=12)
+    plt.ylabel('out_dc/in_dc', fontsize=12)
+    plt.title(' out_dc/in_dc trend chart', fontsize=14)
+    plt.legend(fontsize=10)
+    plt.xticks(rotation=45)  # 时间标签旋转，避免重叠
+    plt.tight_layout()
+
+    # 保存图片
+    plt.savefig('Figure/Season/CNYTN_CNSHN_CNNBO_out_dc_and_in_dc trend chart.png', dpi=300, bbox_inches='tight')
+
+    # 显示图表
+    plt.show()
+def write_all_countries_teu():
+    """
+    保存所有国家的csv  包括美国
+    :return:
+    """
+    years = range(2017, 2022)  # 一年一个单位
+    seasons = ['Spring', 'Summer', 'Autumn', 'Winter']
+    records = []
+
+    for year in years:
+        for season in seasons:
+            if year == 2021 and season == 'Summer':  # 因为2021年的数据只到8月份
+                continue
+            file_path = f'../Data/{year}/US/Season/{season}/US{year}_{season}_Digraph.graphml'
+            if not os.path.exists(file_path):
+                print(f'⚠️ 文件不存在: {file_path}')
+                continue
+            G = nx.read_graphml(file_path)
+            total_teu = sum(float(d.get('volumeTEU', 0)) for _, _, d in G.edges(data=True))
+            records.append({'time': f"{year}_{season}", 'total_TEU': total_teu})
+
+    df_total = pd.DataFrame(records)
+
+    df_foreign = pd.read_csv('InputData/country_teu.csv')
+
+    df2_filtered = df_foreign[df_foreign.columns[1:]]
+    # 将df2添加到df1的右侧（按列合并）
+    combined_df = pd.concat([df_total, df2_filtered], axis=1)
+    combined_df.to_csv('InputData/all_country_teu.csv', index=False)
+def draw_country_teu_correlation_heatmap():
+    """
+    画top国家的TEU相关系数图
+    :return:
+    """
+    df = pd.read_csv('InputData/all_country_teu.csv')
+    # 定义需要保留的国家列名（与你的DataFrame列名一致）
+    target_countries = ['total_TEU',
+        'South Korea', 'Japan', 'Germany',
+        'Belgium', 'Vietnam', 'Canada', 'Singapore', 'China'
+    ]
+    # 只保留目标国家的列
+    df_filtered = df[target_countries]
+    print(df_filtered)
+
+    # 2. 计算相关系数矩阵
+    # ----------------------
+    # 计算皮尔逊相关系数（线性相关），返回矩阵
+    corr_matrix = df_filtered.corr()
+
+    # ----------------------
+    # 3. 绘制热力图
+    # ----------------------
+    plt.figure(figsize=(10, 8))  # 设置图大小
+
+    # 绘制热力图
+    sns.heatmap(
+        corr_matrix,
+        annot=True,  # 显示相关系数数值
+        cmap='RdYlBu_r',  # 配色方案（红=正相关，蓝=负相关）
+        vmin=-1, vmax=1,  # 颜色范围（-1到1）
+        center=0,  # 中间值为0
+        square=True,  # 单元格为正方形
+        linewidths=0.5,  # 单元格边框宽度
+        fmt='.2f'  # 数值保留2位小数
+    )
+
+    # 设置标题和字体
+    plt.title('Correlation Heatmap of TEU Flows Between Countries', fontsize=14, pad=20)
+    plt.tight_layout()  # 调整布局
+
+    # 保存图片
+    plt.savefig('Figure/Season/country_teu_correlation_heatmap.png', dpi=300, bbox_inches='tight')
+    plt.show()
 
 #region非美国港口中心性变化趋势图
 # # port_target = ['BEANT', 'NLROT', 'CNSHA', 'SGSGP', 'KRBUS',
@@ -1609,315 +1820,279 @@ def freight_traffic_network_layer():
 #endregion
 
 
-def write_weighted_dc_sorted_ports_by_time():
+def draw_ports_teu_trend():
     """
-    按照weighted dc排名的港口图
+    画港口的TEU变化趋势图   total in out 都可以
     :return:
     """
-    file_path = 'InputData/ports_weighted_degree_centrality.json'
-    degree_centrality = json.loads(pathlib.Path(file_path).read_text())
-    # 1. 对每个时间段的港口按dc降序排序，提取港口名称列表
-    sorted_ports_by_time = {}
-    for time, data in degree_centrality.items():
-        # 按dc降序排序，取港口名称（如['USLSA', 'USLGB', 'CNSHA']）
-        sorted_ports = [port for port, metrics in sorted(data.items(), key=lambda x: x[1]['dc'], reverse=True)]
-        sorted_ports_by_time[time] = sorted_ports
-    # 2. 确定最大排名数（即所有时间段中港口数量最多的那个，保证行数足够）
-    max_rank = max(len(ports) for ports in sorted_ports_by_time.values())
-    # 3. 构建数据：行=排名（1,2,3...），列=时间段，值=港口名称
-    rank_data = {}
-    for time, ports in sorted_ports_by_time.items():
-        # 为每个时间段填充港口名称，不足max_rank的用空值补充
-        rank_data[time] = ports + [None] * (max_rank - len(ports))
-    # 4. 转为DataFrame，行索引设为排名（1开始）
-    df = pd.DataFrame(rank_data, index=range(1, max_rank + 1))
-    # 5. 保存为CSV（index_label='排名'，明确行含义）
-    df.to_csv('Figure/Season/weighted_dc_sorted_ports_by_time.csv', index_label='排名')
-def draw_USLSA_USLGB_USNWK_weighted_degree_centrality_trend_chart():
-    """
-    美国这三个港口的加权中心性变化趋势图
-    :return:
-    """
-    file_path = 'InputData/ports_weighted_degree_centrality.json'
-    degree_centrality = json.loads(pathlib.Path(file_path).read_text())
-    # 2. 提取目标港口的dc数据（按时间排序）
-    # target_ports = ['USLSA', 'USLGB', 'USNWK']          # 美国的top3港口
-    target_ports = ['USWAS', 'USSAV', 'USHOU', 'USNFK']
-
-    # 收集数据：{港口: {时间: dc值}}
-    port_data = {port: {} for port in target_ports}
-    for time, ports in degree_centrality.items():
-        for port in target_ports:
-            if port in ports:  # 确保港口在该时间段存在
-                port_data[port][time] = ports[port]['dc']
-
-    # 3. 转为DataFrame并按时间排序（关键：保证x轴时间顺序正确）
-    df = pd.DataFrame(index=list(degree_centrality.keys()))
-
-    # 填充每个港口的dc值
-    for port in target_ports:
-        df[port] = [port_data[port].get(time, None) for time in list(degree_centrality.keys())]
-
-    # 4. 绘制折线图
-    plt.figure(figsize=(12, 6))
-
-    # 为每个港口绘制折线
-    markers = ['o', 's', '^', 'D']  # 不同标记区分港口
-    for i, port in enumerate(target_ports):
-        plt.plot(
-            df.index, df[port],
-            marker=markers[i],  # 标记样式
-            label=port,         # 图例标签
-            linewidth=2,        # 线宽
-            markersize=6        # 标记大小
-        )
-
-    # 美化图表
-    plt.xlabel('Time', fontsize=12)
-    plt.ylabel('weighted degree centrality', fontsize=12)
-    plt.title('USWAS,USSAV,USHOU,USNFK weighted degree centrality trend chart', fontsize=14)
-    plt.legend(fontsize=10)  # 显示图例
-    plt.xticks(rotation=45)  # 时间标签旋转45度，避免重叠
-    plt.tight_layout()       # 自动调整布局
-
-    # 5. 保存图片（可选）
-    plt.savefig('Figure/Season/USWAS,USSAV,USHOU,USNFK dc值变化趋势.png', dpi=300, bbox_inches='tight')
-    # 显示图表
-    plt.show()
+    target_ports = ['USLSA', 'USLGB', 'USNWK']
+    teu_type = 'in_TEU'
 
 
-    # 占据了美国多少的TEU
-    record = {}
     years = range(2017, 2022)
-    seasons = ['Spring','Summer','Autumn','Winter']
+    seasons = ['Spring', 'Summer', 'Autumn', 'Winter']
+
+    # 提取每个港口的TEU数据（按港口单独存储，便于后续绘图）
+    port_teu = {port: {} for port in target_ports}  # {港口: {时间: TEU值}}
+    time_list = []
+
     for year in years:
         for season in seasons:
-            if year == 2021 and season == 'Summer':                 # 因为2021年的数据只到8月份
+            # 跳过2021年夏季及以后（数据不全）
+            if year == 2021 and season in ['Summer', 'Autumn', 'Winter']:
                 continue
-            time = f"{year}_{season}"
             file_path = f'../Data/{year}/US/Season/{season}/US{year}_{season}_Digraph.graphml'
+
             if not os.path.exists(file_path):
                 print(f'⚠️ 文件不存在: {file_path}')
-                continue
+
+            time = f"{year}_{season}"
+            time_list.append(time)
+            # 读取图数据并提取各港口的TEU
             DiGraph = nx.read_graphml(file_path)
+            for port in target_ports:
+                # 处理港口不存在或属性缺失的情况
+                if port not in DiGraph.nodes:
+                    print(f'⚠️ 港口{port}在{time}的数据中不存在')
+                    port_teu[port][time] = None
+                    continue
+                teu_str = DiGraph.nodes[port].get(teu_type, '0')
+                try:
+                    teu = float(teu_str)
+                    port_teu[port][time] = teu
+                except ValueError:
+                    print(f'⚠️ 港口{port}在{time}的TEU值无效: {teu_str}')
+                    port_teu[port][time] = None
 
-            total_teu = sum(float(d.get('volumeTEU', 0)) for _, _, d in DiGraph.edges(data=True))
-            target_teu = sum(float(DiGraph.nodes[p].get('total_TEU', 0)) for p in target_ports)
-            record[time] = target_teu / total_teu
-    print(record)
-def CNYTN_CNSHN_CNNBO_out_dc_and_in_dc_trend_chart():
-    """
-    这三个中国港口的 out_dc / in_dc  之比趋势图
-    :return:
-    """
-    # 假设你已计算中国3港的平均in_dc和out_dc（16个季度的平均值，减少波动）
-    target_ports = ['CNSHA', 'CNYTN', 'CNNBO']
-    file_path = 'InputData/ports_weighted_degree_centrality.json'
-    degree_centrality = json.loads(pathlib.Path(file_path).read_text())
 
-    # 3. 提取每个港口在各时间段的 out_dc/in_dc 比值
-    # 存储结构：{港口: {时间: 比值}}
-    ratio_data = {port: {} for port in target_ports}
-    all_times = list(degree_centrality.keys())
+    df = pd.DataFrame(port_teu, index=time_list)
 
-    for time in all_times:
-        ports_data = degree_centrality[time]  # 该时间段的所有港口数据
-        for port in target_ports:
-            if port in ports_data:  # 确保港口在该时间段存在
-                metrics = ports_data[port]
-                in_dc = metrics.get('in_dc', 0.0)
-                out_dc = metrics.get('out_dc', 0.0)
-
-                # 避免除以0（若in_dc为0，比值设为None或一个大值）
-                if in_dc == 0:
-                    ratio = None  # 或根据需求设为np.inf
-                else:
-                    ratio = out_dc / in_dc  # 计算出口/进口比值
-
-                ratio_data[port][time] = ratio
-
-    # 4. 转为DataFrame（便于绘图）
-    df = pd.DataFrame(ratio_data)
-
-    # 5. 绘制折线图
+    # 绘制TEU变化趋势图
     plt.figure(figsize=(14, 7))
 
-    # 为每个港口绘制比值趋势
-    markers = ['o', 's', '^']  # 不同标记区分港口
-    colors =  ['#E74C3C', '#3498DB', '#9B59B6']
+    # 自定义样式（配色+标记）
+    colors = ['#1f77b4', '#ff7f0e', '#2ca02c']  # 蓝、橙、绿
+    markers = ['o', 's', '^']  # 圆形、正方形、三角形
 
     for i, port in enumerate(target_ports):
         plt.plot(
             df.index, df[port],
-            marker=markers[i],
-            color=colors[i],
             label=port,
+            color=colors[i],
+            marker=markers[i],
             linewidth=2,
-            markersize=6
+            markersize=7,
+            linestyle='-',
+            alpha=0.8
         )
 
     # 美化图表
-    plt.axhline(y=1, color='gray', linestyle='--', alpha=0.5, label='=1')  # 参考线：1表示双向均衡
     plt.xlabel('Time', fontsize=12)
-    plt.ylabel('out_dc/in_dc', fontsize=12)
-    plt.title(' out_dc/in_dc trend chart', fontsize=14)
-    plt.legend(fontsize=10)
-    plt.xticks(rotation=45)  # 时间标签旋转，避免重叠
-    plt.tight_layout()
+    plt.ylabel('TEU', fontsize=12)
+    plt.title(f'USLSA,USLGB,USNWK {teu_type} trend chart', fontsize=14)
+    plt.legend(fontsize=10, loc='upper left')
+    plt.grid(axis='y', alpha=0.3)
+    plt.xticks(rotation=45, ha='right', fontsize=10)  # 旋转标签避免重叠
+    plt.tight_layout()  # 自动调整布局
 
     # 保存图片
-    plt.savefig('Figure/Season/CNYTN_CNSHN_CNNBO_out_dc_and_in_dc trend chart.png', dpi=300, bbox_inches='tight')
-
-    # 显示图表
+    plt.savefig(f'Figure/Season/USLSA_USLGB_USNWK_{teu_type}_trend.png', dpi=300, bbox_inches='tight')
     plt.show()
 
+#region给DiGraph添加商品种类信息
+# category_mapping = {
+#         'animal_plant': [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14],
+#         'grease': [15, 16, 17, 18, 19, 20, 21, 22, 23, 24],
+#         'minerals': [25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38],
+#         'rubber_plastics': [39, 40, 41, 42, 43],
+#         'pulpwood': [44, 45, 46, 47, 48, 49],
+#         'textile': [50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67],
+#         'metal': [71, 72, 73, 74, 75, 76, 77, 78, 79, 80, 81, 82, 83],
+#         'machinery': [84, 85, 86, 87, 88, 89],
+#         'precision_instrument': [90, 91, 92, 94, 95, 96],
+#         'special_other': [68, 69, 70, 93, 97, 98, 99]
+#     }
+# 创建反向映射：数字 -> 类别（提高查询效率）
+# number_to_category = {}
+# for category, numbers in category_mapping.items():
+#     for num in numbers:
+#         number_to_category[num] = category
+#         number_to_category[str(num)] = category  # 额外添加字符串键，避免KeyError
+#
+#
+# years = range(2017, 2022)
+# seasons = ['Spring','Summer','Autumn','Winter']
+# for year in years:
+#     for season in seasons:
+#         if year == 2021 and season == 'Summer':                 # 因为2021年的数据只到8月份
+#             continue
+#         # 读取MulGraph和DiGraph
+#         mul_file = f'../Data/{year}/US/Season/{season}/US{year}_{season}.graphml'
+#         dig_file = f'../Data/{year}/US/Season/{season}/US{year}_{season}_Digraph.graphml'
+#
+#         # 检查文件是否存在（合并检查，减少重复代码）
+#         if not (os.path.exists(mul_file) and os.path.exists(dig_file)):
+#             print(f'⚠️ 文件缺失：{mul_file} 或 {dig_file}')
+#             continue
+#
+#         MulGraph = nx.read_graphml(mul_file)
+#         DiGraph = nx.read_graphml(dig_file)
+#
+#
+#         count = 0
+#         # 先在DiGraph中创建相应的category
+#         for u,v,d in DiGraph.edges(data=True):
+#             for category_name in category_mapping.keys():
+#                 d[category_name] = 0
+#
+#         for f,t,data in MulGraph.edges(data=True):
+#             if not DiGraph.has_edge(f, t):
+#                 print("DiGraph中没有这条边")
+#                 count += 1
+#                 continue
+#                 # 处理HSCode：确保能映射到类别（捕获异常，避免程序中断）
+#             try:
+#                 hscode = data['HSCode']
+#                 # 若HSCode不在映射中，设为unknown（可选，根据需求调整）
+#                 cate = number_to_category.get(hscode, 'unknown')
+#             except KeyError:
+#                 print(f'⚠️ MulGraph边 ({f}, {t}) 无HSCode属性，跳过----{hscode}')
+#                 count += 1
+#                 continue
+#
+#             # 处理volumeTEU：确保是数值类型（避免字符串累加报错）
+#             try:
+#                 teu = float(data['volumeTEU'])
+#             except (KeyError, ValueError):
+#                 print(f'⚠️ MulGraph边 ({f}, {t}) 的volumeTEU无效，跳过')
+#                 count += 1
+#                 continue
+#
+#             # 累加TEU到对应类别（若为unknown，可选择不累加或单独处理）
+#             if cate != 'unknown':
+#                 DiGraph[f][t][cate] += teu
+#             else:
+#                 print(f'⚠️ HSCode {hscode} 无对应类别，跳过')
+#                 count += 1
+#         print(count / MulGraph.number_of_edges())
+#         nx.write_graphml(DiGraph, dig_file)
+#         print(f'✅ 成功更新并保存：{dig_file}')
+#endregion
 
-# # 初始化存储数据的字典
-# record = {}
+#regionUSTop3港口的商品种类json
+# target_ports = ['CNSHA','CNYTN','CNNBO']
+# commodity_categories = [
+#     'animal_plant', 'grease', 'minerals', 'rubber_plastics',
+#     'pulpwood', 'textile', 'metal', 'machinery',
+#     'precision_instrument', 'special_other'
+# ]
 # years = range(2017, 2022)
 # seasons = ['Spring', 'Summer', 'Autumn', 'Winter']
-# target_ports = ['USLSA', 'USLGB', 'USNWK']
-#
-# # 提取每个港口的TEU数据（按港口单独存储，便于后续绘图）
-# port_teu = {port: {} for port in target_ports}  # {港口: {时间: TEU值}}
-# time_list = []
+# records = {}
 #
 # for year in years:
 #     for season in seasons:
 #         # 跳过2021年夏季及以后（数据不全）
 #         if year == 2021 and season in ['Summer', 'Autumn', 'Winter']:
 #             continue
-#         file_path = f'../Data/{year}/US/Season/{season}/US{year}_{season}_Digraph.graphml'
 #
+#         # 读取包含类别TEU的图文件（根据你的实际文件选择MulGraph/DiGraph，这里假设是MulGraph）
+#         file_path = f'../Data/{year}/US/Season/{season}/US{year}_{season}_Digraph.graphml'
 #         if not os.path.exists(file_path):
 #             print(f'⚠️ 文件不存在: {file_path}')
-#
+#             continue
 #         time = f"{year}_{season}"
-#         time_list.append(time)
-#         # 读取图数据并提取各港口的TEU
-#         DiGraph = nx.read_graphml(file_path)
+#         DiG = nx.read_graphml(file_path)
+#         category = {}
 #         for port in target_ports:
-#             # 处理港口不存在或属性缺失的情况
-#             if port not in DiGraph.nodes:
-#                 print(f'⚠️ 港口{port}在{time}的数据中不存在')
-#                 port_teu[port][time] = None
-#                 continue
-#             teu_str = DiGraph.nodes[port].get('out_TEU', '0')
-#             try:
-#                 teu = float(teu_str)
-#                 port_teu[port][time] = teu
-#             except ValueError:
-#                 print(f'⚠️ 港口{port}在{time}的TEU值无效: {teu_str}')
-#                 port_teu[port][time] = None
+#             category_dict = {key : 0 for key in commodity_categories}
 #
+#             # 关键修复1：统计“港口作为起点（出口）+ 终点（进口）”的所有边
+#             # 1. 港口作为起点的出边（出口：port → 其他节点）
+#             for u, v, data in DiG.out_edges(port, data=True):
+#                 for key in commodity_categories:
+#                     teu = float(data.get(key, 0))  # 无字段则取0，转数值避免类型错
+#                     category_dict[key] += teu
 #
-# df = pd.DataFrame(port_teu, index=time_list)
+#             # # 2. 港口作为终点的入边（进口：其他节点 → port）
+#             # for u, v, data in DiG.in_edges(port, data=True):
+#             #     for key in commodity_categories:
+#             #         teu = float(data.get(key, 0))
+#             #         category_dict[key] += teu
+#             # 保存当前港口的类别TEU
+#             category[port] = category_dict
 #
-# # 绘制TEU变化趋势图
-# plt.figure(figsize=(14, 7))
+#         # 保存当前时间的所有港口数据
+#         records[time] = category
+# pathlib.Path('Figure/Season/US_Top3_category.json').write_text(json.dumps(records, indent=2))
+#endregion
+
+
+#region查看港口的商品种类TEU变化趋势图
+# file_path = "Figure/Season/US_Top3_category.json"
+# record = json.loads(pathlib.Path(file_path).read_text())
+# data_list = []
+# for time, port_dict in record.items():
+#     for port, cate_teu in port_dict.items():
+#         for category, teu in cate_teu.items():
+#             data_list.append({
+#                 "Time": time,
+#                 "Port": port,
+#                 "Category": category,
+#                 "TEU": teu
+#             })
 #
-# # 自定义样式（配色+标记）
-# colors = ['#1f77b4', '#ff7f0e', '#2ca02c']  # 蓝、橙、绿
-# markers = ['o', 's', '^']  # 圆形、正方形、三角形
+# # 转为DataFrame并按时间排序（确保趋势图顺序正确）
+# df = pd.DataFrame(data_list)
 #
-# for i, port in enumerate(target_ports):
-#     plt.plot(
-#         df.index, df[port],
-#         label=port,
-#         color=colors[i],
-#         marker=markers[i],
-#         linewidth=2,
-#         markersize=7,
-#         linestyle='-',
-#         alpha=0.8
+# # 商品类别配色+标记（10种类别，区分度高）
+# category_colors = plt.cm.Set3(np.linspace(0, 1, 10))  # 柔和多彩的配色
+# category_markers = ['o', 's', '^', 'D', 'v', '<', '>', 'p', '*', 'h']  # 10种不同标记
+#
+# for port in target_ports:
+#     # 筛选当前港口的数据
+#     port_df = df[df["Port"] == port].copy()
+#
+#     # 创建单独的画布
+#     plt.figure(figsize=(14, 8))
+#
+#     # 遍历每个商品类别，绘制趋势线
+#     for idx, category in enumerate(port_df["Category"].unique()):
+#         cate_df = port_df[port_df["Category"] == category]
+#         plt.plot(
+#             cate_df["Time"],  # X轴：时间（年_季节）
+#             cate_df["TEU"],  # Y轴：TEU数值
+#             label=category,
+#             color=category_colors[idx],
+#             marker=category_markers[idx],
+#             linewidth=2.5,  # 线条粗细（清晰可见）
+#             markersize=8,  # 标记大小（突出数据点）
+#             alpha=0.8  # 透明度（避免重叠时刺眼）
+#         )
+#
+#     # 图表美化（英文适配，专业清晰）
+#     plt.title(f'Commodity TEU Trend for {port}', fontsize=16, pad=20)
+#     plt.xlabel('Time (Year_Season)', fontsize=14)
+#     plt.ylabel('TEU (Twenty-foot Equivalent Unit)', fontsize=14)
+#     plt.grid(axis='y', alpha=0.3)  # 仅Y轴网格（辅助读值，不干扰线条）
+#     plt.xticks(rotation=45, ha='right', fontsize=12)  # 时间标签旋转（避免重叠）
+#     plt.yticks(fontsize=12)
+#
+#     # 图例（放在右侧，不遮挡趋势线）
+#     plt.legend(
+#         title='Commodity Categories',
+#         title_fontsize=12,
+#         fontsize=11,
+#         bbox_to_anchor=(1.05, 1),
+#         loc='upper left'
 #     )
 #
-# # 美化图表
-# plt.xlabel('Time', fontsize=12)
-# plt.ylabel('TEU', fontsize=12)
-# plt.title('USLSA,USLGB,USNWK TEU trend chart', fontsize=14)
-# plt.legend(fontsize=10, loc='upper left')
-# plt.grid(axis='y', alpha=0.3)
-# plt.xticks(rotation=45, ha='right', fontsize=10)  # 旋转标签避免重叠
-# plt.tight_layout()  # 自动调整布局
+#     # 自动调整布局（防止标签/图例被截断）
+#     plt.tight_layout()
 #
-# # 保存图片
-# # plt.savefig('Figure/Season/USLSA_USLGB_USNWK_TEU_trend.png', dpi=300, bbox_inches='tight')
-# plt.show()
+#     # 保存图片（按港口命名，便于区分）
+#     # plt.savefig(f'{port}_commodity_trend.png', dpi=300, bbox_inches='tight')
+#     plt.show()
+#endregion
 
 
-def write_all_countries_teu():
-    """
-    保存所有国家的csv  包括美国
-    :return:
-    """
-    years = range(2017, 2022)  # 一年一个单位
-    seasons = ['Spring', 'Summer', 'Autumn', 'Winter']
-    records = []
-
-    for year in years:
-        for season in seasons:
-            if year == 2021 and season == 'Summer':  # 因为2021年的数据只到8月份
-                continue
-            file_path = f'../Data/{year}/US/Season/{season}/US{year}_{season}_Digraph.graphml'
-            if not os.path.exists(file_path):
-                print(f'⚠️ 文件不存在: {file_path}')
-                continue
-            G = nx.read_graphml(file_path)
-            total_teu = sum(float(d.get('volumeTEU', 0)) for _, _, d in G.edges(data=True))
-            records.append({'time': f"{year}_{season}", 'total_TEU': total_teu})
-
-    df_total = pd.DataFrame(records)
-
-    df_foreign = pd.read_csv('InputData/country_teu.csv')
-
-    df2_filtered = df_foreign[df_foreign.columns[1:]]
-    # 将df2添加到df1的右侧（按列合并）
-    combined_df = pd.concat([df_total, df2_filtered], axis=1)
-    combined_df.to_csv('InputData/all_country_teu.csv', index=False)
-
-
-def draw_country_teu_correlation_heatmap():
-    """
-    画top国家的TEU相关系数图
-    :return:
-    """
-    df = pd.read_csv('InputData/all_country_teu.csv')
-    # 定义需要保留的国家列名（与你的DataFrame列名一致）
-    target_countries = ['total_TEU',
-        'South Korea', 'Japan', 'Germany',
-        'Belgium', 'Vietnam', 'Canada', 'Singapore', 'China'
-    ]
-    # 只保留目标国家的列
-    df_filtered = df[target_countries]
-    print(df_filtered)
-
-    # 2. 计算相关系数矩阵
-    # ----------------------
-    # 计算皮尔逊相关系数（线性相关），返回矩阵
-    corr_matrix = df_filtered.corr()
-
-    # ----------------------
-    # 3. 绘制热力图
-    # ----------------------
-    plt.figure(figsize=(10, 8))  # 设置图大小
-
-    # 绘制热力图
-    sns.heatmap(
-        corr_matrix,
-        annot=True,  # 显示相关系数数值
-        cmap='RdYlBu_r',  # 配色方案（红=正相关，蓝=负相关）
-        vmin=-1, vmax=1,  # 颜色范围（-1到1）
-        center=0,  # 中间值为0
-        square=True,  # 单元格为正方形
-        linewidths=0.5,  # 单元格边框宽度
-        fmt='.2f'  # 数值保留2位小数
-    )
-
-    # 设置标题和字体
-    plt.title('Correlation Heatmap of TEU Flows Between Countries', fontsize=14, pad=20)
-    plt.tight_layout()  # 调整布局
-
-    # 保存图片
-    plt.savefig('Figure/Season/country_teu_correlation_heatmap.png', dpi=300, bbox_inches='tight')
-    plt.show()

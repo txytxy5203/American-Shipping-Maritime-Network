@@ -150,26 +150,47 @@ from collections import deque
 
 # -------------------------- 示例用法 --------------------------
 if __name__ == "__main__":
-    # 美国的港口中心性变化趋势图
-    file_path = 'InputData/ports_degree_centrality.json'
-    degree_centrality = json.loads(pathlib.Path(file_path).read_text())
-    time = list(degree_centrality.keys())
-    ports = ['USHOU','USNWK', 'USSAV', 'USNFK', 'USNOL','USCHA','USNYK','USLSA']
-    # ports = ['USHOU','USNWK', 'USSAV']
-    value = {port : [] for port in ports}
+    # 定义分类映射关系：键为类别名称，值为该类别包含的数字列表
+    category_mapping = {
+        'animal_plant': [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14],
+        'grease': [15, 16, 17, 18, 19, 20, 21, 22, 23, 24],
+        'minerals': [25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38],
+        'rubber_plastics': [39, 40, 41, 42, 43],
+        'pulpwood': [44, 45, 46, 47, 48, 49],
+        'textile': [50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67],
+        'metal': [71, 72, 73, 74, 75, 76, 77, 78, 79, 80, 81, 82, 83],
+        'machinery': [84, 85, 86, 87, 88, 89],
+        'precision_instrument': [90, 91, 92, 94, 95, 96],
+        'special_other': [68, 69, 70, 93, 97, 98, 99]
+    }
 
-    for _, data in degree_centrality.items():
-        sorted_asc = dict(sorted(data.items(), key=lambda x: x[1], reverse=True))
-        for port in ports:
-            value[port].append(sorted_asc[port])
-    # 绘制折线图
-    plt.figure(figsize=(10, 6))
-    for port in ports:
-        print(port, value[port])
-        plt.plot(time, value[port], marker='o', label=port)  # 每个港口一条线，带标记点
+    # 创建反向映射：数字 -> 类别（提高查询效率）
+    number_to_category = {}
+    for category, numbers in category_mapping.items():
+        for num in numbers:
+            number_to_category[num] = category
+    print(number_to_category)
 
-    plt.xlabel("Time", fontsize=12)
-    plt.ylabel("degree centrality", fontsize=12)
-    plt.title("", fontsize=14)
-    plt.legend()  # 显示港口标签
-    plt.show()
+    Mul_G = nx.MultiDiGraph()
+    Mul_G.add_edges_from([
+        (1, 2,{'HSCode' : 1, 'volumeTEU': 1}),
+        (1, 2,{'HSCode' : 1, 'volumeTEU': 1}),
+        (2, 1,{'HSCode' : 99, 'volumeTEU': 2}),
+        (1, 3,{'HSCode' : 1, 'volumeTEU': 1}),
+        (3, 1,{'HSCode' : 99, 'volumeTEU': 1}),
+        (3, 1,{'HSCode' : 99, 'volumeTEU': 1}),
+    ])
+
+    DiG = nx.DiGraph()
+    for f,t,d in DiG.edges(data=True):
+        DiG[f][t]['animal_plant'] = 0
+        DiG[f][t]['special_other'] = 0
+    for u,v,data in Mul_G.edges(data=True):
+        if DiG.has_edge(u, v):
+            # HSCode 的映射
+            cate = number_to_category[data['HSCode']]
+            print(cate)
+            DiG[u][v][cate] += data['volumeTEU']
+
+    for a,b,c in DiG.edges(data=True):
+        print(a, b, c)
