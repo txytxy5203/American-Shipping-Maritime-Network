@@ -1585,6 +1585,85 @@ def draw_USLSA_USLGB_USNWK_weighted_degree_centrality_trend_chart():
     #         target_teu = sum(float(DiGraph.nodes[p].get('total_TEU', 0)) for p in target_ports)
     #         record[time] = target_teu / total_teu
     # print(record)
+def draw_ports_teu_trend(teu_type:str):
+    """
+
+    :param teu_type: "in_TEU" or "out_TEU" or "total_TEU"
+    :return:
+    """
+    target_ports = ['USLSA', 'USLGB', 'USNWK']
+
+
+
+    years = range(2017, 2022)
+    seasons = ['Spring', 'Summer', 'Autumn', 'Winter']
+
+    # 提取每个港口的TEU数据（按港口单独存储，便于后续绘图）
+    port_teu = {port: {} for port in target_ports}  # {港口: {时间: TEU值}}
+    time_list = []
+
+    for year in years:
+        for season in seasons:
+            # 跳过2021年夏季及以后（数据不全）
+            if year == 2021 and season in ['Summer', 'Autumn', 'Winter']:
+                continue
+            file_path = f'../Data/{year}/US/Season/{season}/US{year}_{season}_Digraph.graphml'
+
+            if not os.path.exists(file_path):
+                print(f'⚠️ 文件不存在: {file_path}')
+
+            time = f"{year}_{season}"
+            time_list.append(time)
+            # 读取图数据并提取各港口的TEU
+            DiGraph = nx.read_graphml(file_path)
+            for port in target_ports:
+                # 处理港口不存在或属性缺失的情况
+                if port not in DiGraph.nodes:
+                    print(f'⚠️ 港口{port}在{time}的数据中不存在')
+                    port_teu[port][time] = None
+                    continue
+                teu_str = DiGraph.nodes[port].get(teu_type, '0')
+                try:
+                    teu = float(teu_str)
+                    port_teu[port][time] = teu
+                except ValueError:
+                    print(f'⚠️ 港口{port}在{time}的TEU值无效: {teu_str}')
+                    port_teu[port][time] = None
+
+
+    df = pd.DataFrame(port_teu, index=time_list)
+
+    # 绘制TEU变化趋势图
+    plt.figure(figsize=(14, 7))
+
+    # 自定义样式（配色+标记）
+    colors = ['#1f77b4', '#ff7f0e', '#2ca02c']  # 蓝、橙、绿
+    markers = ['o', 's', '^']  # 圆形、正方形、三角形
+
+    for i, port in enumerate(target_ports):
+        plt.plot(
+            df.index, df[port],
+            label=port,
+            color=colors[i],
+            marker=markers[i],
+            linewidth=2,
+            markersize=7,
+            linestyle='-',
+            alpha=0.8
+        )
+
+    # 美化图表
+    plt.xlabel('Time', fontsize=12)
+    plt.ylabel('TEU', fontsize=12)
+    plt.title(f'USLSA,USLGB,USNWK {teu_type} trend chart', fontsize=14)
+    plt.legend(fontsize=10, loc='upper left')
+    plt.grid(axis='y', alpha=0.3)
+    plt.xticks(rotation=45, ha='right', fontsize=10)  # 旋转标签避免重叠
+    plt.tight_layout()  # 自动调整布局
+
+    # 保存图片
+    plt.savefig(f'Figure/Season/USLSA_USLGB_USNWK_{teu_type}_trend.png', dpi=300, bbox_inches='tight')
+    plt.show()
 def CNYTN_CNSHN_CNNBO_out_dc_and_in_dc_trend_chart():
     """
     这三个中国港口的 out_dc / in_dc  之比趋势图
@@ -1820,84 +1899,8 @@ def draw_country_teu_correlation_heatmap():
 #endregion
 
 
-def draw_ports_teu_trend():
-    """
-    画港口的TEU变化趋势图   total in out 都可以
-    :return:
-    """
-    target_ports = ['USLSA', 'USLGB', 'USNWK']
-    teu_type = 'in_TEU'
 
 
-    years = range(2017, 2022)
-    seasons = ['Spring', 'Summer', 'Autumn', 'Winter']
-
-    # 提取每个港口的TEU数据（按港口单独存储，便于后续绘图）
-    port_teu = {port: {} for port in target_ports}  # {港口: {时间: TEU值}}
-    time_list = []
-
-    for year in years:
-        for season in seasons:
-            # 跳过2021年夏季及以后（数据不全）
-            if year == 2021 and season in ['Summer', 'Autumn', 'Winter']:
-                continue
-            file_path = f'../Data/{year}/US/Season/{season}/US{year}_{season}_Digraph.graphml'
-
-            if not os.path.exists(file_path):
-                print(f'⚠️ 文件不存在: {file_path}')
-
-            time = f"{year}_{season}"
-            time_list.append(time)
-            # 读取图数据并提取各港口的TEU
-            DiGraph = nx.read_graphml(file_path)
-            for port in target_ports:
-                # 处理港口不存在或属性缺失的情况
-                if port not in DiGraph.nodes:
-                    print(f'⚠️ 港口{port}在{time}的数据中不存在')
-                    port_teu[port][time] = None
-                    continue
-                teu_str = DiGraph.nodes[port].get(teu_type, '0')
-                try:
-                    teu = float(teu_str)
-                    port_teu[port][time] = teu
-                except ValueError:
-                    print(f'⚠️ 港口{port}在{time}的TEU值无效: {teu_str}')
-                    port_teu[port][time] = None
-
-
-    df = pd.DataFrame(port_teu, index=time_list)
-
-    # 绘制TEU变化趋势图
-    plt.figure(figsize=(14, 7))
-
-    # 自定义样式（配色+标记）
-    colors = ['#1f77b4', '#ff7f0e', '#2ca02c']  # 蓝、橙、绿
-    markers = ['o', 's', '^']  # 圆形、正方形、三角形
-
-    for i, port in enumerate(target_ports):
-        plt.plot(
-            df.index, df[port],
-            label=port,
-            color=colors[i],
-            marker=markers[i],
-            linewidth=2,
-            markersize=7,
-            linestyle='-',
-            alpha=0.8
-        )
-
-    # 美化图表
-    plt.xlabel('Time', fontsize=12)
-    plt.ylabel('TEU', fontsize=12)
-    plt.title(f'USLSA,USLGB,USNWK {teu_type} trend chart', fontsize=14)
-    plt.legend(fontsize=10, loc='upper left')
-    plt.grid(axis='y', alpha=0.3)
-    plt.xticks(rotation=45, ha='right', fontsize=10)  # 旋转标签避免重叠
-    plt.tight_layout()  # 自动调整布局
-
-    # 保存图片
-    plt.savefig(f'Figure/Season/USLSA_USLGB_USNWK_{teu_type}_trend.png', dpi=300, bbox_inches='tight')
-    plt.show()
 
 #region给DiGraph添加商品种类信息
 # category_mapping = {
@@ -2096,3 +2099,91 @@ def draw_ports_teu_trend():
 #endregion
 
 
+def draw_port_inout_trend(port: str):
+    """
+    绘制单个港口的 in_TEU（进口）和 out_TEU（出口）在同一张图中
+    :param port: 目标港口（'USLSA', 'USLGB', 'USNWK'）
+    """
+    years = range(2017, 2022)
+    seasons = ['Spring', 'Summer', 'Autumn', 'Winter']
+
+    # 存储当前港口的进口、出口TEU数据：{TEU类型: {时间: TEU值}}
+    teu_data = {'in_TEU': {}, 'out_TEU': {}}
+    time_list = []
+
+    for year in years:
+        for season in seasons:
+            # 跳过2021年夏季及以后（数据不全）
+            if year == 2021 and season in ['Summer', 'Autumn', 'Winter']:
+                continue
+            file_path = f'../Data/{year}/US/Season/{season}/US{year}_{season}_Digraph.graphml'
+
+            if not os.path.exists(file_path):
+                print(f'⚠️ 文件不存在: {file_path}')
+                continue
+
+            time = f"{year}_{season}"
+            time_list.append(time)
+            # 读取图数据
+            DiGraph = nx.read_graphml(file_path)
+
+            # 处理港口不存在的情况（进口、出口统一标记为None）
+            if port not in DiGraph.nodes:
+                print(f'⚠️ 港口{port}在{time}的数据中不存在')
+                teu_data['in_TEU'][time] = None
+                teu_data['out_TEU'][time] = None
+                continue
+
+            # 提取进口TEU（in_TEU）
+            in_teu_str = DiGraph.nodes[port].get('in_TEU', '0')
+            try:
+                teu_data['in_TEU'][time] = float(in_teu_str)
+            except ValueError:
+                print(f'⚠️ 港口{port}在{time}的in_TEU值无效: {in_teu_str}')
+                teu_data['in_TEU'][time] = None
+
+            # 提取出口TEU（out_TEU）
+            out_teu_str = DiGraph.nodes[port].get('out_TEU', '0')
+            try:
+                teu_data['out_TEU'][time] = float(out_teu_str)
+            except ValueError:
+                print(f'⚠️ 港口{port}在{time}的out_TEU值无效: {out_teu_str}')
+                teu_data['out_TEU'][time] = None
+
+    # 转换为DataFrame（时间为索引，进口/出口为列）
+    df = pd.DataFrame(teu_data, index=time_list)
+
+    # 绘制同图趋势（进口+出口）
+    plt.figure(figsize=(12, 6))
+
+    # 自定义样式：进口用蓝色圆形，出口用橙色正方形，区分度高
+    styles = {
+        'in_TEU': {'color': '#1f77b4', 'marker': 'o', 'label': 'Import TEU (in_TEU)'},
+        'out_TEU': {'color': '#ff7f0e', 'marker': 's', 'label': 'Export TEU (out_TEU)'}
+    }
+
+    # 分别绘制进口、出口趋势线
+    for teu_type, style in styles.items():
+        plt.plot(
+            df.index, df[teu_type],
+            color=style['color'],
+            marker=style['marker'],
+            linewidth=2,
+            markersize=7,
+            linestyle='-',
+            alpha=0.8,
+            label=style['label']
+        )
+
+    # 图表美化（清晰易读）
+    plt.xlabel('Time', fontsize=12)
+    plt.ylabel('TEU', fontsize=12)
+    plt.title(f'{port} Import and Export TEU Trend', fontsize=14, pad=15)
+    plt.legend(fontsize=10, loc='upper left')  # 图例放在左上角，避免遮挡线条
+    # plt.grid(axis='y', alpha=0.3)  # 仅Y轴网格，辅助读值
+    plt.xticks(rotation=45, ha='right', fontsize=10)  # 时间标签旋转，避免重叠
+    plt.tight_layout()  # 自动调整布局，防止标签截断
+
+    # 保存图片（按港口命名，便于区分）
+    plt.savefig(f'Figure/Season/{port}_in_out_TEU_trend.png', dpi=300, bbox_inches='tight')
+    plt.show()
