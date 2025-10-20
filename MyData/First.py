@@ -2193,47 +2193,68 @@ def write_US_Top3_category():
 #     plt.show()
 #endregion
 
-# file_path = "Figure/Season/USTop3/US_Top3_category.json"
-# record = json.loads(pathlib.Path(file_path).read_text())
-#
-# target_ports = ['USLSA', 'USLGB', 'USNWK']  # 确保与数据中的港口名一致
-# seasons = ["2017_Spring", "2020_Spring", "2021_Spring"]
-#
-# for season in seasons:
-#     for port in target_ports:
-#         # 输入数据
-#         data = record[season][port]
-#         sorted_data = dict(sorted(data.items(), key=lambda k: k[1], reverse=True))
-#
-#         # 提取标签和数值
-#         labels = list(sorted_data.keys())
-#         values = list(sorted_data.values())
-#
-#         # 设置画布
-#         plt.figure(figsize=(6, 6))  # 正方形画布，避免饼图变形
-#
-#         # 绘制饼状图
-#         wedges, texts, autotexts = plt.pie(
-#             values,
-#             labels=labels,
-#             autopct='%1.1f%%',  # 显示百分比（保留1位小数）
-#             startangle=90,      # 从90度位置开始绘制（顶部为起点）
-#             colors=plt.cm.Set3([0.1, 0.5, 0.9]),  # 柔和的三色区分
-#             textprops={'fontsize': 12}  # 标签文字大小
-#         )
-#
-#         # 美化百分比文本（白色加粗，更清晰）
-#         for autotext in autotexts:
-#             autotext.set_color('black')
-#             autotext.set_fontweight('bold')
-#
-#         # 添加标题
-#         plt.title(f'{port} {season} category distribution', fontsize=14, pad=10)
-#
-#         # 确保饼图是正圆形
-#         plt.axis('equal')
-#
-#         # 显示并保存
-#         plt.tight_layout()
-#         plt.savefig(f"Figure/Season/USTop3/Category/{port} {season} category distribution", dpi=300)
-#         plt.show()
+def draw_US_Top3_category_pie_chart():
+    """
+    画美国Top3港口的商品种类饼状图
+    return:
+    """
+    file_path = "Figure/Season/USTop3/Category/US_Top3_in_category.json"
+    record = json.loads(pathlib.Path(file_path).read_text())
+
+    target_ports = ['USLSA', 'USLGB', 'USNWK']  # 确保与数据中的港口名一致
+    seasons = ["2017_Spring", "2020_Spring", "2021_Spring"]
+
+    category_color_mapping = {
+        'animal_plant': '#1f77b4',    # 深海蓝（SCI图表常用基准色）
+        'grease': '#ff7f0e',          # 暖橙（低饱和，不刺眼）
+        'minerals': '#2ca02c',        # 森林绿（沉稳自然）
+        'rubber_plastics': '#d62728', # 砖红（低饱和红色，专业感）
+        'pulpwood': '#9467bd',        # 薰衣草紫（柔和不突兀）
+        'textile': '#8c564b',         # 棕褐（复古专业）
+        'metal': '#e377c2',           # 淡粉紫（低饱和，区分度高）
+        'machinery': '#7f7f7f',       # 中灰（中性专业）
+        'precision_instrument': '#bcbd22', # 橄榄黄（低饱和，不抢眼）
+        'special_other': '#17becf'    # 浅青蓝（最后一类，柔和收尾）
+    }
+
+
+    for season in seasons:
+        for port in target_ports:
+            # 输入数据
+            data = record[season][port]
+            sorted_data = dict(sorted(data.items(), key=lambda k: k[1], reverse=True))
+
+            # 提取标签和数值
+            labels = list(sorted_data.keys())
+            values = list(sorted_data.values())
+
+            colors = [category_color_mapping[cate] for cate in labels]  # 按类别取专属颜色
+
+            # 设置画布
+            plt.figure(figsize=(6, 6))  # 正方形画布，避免饼图变形
+
+            # 绘制饼状图
+            wedges, texts, autotexts = plt.pie(
+                values,
+                labels=labels,
+                autopct='%1.1f%%',  # 显示百分比（保留1位小数）
+                startangle=90,      # 从90度位置开始绘制（顶部为起点）
+                colors=colors,
+                textprops={'fontsize': 12}  # 标签文字大小
+            )
+
+            # 美化百分比文本（白色加粗，更清晰）
+            for autotext in autotexts:
+                autotext.set_color('white')
+                autotext.set_fontweight('bold')
+
+            # 添加标题
+            plt.title(f'{port} {season} Import Category Distribution', fontsize=14, pad=10)
+
+            # 确保饼图是正圆形
+            plt.axis('equal')
+
+            # 显示并保存
+            plt.tight_layout()
+            plt.savefig(f"Figure/Season/USTop3/Category/{port} {season} Import Category Distribution", dpi=300)
+            plt.show()
