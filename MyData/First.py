@@ -3,6 +3,9 @@ import json
 import pathlib
 import random
 import sys
+
+from matplotlib.lines import Line2D
+
 sys.path.append('../Algorithm')
 import os
 import networkx as nx
@@ -23,6 +26,8 @@ from matplotlib import patheffects
 from scipy.stats import entropy
 from heapq import nlargest
 from collections import deque
+from matplotlib.path import Path
+import matplotlib.patches as patches
 
 
 # ---------- 工具函数 ----------
@@ -1919,7 +1924,6 @@ def draw_country_teu_correlation_heatmap():
 #endregion
 #endregion
 
-
 #region 计算加权core number   算法太慢了，算不了，要优化
 # total_record = {}
 # in_record = {}
@@ -2123,6 +2127,71 @@ def write_US_Top3_category():
             # 保存当前时间的所有港口数据
             records[time] = category
     pathlib.Path('Figure/Season/USTop3/Category/US_Top3_in_category.json').write_text(json.dumps(records, indent=2))
+def draw_US_Top3_category_pie_chart():
+    """
+    画美国Top3港口的商品种类饼状图
+    return:
+    """
+    file_path = "Figure/Season/USTop3/Category/US_Top3_in_category.json"
+    record = json.loads(pathlib.Path(file_path).read_text())
+
+    target_ports = ['USLSA', 'USLGB', 'USNWK']  # 确保与数据中的港口名一致
+    seasons = ["2017_Spring", "2020_Spring", "2021_Spring"]
+
+    category_color_mapping = {
+        'animal_plant': '#1f77b4',    # 深海蓝（SCI图表常用基准色）
+        'grease': '#ff7f0e',          # 暖橙（低饱和，不刺眼）
+        'minerals': '#2ca02c',        # 森林绿（沉稳自然）
+        'rubber_plastics': '#d62728', # 砖红（低饱和红色，专业感）
+        'pulpwood': '#9467bd',        # 薰衣草紫（柔和不突兀）
+        'textile': '#8c564b',         # 棕褐（复古专业）
+        'metal': '#e377c2',           # 淡粉紫（低饱和，区分度高）
+        'machinery': '#7f7f7f',       # 中灰（中性专业）
+        'precision_instrument': '#bcbd22', # 橄榄黄（低饱和，不抢眼）
+        'special_other': '#17becf'    # 浅青蓝（最后一类，柔和收尾）
+    }
+
+
+    for season in seasons:
+        for port in target_ports:
+            # 输入数据
+            data = record[season][port]
+            sorted_data = dict(sorted(data.items(), key=lambda k: k[1], reverse=True))
+
+            # 提取标签和数值
+            labels = list(sorted_data.keys())
+            values = list(sorted_data.values())
+
+            colors = [category_color_mapping[cate] for cate in labels]  # 按类别取专属颜色
+
+            # 设置画布
+            plt.figure(figsize=(6, 6))  # 正方形画布，避免饼图变形
+
+            # 绘制饼状图
+            wedges, texts, autotexts = plt.pie(
+                values,
+                labels=labels,
+                autopct='%1.1f%%',  # 显示百分比（保留1位小数）
+                startangle=90,      # 从90度位置开始绘制（顶部为起点）
+                colors=colors,
+                textprops={'fontsize': 12}  # 标签文字大小
+            )
+
+            # 美化百分比文本（白色加粗，更清晰）
+            for autotext in autotexts:
+                autotext.set_color('white')
+                autotext.set_fontweight('bold')
+
+            # 添加标题
+            plt.title(f'{port} {season} Import Category Distribution', fontsize=14, pad=10)
+
+            # 确保饼图是正圆形
+            plt.axis('equal')
+
+            # 显示并保存
+            plt.tight_layout()
+            plt.savefig(f"Figure/Season/USTop3/Category/{port} {season} Import Category Distribution", dpi=300)
+            plt.show()
 #endregion
 
 
@@ -2193,68 +2262,312 @@ def write_US_Top3_category():
 #     plt.show()
 #endregion
 
-def draw_US_Top3_category_pie_chart():
-    """
-    画美国Top3港口的商品种类饼状图
-    return:
-    """
-    file_path = "Figure/Season/USTop3/Category/US_Top3_in_category.json"
-    record = json.loads(pathlib.Path(file_path).read_text())
 
-    target_ports = ['USLSA', 'USLGB', 'USNWK']  # 确保与数据中的港口名一致
-    seasons = ["2017_Spring", "2020_Spring", "2021_Spring"]
+#region哪些节点
+# years = range(2017, 2022)
+# seasons = ['Spring', 'Summer', 'Autumn', 'Winter']
+# target_ports = ['USLSA', 'USLGB', 'USNWK']  # 确保与数据中的港口名一致
+# records = {}
+#
+# for year in years:
+#     for season in seasons:
+#         # 跳过2021年夏季及以后（数据不全）
+#         if year == 2021 and season in ['Summer', 'Autumn', 'Winter']:
+#             continue
+#         file_path = f'../Data/{year}/US/Season/{season}/US{year}_{season}_Digraph.graphml'
+#         if not os.path.exists(file_path):
+#             print(f'⚠️ 文件不存在: {file_path}')
+#             continue
+#         time = f"{year}_{season}"
+#         DiG = nx.read_graphml(file_path)
+#
+#         # 获取该港口的所有入边（u → target_port，u是起点，target_port是终点）
+#         in_edges = DiG.in_edges(target_ports[0], data=True)  # 返回 (u, v, data)，其中 v=target_port
+#         print(f"{target_ports[0]}有多少入边: {len(in_edges)}")
+#
+#         from_ports = {}
+#         for u, v, data in in_edges:
+#             teu = data.get('volumeTEU', '未知')
+#             from_ports[u] = teu
+#
+#         sorted_dict = dict(sorted(from_ports.items(), key=lambda k: k[1], reverse=True))
+#         records[time] = sorted_dict
+# pathlib.Path('Figure/Season/USTop3/Category/ports_to_USTop3.json').write_text(json.dumps(records, indent=2))
+# for k,v in records.items():
+#     print('------------')
+#     print(k)
+#     print(list(v)[:5])
 
-    category_color_mapping = {
-        'animal_plant': '#1f77b4',    # 深海蓝（SCI图表常用基准色）
-        'grease': '#ff7f0e',          # 暖橙（低饱和，不刺眼）
-        'minerals': '#2ca02c',        # 森林绿（沉稳自然）
-        'rubber_plastics': '#d62728', # 砖红（低饱和红色，专业感）
-        'pulpwood': '#9467bd',        # 薰衣草紫（柔和不突兀）
-        'textile': '#8c564b',         # 棕褐（复古专业）
-        'metal': '#e377c2',           # 淡粉紫（低饱和，区分度高）
-        'machinery': '#7f7f7f',       # 中灰（中性专业）
-        'precision_instrument': '#bcbd22', # 橄榄黄（低饱和，不抢眼）
-        'special_other': '#17becf'    # 浅青蓝（最后一类，柔和收尾）
+#region标准世界地图模板
+# DiG = nx.read_graphml(f'../Data/2021/US/Season/Spring/US2021_Spring_Digraph.graphml')
+# # 2. 读港口坐标
+# Port_Data = ConstructNetwork.Read_Port_Data()
+# port_coords = {
+#     node: (float(Port_Data[node]["longitude"]), float(Port_Data[node]["latitude"]))
+#     for node in DiG.nodes()
+#     if "longitude" in Port_Data[node]
+#        and "latitude" in Port_Data[node]
+#        and DiG.nodes[node].get('total_TEU') >  1000
+# }
+# # 画布
+# fig, ax = plt.subplots(figsize=(12, 8))
+# world_map = Basemap(
+#     resolution='l',
+#     projection='cyl',
+#     lon_0=0,
+#     ax=ax
+# )
+# # 2. 绘制地图要素
+# world_map.drawmapboundary(fill_color='#D0CFD4')  # 海洋颜色
+# world_map.fillcontinents(color='#EFEFEF', lake_color='#D0CFD4')  # 陆地和湖泊颜色
+# world_map.drawcoastlines(linewidth=0.5, color='#888888')  # 海岸线
+# world_map.drawcountries(linewidth=0.5, color='#666666')  # 国家边界（增强地图可读性）
+#
+#
+# # 3. 提取港口经纬度并绘制
+# lons = [coord[0] for coord in port_coords.values()]  # 所有港口的经度
+# lats = [coord[1] for coord in port_coords.values()]  # 所有港口的纬度
+#
+# # 绘制港口：用蓝色圆点，大小适中，带黑色边缘（突出显示）
+# x, y = world_map(lons, lats)  # 将经纬度转换为地图坐标
+# world_map.plot(
+#     x, y,
+#     'bo',  # 'b'=蓝色, 'o'=圆形标记
+#     markersize=4,  # 点大小
+#     markeredgecolor='k',  # 边缘黑色
+#     markeredgewidth=0.5,
+#     alpha=0.7  # 轻微透明，避免重叠时完全遮挡
+# )
+#
+# # 4. 美化图表
+# ax.set_title('Global Distribution of Ports', fontsize=14, pad=20)
+#
+# # 保存高清图片（可选）
+# # plt.savefig('global_ports_distribution.png', dpi=300, bbox_inches='tight')
+#
+# # 显示地图
+# plt.show()
+#endregion
+
+def draw_Spring_Maritime_Network():
+    """
+    画世界地图
+    :return:
+    """
+    # ----------------------
+    # 1. 数据加载与处理
+    # ----------------------
+    # 读取图数据
+    DiG = nx.read_graphml(f'../Data/2021/US/Season/Spring/US2021_Spring_Digraph.graphml')
+
+    # 读取港口坐标数据
+    Port_Data = ConstructNetwork.Read_Port_Data()
+
+    # 假设缩写规则：NA=北美洲, SA=南美洲, EU=欧洲, AS=亚洲, AF=非洲, OC=大洋洲, UN=未知
+    continent_color_mapping = {
+        'NA': '#1f77b4',    # 深蓝色（北美洲）
+        'SA': '#ff7f0e',    # 橙色（南美洲）
+        'EU': '#2ca02c',    # 绿色（欧洲）
+        'AS': '#d62728',    # 红色（亚洲）
+        'AF': '#9467bd',    # 紫色（非洲）
+        'OC': '#8c564b',    # 棕色（大洋洲）
+        'UN': '#7f7f7f'     # 灰色（未知大洲）
     }
 
+    # 筛选有效节点（有坐标+total_TEU>1000），并提取TEU值用于可视化
+    port_info = {}  # 存储：{节点: (经度, 纬度, total_TEU)}
+    for node in DiG.nodes():
+        # 检查坐标是否有效
+        if node not in Port_Data or not isinstance(Port_Data[node], dict):
+            continue
+        if "longitude" not in Port_Data[node] or "latitude" not in Port_Data[node]:
+            continue
+        # 检查total_TEU是否有效且大于1000
+        try:
+            total_teu = float(DiG.nodes[node].get('total_TEU', 0))
+            if total_teu <= 1000:
+                continue
+        except (ValueError, TypeError):
+            continue
 
-    for season in seasons:
-        for port in target_ports:
-            # 输入数据
-            data = record[season][port]
-            sorted_data = dict(sorted(data.items(), key=lambda k: k[1], reverse=True))
+        # 4. 提取双字母大洲缩写（假设存储在节点属性的'continent'键中，根据实际数据调整）
+        continent_code = DiG.nodes[node].get('continent', 'UN')  # 替换为实际键名
+        # 统一缩写格式（大写，避免'nA'/'na'等不一致）
+        continent_code = continent_code.strip().upper()
+        # 若缩写不在映射中，归为'UN'（未知）
+        if continent_code not in continent_color_mapping:
+            continent_code = 'UN'
+        # 存储有效信息
+        lon = float(Port_Data[node]["longitude"])
+        lat = float(Port_Data[node]["latitude"])
+        port_info[node] = (lon, lat, total_teu, continent_code)
+    # node 信息
+    nodes = list(port_info.keys())
+    lons = [port_info[node][0] for node in nodes]
+    lats = [port_info[node][1] for node in nodes]
+    teus = [port_info[node][2] for node in nodes]
 
-            # 提取标签和数值
-            labels = list(sorted_data.keys())
-            values = list(sorted_data.values())
+    # 筛选有效边（仅保留两端节点都在port_info中的边，避免无坐标节点）
+    edges = []
+    edge_teus = []  # 边的货运量（用于线条粗细）
+    for u, v, data in DiG.edges(data=True):
+        if u in port_info and v in port_info:  # 确保边的两端节点都有坐标
+            try:
+                # 假设边的货运量存在于'volumeTEU'属性
+                edge_teu = float(data.get('volumeTEU', 0))
+                if edge_teu > 10000:  # 过滤无货运量的边
+                    edges.append((u, v))
+                    edge_teus.append(edge_teu)
+            except (ValueError, TypeError):
+                continue
 
-            colors = [category_color_mapping[cate] for cate in labels]  # 按类别取专属颜色
+    # ----------------------
+    # 2. 地图与网络可视化设置
+    # ----------------------
+    # 美国中心经纬度：西经98.5°（-98.5），北纬39.8°
+    center_lon = -98.5
+    center_lat = 39.8
 
-            # 设置画布
-            plt.figure(figsize=(6, 6))  # 正方形画布，避免饼图变形
+    # 创建画布
+    fig, ax = plt.subplots(figsize=(14, 10))
 
-            # 绘制饼状图
-            wedges, texts, autotexts = plt.pie(
-                values,
-                labels=labels,
-                autopct='%1.1f%%',  # 显示百分比（保留1位小数）
-                startangle=90,      # 从90度位置开始绘制（顶部为起点）
-                colors=colors,
-                textprops={'fontsize': 12}  # 标签文字大小
+
+    # 定义地图（聚焦港口集中区域，如美洲：调整经纬度范围）
+    # 若全球分布，可保留 llcrnrlon=-180, urcrnrlon=180, llcrnrlat=-90, urcrnrlat=90
+    world_map = Basemap(
+        resolution='i',  # 中分辨率（比'l'更清晰，加载速度适中）
+        projection='cyl',
+        lon_0=center_lon,  # 以港口中心为地图中心
+        lat_0=center_lat,
+        llcrnrlon=min(lons) - 10,  # 左边界：最西港口-10度
+        urcrnrlon=max(lons) + 10,  # 右边界：最东港口+10度
+        llcrnrlat=min(lats) - 30,  # 下边界：最南港口-30度
+        urcrnrlat=max(lats) + 10,  # 上边界：最北港口+10度
+        ax=ax
+    )
+
+    # 绘制地图要素（更细腻的配色）
+    world_map.drawmapboundary(fill_color='#A8DADC')  # 海洋：浅蓝色
+    world_map.fillcontinents(color='#F1FAEE', lake_color='#A8DADC', alpha=0.8)  # 陆地：浅灰色
+    world_map.drawcoastlines(linewidth=0.8, color='#1D3557')  # 海岸线：深蓝色
+    world_map.drawcountries(linewidth=0.6, color='#457B9D')  # 国家边界：中蓝色
+    world_map.drawmeridians(np.arange(-180, 180, 20), labels=[0, 0, 0, 1], linewidth=0.3, color='#999')  # 经度线
+    world_map.drawparallels(np.arange(-90, 90, 20), labels=[1, 0, 0, 0], linewidth=0.3, color='#999')  # 纬度线
+
+    # ----------------------
+    # 3. 绘制海运网络（边+节点）
+    # ----------------------
+    # 绘制边（航线）：用贝塞尔曲线实现弧形，线条粗细与货运量正相关
+    if edges:
+        max_edge_teu = max(edge_teus)
+        edge_widths = [0.5 + 2.5 * (teu / max_edge_teu) for teu in edge_teus]
+
+        for i, (u, v) in enumerate(edges):
+            # 获取两端节点经纬度和地图坐标
+            u_lon, u_lat, _, _ = port_info[u]
+            v_lon, v_lat, _, _ = port_info[v]
+            x1, y1 = world_map(u_lon, u_lat)
+            x2, y2 = world_map(v_lon, v_lat)
+
+            # 计算两点距离（控制弯曲程度）
+            dx = x2 - x1
+            dy = y2 - y1
+            distance = np.sqrt(dx ** 2 + dy ** 2)
+            mid_x = (x1 + x2) / 2  # 中点x
+            mid_y = (y1 + y2) / 2  # 中点y
+
+            # 【关键】判断弯曲方向：50%随机+50%按经度差（避免全随机导致混乱）
+            # 规则1：若u在v西边（u_lon < v_lon），50%概率向上，50%向下
+            # 规则2：若u在v东边（u_lon > v_lon），反向概率，增加对称性
+            if u_lon < v_lon:
+                bend_up = random.choice([True, False])  # 随机
+            else:
+                bend_up = random.choice([False, True])  # 反向随机
+
+            # 根据方向设置控制点y坐标（向上则+距离比例，向下则-）
+            bend_strength = 0.15  # 弯曲强度（越大越弯）
+            if bend_up:
+                ctrl_y = mid_y + distance * bend_strength  # 向上弯
+            else:
+                ctrl_y = mid_y - distance * bend_strength  # 向下弯
+            ctrl_x = mid_x  # 控制点x始终为中点（左右不偏移，保持对称）
+
+            # 创建贝塞尔曲线路径
+            verts = [(x1, y1), (ctrl_x, ctrl_y), (x2, y2)]
+            codes = [Path.MOVETO, Path.CURVE3, Path.CURVE3]
+            path = Path(verts, codes)
+
+            # 绘制曲线
+            curve = patches.PathPatch(
+                path,
+                facecolor='none',
+                edgecolor='#E63946',
+                linewidth=edge_widths[i],
+                alpha=0.6
+            )
+            ax.add_patch(curve)
+
+    # ----------------------
+    # 4. 按大洲着色绘制节点
+    # ----------------------
+    if port_info:
+        for node in port_info:
+            lon, lat, teu, continent_code = port_info[node]
+            x, y = world_map(lon, lat)
+
+            # 节点大小与TEU成正比（归一化到5-20）
+            max_teu = max(p[2] for p in port_info.values())
+            node_size = 5 + 15 * (teu / max_teu)
+
+            # 按大洲获取颜色
+            node_color = continent_color_mapping[continent_code]
+
+            # 绘制节点
+            world_map.plot(
+                x, y, 'o',
+                markersize=node_size,
+                color=node_color,
+                markeredgecolor='white',
+                markeredgewidth=0.8,
+                alpha=0.9
             )
 
-            # 美化百分比文本（白色加粗，更清晰）
-            for autotext in autotexts:
-                autotext.set_color('white')
-                autotext.set_fontweight('bold')
+    # ----------------------
+    # 5. 图例与标注（解释大洲缩写）
+    # ----------------------
+    # 大洲缩写对应的全称（用于图例说明）
+    continent_fullname = {
+        'NA': 'North America',
+        'SA': 'South America',
+        'EU': 'Europe',
+        'AS': 'Asia',
+        'AF': 'Africa',
+        'OC': 'Oceania',
+        'UN': 'Unknown'
+    }
 
-            # 添加标题
-            plt.title(f'{port} {season} Import Category Distribution', fontsize=14, pad=10)
+    # 生成图例（包含大洲颜色+缩写+全称）
+    legend_elements = [
+        Line2D(
+            [0], [0], marker='o', color='w',
+            markerfacecolor=color, markersize=10,
+            label=f'{code} ({continent_fullname[code]})'
+        ) for code, color in continent_color_mapping.items()
+    ]
+    # 新增航线图例
+    legend_elements.append(
+        Line2D([0], [0], color='#E63946', lw=3, label='Shipping Routes ( > 10000 TEU)')
+    )
 
-            # 确保饼图是正圆形
-            plt.axis('equal')
+    ax.legend(
+        handles=legend_elements,
+        loc='lower left',
+        fontsize=9,
+        title='Continents',
+        title_fontsize=11
+    )
 
-            # 显示并保存
-            plt.tight_layout()
-            plt.savefig(f"Figure/Season/USTop3/Category/{port} {season} Import Category Distribution", dpi=300)
-            plt.show()
+    ax.set_title('2021 Spring Maritime Network', fontsize=16, pad=20)
+    plt.tight_layout()
+    plt.savefig('Figure/Season/2021 Spring Maritime Network.png', dpi=300)
+    plt.show()
