@@ -1946,6 +1946,30 @@ def write_weighted_dc_sorted_ports_by_time():
     df = pd.DataFrame(rank_data, index=range(1, max_rank + 1))
     # 5. 保存为CSV（index_label='排名'，明确行含义）
     df.to_csv(f'Figure/Season/weighted_{dc_type}_sorted_ports_by_time.csv', index_label='排名')
+def write_weighted_bc_sorted_ports_by_time():
+    """
+    生成根据 加权bc值的大小 的港口排序
+    :return:
+    """
+    ile_path = 'InputData/ports_weighted_betweenness_centrality.json'
+    degree_centrality = json.loads(pathlib.Path(file_path).read_text())
+    # 1. 对每个时间段的港口按dc降序排序，提取港口名称列表
+    sorted_ports_by_time = {}
+    for time, data in degree_centrality.items():
+        # 按dc降序排序，取港口名称
+        sorted_ports = [port for port, metrics in sorted(data.items(), key=lambda x: x[1], reverse=True)]
+        sorted_ports_by_time[time] = sorted_ports
+    # 2. 确定最大排名数（即所有时间段中港口数量最多的那个，保证行数足够）
+    max_rank = max(len(ports) for ports in sorted_ports_by_time.values())
+    # 3. 构建数据：行=排名（1,2,3...），列=时间段，值=港口名称
+    rank_data = {}
+    for time, ports in sorted_ports_by_time.items():
+        # 为每个时间段填充港口名称，不足max_rank的用空值补充
+        rank_data[time] = ports + [None] * (max_rank - len(ports))
+    # 4. 转为DataFrame，行索引设为排名（1开始）
+    df = pd.DataFrame(rank_data, index=range(1, max_rank + 1))
+    # 5. 保存为CSV（index_label='排名'，明确行含义）
+    df.to_csv(f'Figure/Season/weighted_bc_sorted_ports_by_time.csv', index_label='排名')
 def draw_USLSA_USLGB_USNWK_weighted_degree_centrality_trend_chart():
     """
     美国这三个港口的加权中心性变化趋势图
@@ -2324,7 +2348,139 @@ def draw_country_teu_correlation_heatmap():
     # 保存图片
     plt.savefig('Figure/Season/country_teu_correlation_heatmap.png', dpi=300, bbox_inches='tight')
     plt.show()
+def draw_weighted_dc_and_weighted_bc():
+    """
+    加权dc和加权bc之间的关系
+    :return:
+    """
+    years = range(2017,2022)
+    seasons = ['Spring', 'Summer', 'Autumn', 'Winter']
+    for year in years:
+        for season in seasons:
+            # 跳过2021年夏季及以后（数据不全）
+            if year == 2021 and season in ['Summer', 'Autumn', 'Winter']:
+                continue
+            # 读取数据
+            try:
+                time_period = f"{year}_{season}"
 
+                # 读取度中心性和介数中心性数据
+                dc_path = pathlib.Path('InputData/ports_weighted_degree_centrality.json')
+                bc_path = pathlib.Path('InputData/ports_betweenness_centrality.json')
+
+                dc = json.loads(dc_path.read_text())
+                bc = json.loads(bc_path.read_text())
+
+
+                # 检查时间段是否存在
+                if time_period not in dc or time_period not in bc:
+                    raise ValueError(f"Time period {time_period} not found in data")
+
+                # 提取该时间段的港口数据
+                dc_data = dc[time_period]
+                bc_data = bc[time_period]
+
+                # 获取共同港口
+                common_ports = set(dc_data.keys()) & set(bc_data.keys())
+                if not common_ports:
+                    raise ValueError(f"No common ports found in {time_period}")
+
+                # 设置绘图风格
+                plt.style.use('seaborn-v0_8-notebook')
+                plt.figure(figsize=(12, 8))
+
+                # 存储所有数据点用于后续范围调整
+                all_dc = []
+                all_bc = []
+
+                # 绘制每个港口的散点（提高透明度：alpha从0.7→0.9）
+                for port in common_ports:
+                    try:
+                        # 提取度中心性(dc)和介数中心性(bc)值
+                        dc_val = dc_data[port]['dc']  # 度中心性值（横坐标）
+                        bc_val = bc_data[port]  # 介数中心性值（纵坐标）
+
+                        # 绘制散点：提高透明度（alpha=0.9），增强节点可见性
+                        plt.scatter(
+                            dc_val, bc_val,
+                            s=60,
+                            alpha=0.9,  # 透明度提高（0→完全透明，1→完全不透明）
+                            color='steelblue',
+                            edgecolors='k',
+                            linewidth=0.8  # 略微加粗边框，与高透明度匹配
+                        )
+
+                        # 记录所有值用于调整坐标轴范围
+                        all_dc.append(dc_val)
+                        all_bc.append(bc_val)
+
+                        # 横坐标>1000 或 纵坐标>0.075 时添加标签
+                        if dc_val > 1000 or bc_val > 0.075:
+                            # 计算标签偏移量（根据数据范围动态调整，确保偏移明显）
+                            x_offset = (max(all_dc) - min(all_dc)) * 0.01 if all_dc else 50
+                            y_offset = (max(all_bc) - min(all_bc)) * 0.01 if all_bc else 0.005
+
+                            # 确定标签位置（增大偏移距离）
+                            if dc_val > 1000:
+                                # 横坐标大的点，标签向左偏移
+                                text_x = dc_val - x_offset
+                                ha = 'right'
+                            else:
+                                # 横坐标小的点，标签向右偏移
+                                text_x = dc_val + x_offset
+                                ha = 'left'
+
+                            if bc_val > 0.075:
+                                # 纵坐标大的点，标签向下偏移
+                                text_y = bc_val - y_offset
+                                va = 'top'
+                            else:
+                                # 纵坐标小的点，标签向上偏移
+                                text_y = bc_val + y_offset
+                                va = 'bottom'
+
+                            # 添加标签（带偏移）
+                            plt.text(
+                                text_x, text_y,  # 偏移后的位置
+                                port,
+                                fontsize=9,
+                                ha=ha,
+                                va=va,
+                                bbox=dict(facecolor='white', alpha=0.8, boxstyle='round,pad=0.3')  # 标签背景略加深
+                            )
+
+                    except KeyError as e:
+                        print(f"Warning: Port {port} missing field {e}, skipped")
+                    except Exception as e:
+                        print(f"Error processing port {port}: {e}, skipped")
+
+                # 设置标题和坐标轴标签（英文）
+                plt.title(f'Distribution of Weighted Degree Centrality and Betweenness Centrality ({time_period})',
+                          fontsize=14, pad=20)
+                plt.xlabel('Weighted Degree Centrality', fontsize=12, labelpad=10)
+                plt.ylabel('Betweenness Centrality', fontsize=12, labelpad=10)
+
+                # 添加网格线
+                plt.grid(True, linestyle='--', alpha=0.5)
+
+                # 调整坐标轴范围（留一定余量）
+                x_margin = (max(all_dc) - min(all_dc)) * 0.1 if all_dc else 100
+                y_margin = (max(all_bc) - min(all_bc)) * 0.1 if all_bc else 0.01
+                plt.xlim(min(all_dc) - x_margin, max(all_dc) + x_margin)
+                plt.ylim(min(all_bc) - y_margin, max(all_bc) + y_margin)
+
+                # 调整布局
+                plt.tight_layout()
+                plt.savefig(f'Figure/Season/Centrality/Distribution of Weighted Degree Centrality and Betweenness Centrality {time_period}', dpi=300)
+                # 显示图像
+                # plt.show()
+
+            except FileNotFoundError as e:
+                print(f"Error: File not found - {e}")
+            except json.JSONDecodeError:
+                print("Error: Invalid JSON format in files")
+            except Exception as e:
+                print(f"An error occurred: {e}")
 #region非美国港口中心性变化趋势图
 # # port_target = ['BEANT', 'NLROT', 'CNSHA', 'SGSGP', 'KRBUS',
 # #                'BSFRT', 'DEHAM', 'HKHKG', 'DEBHN', 'MXATM', 'CNYTN']
@@ -2843,136 +2999,4 @@ def draw_US_Top3_category_pie_chart():
 #endregion
 
 
-def weighted_dc_and_weighted_bc():
-    """
-    加权dc和加权bc之间的关系
-    :return:
-    """
-    years = range(2017,2022)
-    seasons = ['Spring', 'Summer', 'Autumn', 'Winter']
-    for year in years:
-        for season in seasons:
-            # 跳过2021年夏季及以后（数据不全）
-            if year == 2021 and season in ['Summer', 'Autumn', 'Winter']:
-                continue
-            # 读取数据
-            try:
-                time_period = f"{year}_{season}"
-
-                # 读取度中心性和介数中心性数据
-                dc_path = pathlib.Path('InputData/ports_weighted_degree_centrality.json')
-                bc_path = pathlib.Path('InputData/ports_betweenness_centrality.json')
-
-                dc = json.loads(dc_path.read_text())
-                bc = json.loads(bc_path.read_text())
-
-
-                # 检查时间段是否存在
-                if time_period not in dc or time_period not in bc:
-                    raise ValueError(f"Time period {time_period} not found in data")
-
-                # 提取该时间段的港口数据
-                dc_data = dc[time_period]
-                bc_data = bc[time_period]
-
-                # 获取共同港口
-                common_ports = set(dc_data.keys()) & set(bc_data.keys())
-                if not common_ports:
-                    raise ValueError(f"No common ports found in {time_period}")
-
-                # 设置绘图风格
-                plt.style.use('seaborn-v0_8-notebook')
-                plt.figure(figsize=(12, 8))
-
-                # 存储所有数据点用于后续范围调整
-                all_dc = []
-                all_bc = []
-
-                # 绘制每个港口的散点（提高透明度：alpha从0.7→0.9）
-                for port in common_ports:
-                    try:
-                        # 提取度中心性(dc)和介数中心性(bc)值
-                        dc_val = dc_data[port]['dc']  # 度中心性值（横坐标）
-                        bc_val = bc_data[port]  # 介数中心性值（纵坐标）
-
-                        # 绘制散点：提高透明度（alpha=0.9），增强节点可见性
-                        plt.scatter(
-                            dc_val, bc_val,
-                            s=60,
-                            alpha=0.9,  # 透明度提高（0→完全透明，1→完全不透明）
-                            color='steelblue',
-                            edgecolors='k',
-                            linewidth=0.8  # 略微加粗边框，与高透明度匹配
-                        )
-
-                        # 记录所有值用于调整坐标轴范围
-                        all_dc.append(dc_val)
-                        all_bc.append(bc_val)
-
-                        # 横坐标>1000 或 纵坐标>0.075 时添加标签
-                        if dc_val > 1000 or bc_val > 0.075:
-                            # 计算标签偏移量（根据数据范围动态调整，确保偏移明显）
-                            x_offset = (max(all_dc) - min(all_dc)) * 0.01 if all_dc else 50
-                            y_offset = (max(all_bc) - min(all_bc)) * 0.01 if all_bc else 0.005
-
-                            # 确定标签位置（增大偏移距离）
-                            if dc_val > 1000:
-                                # 横坐标大的点，标签向左偏移
-                                text_x = dc_val - x_offset
-                                ha = 'right'
-                            else:
-                                # 横坐标小的点，标签向右偏移
-                                text_x = dc_val + x_offset
-                                ha = 'left'
-
-                            if bc_val > 0.075:
-                                # 纵坐标大的点，标签向下偏移
-                                text_y = bc_val - y_offset
-                                va = 'top'
-                            else:
-                                # 纵坐标小的点，标签向上偏移
-                                text_y = bc_val + y_offset
-                                va = 'bottom'
-
-                            # 添加标签（带偏移）
-                            plt.text(
-                                text_x, text_y,  # 偏移后的位置
-                                port,
-                                fontsize=9,
-                                ha=ha,
-                                va=va,
-                                bbox=dict(facecolor='white', alpha=0.8, boxstyle='round,pad=0.3')  # 标签背景略加深
-                            )
-
-                    except KeyError as e:
-                        print(f"Warning: Port {port} missing field {e}, skipped")
-                    except Exception as e:
-                        print(f"Error processing port {port}: {e}, skipped")
-
-                # 设置标题和坐标轴标签（英文）
-                plt.title(f'Distribution of Weighted Degree Centrality and Betweenness Centrality ({time_period})',
-                          fontsize=14, pad=20)
-                plt.xlabel('Weighted Degree Centrality', fontsize=12, labelpad=10)
-                plt.ylabel('Betweenness Centrality', fontsize=12, labelpad=10)
-
-                # 添加网格线
-                plt.grid(True, linestyle='--', alpha=0.5)
-
-                # 调整坐标轴范围（留一定余量）
-                x_margin = (max(all_dc) - min(all_dc)) * 0.1 if all_dc else 100
-                y_margin = (max(all_bc) - min(all_bc)) * 0.1 if all_bc else 0.01
-                plt.xlim(min(all_dc) - x_margin, max(all_dc) + x_margin)
-                plt.ylim(min(all_bc) - y_margin, max(all_bc) + y_margin)
-
-                # 调整布局
-                plt.tight_layout()
-                plt.savefig(f'Figure/Season/Centrality/Distribution of Weighted Degree Centrality and Betweenness Centrality {time_period}', dpi=300)
-                # 显示图像
-                # plt.show()
-
-            except FileNotFoundError as e:
-                print(f"Error: File not found - {e}")
-            except json.JSONDecodeError:
-                print("Error: Invalid JSON format in files")
-            except Exception as e:
-                print(f"An error occurred: {e}")
+f
