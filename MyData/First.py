@@ -2,11 +2,7 @@ import heapq
 import json
 import pathlib
 import random
-import sys
-
 from matplotlib.lines import Line2D
-
-sys.path.append('../Algorithm')
 import os
 import networkx as nx
 import seaborn as sns
@@ -26,8 +22,11 @@ from matplotlib import patheffects
 from scipy.stats import entropy
 from heapq import nlargest
 from collections import deque
+from collections import defaultdict
 from matplotlib.path import Path
 import matplotlib.patches as patches
+import sys
+sys.path.append('../Algorithm')
 
 
 # ---------- 工具函数 ----------
@@ -39,79 +38,6 @@ def rich_club_phi(G, k):
     if nk < 2:
         return np.nan
     return 2 * H.number_of_edges() / (nk * (nk - 1))
-def calc_metrics(G):
-    """计算 14 个网络基本指标"""
-    # 基础规模
-    n_nodes = G.number_of_nodes()
-    n_edges = G.number_of_edges()
-    density = nx.density(G)
-
-    # 最大连通分量
-    gcc_nodes = len(max(nx.connected_components(G), key=len))
-
-    # 度 & 强度（交易次数）
-    # 后续再加上交易TEU的强度
-    degrees = [d for _, d in G.weighted_degree()]
-    strengths = [d for _, d in G.weighted_degree(weight='weight')]
-    avg_degree = np.mean(degrees)
-    avg_strength = np.mean(strengths)
-
-    # 度分布熵
-    cnt = Counter(degrees)
-    probs = np.array(list(cnt.values())) / sum(cnt.values())
-    deg_entropy = entropy(probs, base=2)
-
-    # 聚类系数
-    avg_clustering = nx.average_clustering(G, weight='weight')
-
-    # 介数中心性最大值
-    btw = nx.betweenness_centrality(G, weight='weight')
-    max_betweenness = max(btw.values())
-
-    # Rich-club 系数（取 k=富人阈值，这里简单地取节点度的 90 分位）
-    if degrees:
-        k90 = np.percentile(degrees, 90)
-        rc_phi = rich_club_phi(G, k90)
-    else:
-        rc_phi = np.nan
-
-    # 模块化度 Q（Louvain 社团）
-    try:
-        import community
-        partition = community.best_partition(G, weight='weight')
-        modularity = community.modularity(partition, G, weight='weight')
-    except ImportError:
-        modularity = np.nan
-
-    # 平均路径长度 & 全局效率（对最大连通子图）
-    if nx.is_connected(G):
-        L = nx.average_shortest_path_length(G, weight='weight')
-        eff = nx.global_efficiency(G)
-    else:
-        gcc = max(nx.connected_components(G), key=len)
-        H = G.subgraph(gcc)
-        L = nx.average_shortest_path_length(H, weight='weight')
-        eff = nx.global_efficiency(H)
-
-    total_strength = sum(strengths)
-
-    return {
-        'year': None,
-        'nodes': n_nodes,
-        'edges': n_edges,
-        'gcc_size': gcc_nodes,
-        'density': density,
-        'avg_degree': avg_degree,
-        'avg_strength': avg_strength,
-        'degree_entropy': deg_entropy,
-        'avg_clustering': avg_clustering,
-        'max_betweenness': max_betweenness,
-        'richclub_phi': rc_phi,
-        'modularity': modularity,
-        'avg_path_length': L,
-        'global_efficiency': eff,
-        'total_strength': total_strength
-    }
 def weighted_k_core(G, k, weight='volumeTEU', degree_type='total'):
     """
     计算加权有向图的k-核（支持加权度、加权入度、加权出度）
@@ -821,7 +747,7 @@ def draw_edges_nodes_time_series():
     :return:
     """
     # 1. 读取数据
-    df = pd.read_csv('Figure/all_in_one_Digraph.csv')
+    df = pd.read_csv('Figure/Season/all_in_one_Digraph.csv')
     # 4. 创建画布和坐标轴
     fig, ax1 = plt.subplots(figsize=(12, 6))  # 宽12英寸，高6英寸
     # 2. 创建右侧Y轴（与左侧Y轴共享X轴，实现双轴对齐）
@@ -907,6 +833,98 @@ def draw_edges_nodes_time_series():
         facecolor='white'  # 背景色为白色（避免保存后背景透明）
     )
 
+    # 显示图表（运行时弹出窗口）
+    plt.show()
+def draw_avg_length_efficiency_time_series():
+    """
+    画平均度和效率的变化趋势图
+    :return:
+    """
+    # 1. 读取数据
+    df = pd.read_csv('Figure/Season/all_in_one_Digraph.csv')
+    # 4. 创建画布和坐标轴
+    fig, ax1 = plt.subplots(figsize=(12, 6))  # 宽12英寸，高6英寸
+    # 2. 创建右侧Y轴（与左侧Y轴共享X轴，实现双轴对齐）
+    ax2 = ax1.twinx()  # 关键：生成与ax1共享X轴的第二个Y轴
+
+    # -------------------------- 4. 绘制双折线（分别绑定左右Y轴） --------------------------
+    # -------------------------- 左侧Y轴：Nodes（假设N列是Nodes数量） --------------------------
+    ax1.plot(
+        df['time'],  # X轴：时间
+        df['avg_length'],     # Y轴：Nodes数量（绑定左侧ax1）
+        label='average path length',  # 图例名称
+        color='red',  # 颜色（可选：用十六进制色更精准，这里是深蓝色）
+        marker='o',       # 数据点标记（圆形）
+        linestyle='-',    # 线条样式（实线）
+        linewidth=2.5,    # 线条宽度（加粗更清晰）
+        markersize=7      # 数据点大小
+    )
+
+    # -------------------------- 右侧Y轴：Edges（假设M列是Edges数量） --------------------------
+    ax2.plot(
+        df['time'],  # X轴：时间（与左侧共享，无需重复设置）
+        df['efficiency'],     # Y轴：Edges数量（绑定右侧ax2）
+        label='efficiency',  # 图例名称
+        color='blue',  # 颜色（深红色，与左侧区分明显）
+        marker='s',       # 数据点标记（方形，与圆形区分）
+        linestyle='--',   # 线条样式（虚线，与实线区分）
+        linewidth=2.5,    # 线条宽度（与左侧一致，保持美观）
+        markersize=7      # 数据点大小（与左侧一致）
+    )
+
+    # -------------------------- 5. 美化双轴标签与标题 --------------------------
+    # -------------------------- 左侧Y轴（ax1）设置 --------------------------
+    ax1.set_xlabel('Time', fontsize=12, fontweight='bold')  # X轴标签（加粗）
+    ax1.set_ylabel('avg_length',
+                   color='red',    # 标签颜色与线条颜色一致
+                   fontsize=12,
+                   fontweight='bold')
+    ax1.tick_params(axis='y',  # 左侧Y轴刻度设置
+                    colors='red',  # 刻度颜色与线条一致
+                    labelsize=10)      # 刻度文字大小
+
+    # -------------------------- 右侧Y轴（ax2）设置 --------------------------
+    ax2.set_ylabel('efficiency',  # 右侧Y轴标签（明确对应Edges）
+                   color='blue',    # 标签颜色与线条颜色一致
+                   fontsize=12,
+                   fontweight='bold')
+    ax2.tick_params(axis='y',  # 右侧Y轴刻度设置
+                    colors='blue',  # 刻度颜色与线条一致
+                    labelsize=10)      # 刻度文字大小
+
+    # -------------------------- 标题与X轴刻度 --------------------------
+    ax1.set_title(
+        'Changes in the average length and efficiency in the Network Over Time',
+        fontsize=14,
+        fontweight='bold',
+        pad=20  # 标题与图表的间距（避免拥挤）
+    )
+    ax1.tick_params(axis='x', rotation=45)  # X轴时间标签旋转45度，避免文字重叠
+
+    # -------------------------- 6. 合并双轴图例（关键：避免图例重复） --------------------------
+    # 提取左右轴的图例，合并为一个（放在图表右侧，不遮挡数据）
+    lines1, labels1 = ax1.get_legend_handles_labels()  # 左侧轴图例
+    lines2, labels2 = ax2.get_legend_handles_labels()  # 右侧轴图例
+    ax1.legend(
+        lines1 + lines2,  # 合并图例线条
+        labels1 + labels2,  # 合并图例文字
+        fontsize=11,
+        loc='upper right',  # 图例位置（右上，不遮挡数据）
+        frameon=True,       # 显示图例边框
+        fancybox=True,      # 边框圆角
+        shadow=True         # 边框阴影（更立体）
+    )
+
+    # -------------------------- 7. 调整布局与保存 --------------------------
+    # 自动调整布局（避免标签、图例被截断）
+    plt.tight_layout()
+    # 保存图片（dpi=300为高清，bbox_inches='tight'避免裁剪边缘）
+    plt.savefig(
+        'Figure/Season/avg_length_efficiency_time_series.png',
+        dpi=300,
+        bbox_inches='tight',
+        facecolor='white'  # 背景色为白色（避免保存后背景透明）
+    )
     # 显示图表（运行时弹出窗口）
     plt.show()
 def draw_total_teu():
@@ -1424,13 +1442,13 @@ def write_US_TEU_change_value():
         if attr.get("Country", None) == "United States" and not DiGraph_2017.has_node(node):
             # 2017年没有的  2021年有的
             US_TEU_change_value[node] = DiGraph_2021.nodes[node]["total_TEU"]
-    pathlib.Path('Figure/US_TEU_change_value.json').write_text(json.dumps(US_TEU_change_value, indent=2))
+    pathlib.Path('Figure/Year/US_TEU_change_value.json').write_text(json.dumps(US_TEU_change_value, indent=2))
 def draw_US_TEU_change_value():
     """
     画出美国2017和2021的港口TEU变化量
     :return:
     """
-    delta_file = 'Figure/US_TEU_change_value.json'
+    delta_file = 'Figure/Year/US_TEU_change_value.json'
     US_TEU_change_value = json.loads(pathlib.Path(delta_file).read_text())
 
     # 2. 读港口坐标
@@ -1513,7 +1531,7 @@ def write_US_BC_change_value():
     top_nodes = sorted(betweenness_change.items(), key=lambda item: abs(item[1]), reverse=True)[:N]
 
     # 保存结果
-    pathlib.Path('Figure/US_BC_change_value.json').write_text(json.dumps(dict(top_nodes), indent=2))
+    pathlib.Path('Figure/Year/US_BC_change_value.json').write_text(json.dumps(dict(top_nodes), indent=2))
 def draw_US_BC_change_value():
 
     # 2. 读港口坐标
@@ -1523,7 +1541,7 @@ def draw_US_BC_change_value():
         for node, d in Port_Data.items()
         if "longitude" in d and "latitude" in d
     }
-    delta_file = 'Figure/US_BC_change_value.json'
+    delta_file = 'Figure/Year/US_BC_change_value.json'
     US_Betweenness_change_value = json.loads(pathlib.Path(delta_file).read_text())
     # 画布
     fig, ax = plt.subplots(figsize=(10, 7))
@@ -2572,95 +2590,172 @@ def draw_US_Top3_category_pie_chart():
 #endregion
 
 
-def draw_avg_degree_efficiency_time_series():
+# # 假设 G 是已构建的 nx.Graph() 对象
+# DiG = nx.read_graphml(f'../Data/2017/US/Season/Spring/US2017_Spring_Digraph.graphml')
+# G = nx.Graph(DiG)
+# # ----------------------
+# # 1. 计算度分布数据
+# # ----------------------
+# # 获取所有节点的度（返回字典：{节点: 度}）
+# degrees = dict(G.degree())
+#
+# # 统计每个度数对应的节点数量（键：度数，值：该度数的节点数）
+# degree_counts = defaultdict(int)
+# for d in degrees.values():
+#     degree_counts[d] += 1
+#
+# # 提取度数和对应的节点数量（排序后更美观）
+# degrees_sorted = sorted(degree_counts.keys())  # 排序的度数
+# counts = [degree_counts[d] for d in degrees_sorted]  # 对应的节点数
+#
+#
+# # ----------------------
+# # 3. 方式2：双对数散点图（适合分析幂律特性，常见于复杂网络）
+# # ----------------------
+# plt.figure(figsize=(10, 6))
+#
+# # 计算频率（节点数/总节点数，更适合分布分析）
+# total_nodes = G.number_of_nodes()
+# frequencies = [count / total_nodes for count in counts]
+#
+# # 双对数坐标（x=log(度数), y=log(频率)）
+# plt.loglog(
+#     degrees_sorted,
+#     frequencies,
+#     marker='o',      # 圆点标记
+#     linestyle='',    # 无连接线（散点图）
+#     color='#d62728', # 红色（与直方图区分）
+#     markersize=6,
+#     alpha=0.8
+# )
+#
+# # 美化标签和标题
+# plt.xlabel('log(Degree)', fontsize=12, fontweight='bold')
+# plt.ylabel('log(Frequency)', fontsize=12, fontweight='bold')
+# plt.title('Log-Log Degree Distribution (Power Law Check)', fontsize=14, fontweight='bold', pad=15)
+#
+# # 调整刻度
+# plt.xticks(fontsize=10)
+# plt.yticks(fontsize=10)
+#
+# # 添加网格线（双对数图中网格更重要）
+# plt.grid(True, which="both", linestyle='--', alpha=0.5)
+#
+# plt.tight_layout()
+# plt.show()
+
+
+
+# years = range(2017, 2022)
+# seasons = ['Spring', 'Summer', 'Autumn', 'Winter']
+# records = {}
+#
+# for year in years:
+#     for season in seasons:
+#         # 跳过2021年夏季及以后（数据不全）
+#         if year == 2021 and season in ['Summer', 'Autumn', 'Winter']:
+#             continue
+#         file_path = f'../Data/{year}/US/Season/{season}/US{year}_{season}_Digraph.graphml'
+#         if not os.path.exists(file_path):
+#             print(f'⚠️ 文件不存在: {file_path}')
+#             continue
+#         time = f"{year}_{season}"
+#         DiG = nx.read_graphml(file_path)
+#         G = nx.Graph(DiG)
+#
+#
+#         G_ER = nx.erdos_renyi_graph(G.number_of_nodes(), m=G.number_of_edges(), seed=random.randint(1, 100))
+#         calc_metrics(G_ER)
+
+
+def write_nm_zero_model_all_in_one():
     """
-    画平均度和效率的变化趋势图
+    nm零模型  只有n和m一样  度序列不一样
     :return:
     """
-    # 1. 读取数据
-    df = pd.read_csv('Figure/all_in_one_Digraph.csv')
-    # 4. 创建画布和坐标轴
-    fig, ax1 = plt.subplots(figsize=(12, 6))  # 宽12英寸，高6英寸
-    # 2. 创建右侧Y轴（与左侧Y轴共享X轴，实现双轴对齐）
-    ax2 = ax1.twinx()  # 关键：生成与ax1共享X轴的第二个Y轴
+    # ----------------------
+    # 1. 定义路径和时间段（根据你的数据结构修改）
+    # ----------------------
+    years = range(2017, 2022)  # 你的数据年份
+    seasons = ['Spring', 'Summer', 'Autumn', 'Winter']  # 季节（时间段）
 
-    # -------------------------- 4. 绘制双折线（分别绑定左右Y轴） --------------------------
-    # -------------------------- 左侧Y轴：Nodes（假设N列是Nodes数量） --------------------------
-    ax1.plot(
-        df['time'],  # X轴：时间
-        df['avg_length'],     # Y轴：Nodes数量（绑定左侧ax1）
-        label='average path length',  # 图例名称
-        color='red',  # 颜色（可选：用十六进制色更精准，这里是深蓝色）
-        marker='o',       # 数据点标记（圆形）
-        linestyle='-',    # 线条样式（实线）
-        linewidth=2.5,    # 线条宽度（加粗更清晰）
-        markersize=7      # 数据点大小
-    )
+    # 存储所有时间段的最终指标（每个时间段一行）
+    all_results = []
 
-    # -------------------------- 右侧Y轴：Edges（假设M列是Edges数量） --------------------------
-    ax2.plot(
-        df['time'],  # X轴：时间（与左侧共享，无需重复设置）
-        df['efficiency'],     # Y轴：Edges数量（绑定右侧ax2）
-        label='efficiency',  # 图例名称
-        color='blue',  # 颜色（深红色，与左侧区分明显）
-        marker='s',       # 数据点标记（方形，与圆形区分）
-        linestyle='--',   # 线条样式（虚线，与实线区分）
-        linewidth=2.5,    # 线条宽度（与左侧一致，保持美观）
-        markersize=7      # 数据点大小（与左侧一致）
-    )
+    # ----------------------
+    # 2. 循环处理每个时间段
+    # ----------------------
+    for year in years:
+        for season in seasons:
 
-    # -------------------------- 5. 美化双轴标签与标题 --------------------------
-    # -------------------------- 左侧Y轴（ax1）设置 --------------------------
-    ax1.set_xlabel('Time', fontsize=12, fontweight='bold')  # X轴标签（加粗）
-    ax1.set_ylabel('avg_length',
-                   color='red',    # 标签颜色与线条颜色一致
-                   fontsize=12,
-                   fontweight='bold')
-    ax1.tick_params(axis='y',  # 左侧Y轴刻度设置
-                    colors='red',  # 刻度颜色与线条一致
-                    labelsize=10)      # 刻度文字大小
+            if year == 2021 and season in ['Summer', 'Autumn', 'Winter']:
+                continue
 
-    # -------------------------- 右侧Y轴（ax2）设置 --------------------------
-    ax2.set_ylabel('efficiency',  # 右侧Y轴标签（明确对应Edges）
-                   color='blue',    # 标签颜色与线条颜色一致
-                   fontsize=12,
-                   fontweight='bold')
-    ax2.tick_params(axis='y',  # 右侧Y轴刻度设置
-                    colors='blue',  # 刻度颜色与线条一致
-                    labelsize=10)      # 刻度文字大小
+            # 读取包含类别TEU的图文件（根据你的实际文件选择MulGraph/DiGraph，这里假设是MulGraph）
+            file_path = f'../Data/{year}/US/Season/{season}/US{year}_{season}_Digraph.graphml'
+            if not os.path.exists(file_path):
+                print(f'⚠️ 文件不存在: {file_path}')
+                continue
+            time = f"{year}{season}"
+            G = nx.Graph(nx.read_graphml(file_path))
 
-    # -------------------------- 标题与X轴刻度 --------------------------
-    ax1.set_title(
-        'Changes in the average degrees and efficiency in the Network Over Time',
-        fontsize=14,
-        fontweight='bold',
-        pad=20  # 标题与图表的间距（避免拥挤）
-    )
-    ax1.tick_params(axis='x', rotation=45)  # X轴时间标签旋转45度，避免文字重叠
 
-    # -------------------------- 6. 合并双轴图例（关键：避免图例重复） --------------------------
-    # 提取左右轴的图例，合并为一个（放在图表右侧，不遮挡数据）
-    lines1, labels1 = ax1.get_legend_handles_labels()  # 左侧轴图例
-    lines2, labels2 = ax2.get_legend_handles_labels()  # 右侧轴图例
-    ax1.legend(
-        lines1 + lines2,  # 合并图例线条
-        labels1 + labels2,  # 合并图例文字
-        fontsize=11,
-        loc='upper right',  # 图例位置（右上，不遮挡数据）
-        frameon=True,       # 显示图例边框
-        fancybox=True,      # 边框圆角
-        shadow=True         # 边框阴影（更立体）
-    )
+            N = G.number_of_nodes()
+            M = G.number_of_edges()
+            print(f"\n处理时间段：{year}_{season}，节点数={N}，边数={M}")
 
-    # -------------------------- 7. 调整布局与保存 --------------------------
-    # 自动调整布局（避免标签、图例被截断）
-    plt.tight_layout()
-    # 保存图片（dpi=300为高清，bbox_inches='tight'避免裁剪边缘）
-    plt.savefig(
-        'Figure/Season/avg_degree_efficiency_time_series.png',
-        dpi=300,
-        bbox_inches='tight',
-        facecolor='white'  # 背景色为白色（避免保存后背景透明）
-    )
-    # 显示图表（运行时弹出窗口）
-    plt.show()
+            # 生成10次ER随机图并计算指标
+            num_trials = 10
+            all_metrics = []
+            for i in range(num_trials):
+                G_ER = nx.gnm_random_graph(
+                    n=N,
+                    m=M,
+                    seed=random.randint(1, 1000)
+                )
+                # 计算该时间段的指标（假设all_in_one返回包含'time'的字典）
+                # 注意：all_in_one的参数应匹配当前时间段（year和season）
+                metrics = all_in_one(G_ER, year, season)
+                all_metrics.append(metrics)
+                print(f"  完成第{i + 1}/{num_trials}次ER计算")
+
+            # ----------------------
+            # 3. 计算该时间段的指标平均值（含非平均字段）
+            # ----------------------
+            # 非平均字段（如'time'）
+            non_averaged_keys = ['time']
+            non_averaged = {
+                key: all_metrics[0][key]
+                for key in non_averaged_keys
+                if key in all_metrics[0]
+            }
+
+            # 需平均的字段
+            averaged_keys = [k for k in all_metrics[0].keys() if k not in non_averaged_keys]
+            averaged = {}
+            for key in averaged_keys:
+                values = [m[key] for m in all_metrics if not np.isnan(m[key])]
+                averaged[key] = np.mean(values) if values else np.nan
+
+            # 合并为该时间段的结果
+            final_metrics = {**averaged, **non_averaged}
+            all_results.append(final_metrics)
+            print(f"  完成{year}_{season}的指标计算")
+
+    # ----------------------
+    # 4. 保存为CSV文件
+    # ----------------------
+    if all_results:
+        # 转为DataFrame，确保第一列为'time'
+        df = pd.DataFrame(all_results)
+        # 调整列顺序：将'time'放在第一列
+        if 'time' in df.columns:
+            cols = ['time'] + [col for col in df.columns if col != 'time']
+            df = df[cols]
+
+        # 保存CSV
+
+        df.to_csv('Figure/Season/all_in_one_nm_zero_model.csv', index=False, encoding='utf-8')
+        print(f"\n所有时间段的指标已保存")
+    else:
+        print("\n未计算到任何有效指标，无法生成CSV")

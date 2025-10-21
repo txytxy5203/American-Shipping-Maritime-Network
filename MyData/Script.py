@@ -1,0 +1,108 @@
+"""
+生成一个csv文件   ppt要使用   nm零模型和网络的指标对比
+"""
+
+import pandas as pd
+import numpy as np
+import os
+
+
+def process_csv_files(file1_path, file2_path, output_path=None):
+    """
+    处理两个CSV文件，生成按时间列和指标行组织的新CSV
+
+    参数:
+        file1_path: 第一个CSV文件路径
+        file2_path: 第二个CSV文件路径
+        output_path: 输出CSV文件路径，默认为当前目录下的merged_results.csv
+    """
+    # 定义需要提取的指标列表
+    indicators = [
+        'entropy',
+        'spectral_radius',
+        'density',
+        'avg_degrees',
+        'homogeneity'
+    ]
+    try:
+        # 读取两个CSV文件
+        df1 = pd.read_csv(file1_path)
+        df2 = pd.read_csv(file2_path)
+
+        # 获取并统一时间列名称（第一列）
+        time_col1 = df1.columns[0]
+        time_col2 = df2.columns[0]
+        print(f"检测到时间列: {time_col1} (文件1), {time_col2} (文件2)")
+
+        df1 = df1.rename(columns={time_col1: 'Time'})
+        df2 = df2.rename(columns={time_col2: 'Time'})
+
+        # 检查指标是否存在
+        missing1 = [ind for ind in indicators if ind not in df1.columns]
+        missing2 = [ind for ind in indicators if ind not in df2.columns]
+        if missing1:
+            print(f"警告: 文件1缺少指标: {', '.join(missing1)}")
+        if missing2:
+            print(f"警告: 文件2缺少指标: {', '.join(missing2)}")
+
+        # 获取所有时间并保持原始顺序（去重，按首次出现顺序）
+        all_times = []
+        seen = set()
+        # 先添加第一个文件的时间（保持原始顺序）
+        for time in df1['Time']:
+            if time not in seen:
+                seen.add(time)
+                all_times.append(time)
+        # 再添加第二个文件的时间（保持原始顺序，跳过已存在的）
+        for time in df2['Time']:
+            if time not in seen:
+                seen.add(time)
+                all_times.append(time)
+
+        # 创建结果数据框
+        result_df = pd.DataFrame(index=indicators, columns=all_times)
+
+        # 填充数据（格式：file1_value (file2_value)）
+        for time in all_times:
+            # 从两个文件中获取该时间点的数据
+            row1 = df1[df1['Time'] == time].iloc[0] if time in df1['Time'].values else None
+            row2 = df2[df2['Time'] == time].iloc[0] if time in df2['Time'].values else None
+
+            for ind in indicators:
+                # 获取两个文件中的值
+                val1 = row1[ind] if (row1 is not None and ind in row1) else None
+                val2 = row2[ind] if (row2 is not None and ind in row2) else None
+
+                # 格式化输出字符串
+                if val1 is not None and val2 is not None:
+                    # 保留一位小数，可根据需要调整
+                    result_df.at[ind, time] = f"{val1:.2f} ({val2:.2f})"
+                elif val1 is not None:
+                    result_df.at[ind, time] = f"{val1:.2f} (无数据)"
+                elif val2 is not None:
+                    result_df.at[ind, time] = f"(无数据) ({val2:.2f})"
+                else:
+                    result_df.at[ind, time] = "无数据"
+
+        # 处理输出路径
+        if output_path is None:
+            output_path = os.path.join(os.getcwd(), 'merged_indicators.csv')
+
+        # 保存结果
+        result_df.to_csv(output_path)
+        print(f"成功生成结果文件: {output_path}")
+
+        return result_df
+
+    except Exception as e:
+        print(f"处理出错: {str(e)}")
+        return None
+
+# 使用示例
+if __name__ == "__main__":
+    # 替换为你的文件路径
+    file1 = "Figure/Season/all_in_one_Digraph.csv"  # 第一个CSV文件路径
+    file2 = "Figure/Season/all_in_one_nm_zero_model.csv"  # 第二个CSV文件路径
+    output = "Figure/Season/nm_zero_model_comparison.csv"  # 输出文件路径
+
+    process_csv_files(file1, file2, output)
