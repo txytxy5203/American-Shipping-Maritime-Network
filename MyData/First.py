@@ -526,6 +526,228 @@ def draw_length_efficiency_picture():
 
 
 #regionNetwork Structure
+def draw_Spring_Maritime_Network():
+    """
+    画世界地图
+    :return:
+    """
+    # ----------------------
+    # 1. 数据加载与处理
+    # ----------------------
+    # 读取图数据
+    DiG = nx.read_graphml(f'../Data/2021/US/Season/Spring/US2021_Spring_Digraph.graphml')
+
+    # 读取港口坐标数据
+    Port_Data = ConstructNetwork.Read_Port_Data()
+
+    # 假设缩写规则：NA=北美洲, SA=南美洲, EU=欧洲, AS=亚洲, AF=非洲, OC=大洋洲, UN=未知
+    continent_color_mapping = {
+        'NA': '#1f77b4',    # 深蓝色（北美洲）
+        'SA': '#ff7f0e',    # 橙色（南美洲）
+        'EU': '#2ca02c',    # 绿色（欧洲）
+        'AS': '#d62728',    # 红色（亚洲）
+        'AF': '#9467bd',    # 紫色（非洲）
+        'OC': '#8c564b',    # 棕色（大洋洲）
+        'UN': '#7f7f7f'     # 灰色（未知大洲）
+    }
+
+    # 筛选有效节点（有坐标+total_TEU>1000），并提取TEU值用于可视化
+    port_info = {}  # 存储：{节点: (经度, 纬度, total_TEU)}
+    for node in DiG.nodes():
+        # 检查坐标是否有效
+        if node not in Port_Data or not isinstance(Port_Data[node], dict):
+            continue
+        if "longitude" not in Port_Data[node] or "latitude" not in Port_Data[node]:
+            continue
+        # 检查total_TEU是否有效且大于1000
+        try:
+            total_teu = float(DiG.nodes[node].get('total_TEU', 0))
+            if total_teu <= 1000:
+                continue
+        except (ValueError, TypeError):
+            continue
+
+        # 4. 提取双字母大洲缩写（假设存储在节点属性的'continent'键中，根据实际数据调整）
+        continent_code = DiG.nodes[node].get('continent', 'UN')  # 替换为实际键名
+        # 统一缩写格式（大写，避免'nA'/'na'等不一致）
+        continent_code = continent_code.strip().upper()
+        # 若缩写不在映射中，归为'UN'（未知）
+        if continent_code not in continent_color_mapping:
+            continent_code = 'UN'
+        # 存储有效信息
+        lon = float(Port_Data[node]["longitude"])
+        lat = float(Port_Data[node]["latitude"])
+        port_info[node] = (lon, lat, total_teu, continent_code)
+    # node 信息
+    nodes = list(port_info.keys())
+    lons = [port_info[node][0] for node in nodes]
+    lats = [port_info[node][1] for node in nodes]
+    teus = [port_info[node][2] for node in nodes]
+
+    # 筛选有效边（仅保留两端节点都在port_info中的边，避免无坐标节点）
+    edges = []
+    edge_teus = []  # 边的货运量（用于线条粗细）
+    for u, v, data in DiG.edges(data=True):
+        if u in port_info and v in port_info:  # 确保边的两端节点都有坐标
+            try:
+                # 假设边的货运量存在于'volumeTEU'属性
+                edge_teu = float(data.get('volumeTEU', 0))
+                if edge_teu > 10000:  # 过滤无货运量的边
+                    edges.append((u, v))
+                    edge_teus.append(edge_teu)
+            except (ValueError, TypeError):
+                continue
+
+    # ----------------------
+    # 2. 地图与网络可视化设置
+    # ----------------------
+    # 美国中心经纬度：西经98.5°（-98.5），北纬39.8°
+    center_lon = -98.5
+    center_lat = 39.8
+
+    # 创建画布
+    fig, ax = plt.subplots(figsize=(14, 10))
+
+
+    # 定义地图（聚焦港口集中区域，如美洲：调整经纬度范围）
+    # 若全球分布，可保留 llcrnrlon=-180, urcrnrlon=180, llcrnrlat=-90, urcrnrlat=90
+    world_map = Basemap(
+        resolution='i',  # 中分辨率（比'l'更清晰，加载速度适中）
+        projection='cyl',
+        lon_0=center_lon,  # 以港口中心为地图中心
+        lat_0=center_lat,
+        llcrnrlon=min(lons) - 10,  # 左边界：最西港口-10度
+        urcrnrlon=max(lons) + 10,  # 右边界：最东港口+10度
+        llcrnrlat=min(lats) - 30,  # 下边界：最南港口-30度
+        urcrnrlat=max(lats) + 10,  # 上边界：最北港口+10度
+        ax=ax
+    )
+
+    # 绘制地图要素（更细腻的配色）
+    world_map.drawmapboundary(fill_color='#A8DADC')  # 海洋：浅蓝色
+    world_map.fillcontinents(color='#F1FAEE', lake_color='#A8DADC', alpha=0.8)  # 陆地：浅灰色
+    world_map.drawcoastlines(linewidth=0.8, color='#1D3557')  # 海岸线：深蓝色
+    world_map.drawcountries(linewidth=0.6, color='#457B9D')  # 国家边界：中蓝色
+    world_map.drawmeridians(np.arange(-180, 180, 20), labels=[0, 0, 0, 1], linewidth=0.3, color='#999')  # 经度线
+    world_map.drawparallels(np.arange(-90, 90, 20), labels=[1, 0, 0, 0], linewidth=0.3, color='#999')  # 纬度线
+
+    # ----------------------
+    # 3. 绘制海运网络（边+节点）
+    # ----------------------
+    # 绘制边（航线）：用贝塞尔曲线实现弧形，线条粗细与货运量正相关
+    if edges:
+        max_edge_teu = max(edge_teus)
+        edge_widths = [0.5 + 2.5 * (teu / max_edge_teu) for teu in edge_teus]
+
+        for i, (u, v) in enumerate(edges):
+            # 获取两端节点经纬度和地图坐标
+            u_lon, u_lat, _, _ = port_info[u]
+            v_lon, v_lat, _, _ = port_info[v]
+            x1, y1 = world_map(u_lon, u_lat)
+            x2, y2 = world_map(v_lon, v_lat)
+
+            # 计算两点距离（控制弯曲程度）
+            dx = x2 - x1
+            dy = y2 - y1
+            distance = np.sqrt(dx ** 2 + dy ** 2)
+            mid_x = (x1 + x2) / 2  # 中点x
+            mid_y = (y1 + y2) / 2  # 中点y
+
+            # 【关键】判断弯曲方向：50%随机+50%按经度差（避免全随机导致混乱）
+            # 规则1：若u在v西边（u_lon < v_lon），50%概率向上，50%向下
+            # 规则2：若u在v东边（u_lon > v_lon），反向概率，增加对称性
+            if u_lon < v_lon:
+                bend_up = random.choice([True, False])  # 随机
+            else:
+                bend_up = random.choice([False, True])  # 反向随机
+
+            # 根据方向设置控制点y坐标（向上则+距离比例，向下则-）
+            bend_strength = 0.15  # 弯曲强度（越大越弯）
+            if bend_up:
+                ctrl_y = mid_y + distance * bend_strength  # 向上弯
+            else:
+                ctrl_y = mid_y - distance * bend_strength  # 向下弯
+            ctrl_x = mid_x  # 控制点x始终为中点（左右不偏移，保持对称）
+
+            # 创建贝塞尔曲线路径
+            verts = [(x1, y1), (ctrl_x, ctrl_y), (x2, y2)]
+            codes = [Path.MOVETO, Path.CURVE3, Path.CURVE3]
+            path = Path(verts, codes)
+
+            # 绘制曲线
+            curve = patches.PathPatch(
+                path,
+                facecolor='none',
+                edgecolor='#E63946',
+                linewidth=edge_widths[i],
+                alpha=0.6
+            )
+            ax.add_patch(curve)
+
+    # ----------------------
+    # 4. 按大洲着色绘制节点
+    # ----------------------
+    if port_info:
+        for node in port_info:
+            lon, lat, teu, continent_code = port_info[node]
+            x, y = world_map(lon, lat)
+
+            # 节点大小与TEU成正比（归一化到5-20）
+            max_teu = max(p[2] for p in port_info.values())
+            node_size = 5 + 15 * (teu / max_teu)
+
+            # 按大洲获取颜色
+            node_color = continent_color_mapping[continent_code]
+
+            # 绘制节点
+            world_map.plot(
+                x, y, 'o',
+                markersize=node_size,
+                color=node_color,
+                markeredgecolor='white',
+                markeredgewidth=0.8,
+                alpha=0.9
+            )
+
+    # ----------------------
+    # 5. 图例与标注（解释大洲缩写）
+    # ----------------------
+    # 大洲缩写对应的全称（用于图例说明）
+    continent_fullname = {
+        'NA': 'North America',
+        'SA': 'South America',
+        'EU': 'Europe',
+        'AS': 'Asia',
+        'AF': 'Africa',
+        'OC': 'Oceania',
+        'UN': 'Unknown'
+    }
+
+    # 生成图例（包含大洲颜色+缩写+全称）
+    legend_elements = [
+        Line2D(
+            [0], [0], marker='o', color='w',
+            markerfacecolor=color, markersize=10,
+            label=f'{code} ({continent_fullname[code]})'
+        ) for code, color in continent_color_mapping.items()
+    ]
+    # 新增航线图例
+    legend_elements.append(
+        Line2D([0], [0], color='#E63946', lw=3, label='Shipping Routes ( > 10000 TEU)')
+    )
+
+    ax.legend(
+        handles=legend_elements,
+        loc='lower left',
+        fontsize=9,
+        title='Continents',
+        title_fontsize=11
+    )
+
+    ax.set_title('2021 Spring Maritime Network', fontsize=16, pad=20)
+    plt.tight_layout()
+    plt.savefig('Figure/Season/2021 Spring Maritime Network.png', dpi=300)
+    plt.show()
 def all_in_one(g, year, season) -> dict:
     """
     统一计算相应的基础指标
@@ -595,7 +817,7 @@ def all_in_one(g, year, season) -> dict:
     }
 def draw_edges_nodes_time_series():
     """
-    根据 all in one 的数据画出 edges和nodes变化图
+    根据 all in one Digraph 的数据画出 edges和nodes变化图
     :return:
     """
     # 1. 读取数据
@@ -2349,225 +2571,96 @@ def draw_US_Top3_category_pie_chart():
 # plt.show()
 #endregion
 
-def draw_Spring_Maritime_Network():
+
+def draw_avg_degree_efficiency_time_series():
     """
-    画世界地图
+    画平均度和效率的变化趋势图
     :return:
     """
-    # ----------------------
-    # 1. 数据加载与处理
-    # ----------------------
-    # 读取图数据
-    DiG = nx.read_graphml(f'../Data/2021/US/Season/Spring/US2021_Spring_Digraph.graphml')
+    # 1. 读取数据
+    df = pd.read_csv('Figure/all_in_one_Digraph.csv')
+    # 4. 创建画布和坐标轴
+    fig, ax1 = plt.subplots(figsize=(12, 6))  # 宽12英寸，高6英寸
+    # 2. 创建右侧Y轴（与左侧Y轴共享X轴，实现双轴对齐）
+    ax2 = ax1.twinx()  # 关键：生成与ax1共享X轴的第二个Y轴
 
-    # 读取港口坐标数据
-    Port_Data = ConstructNetwork.Read_Port_Data()
-
-    # 假设缩写规则：NA=北美洲, SA=南美洲, EU=欧洲, AS=亚洲, AF=非洲, OC=大洋洲, UN=未知
-    continent_color_mapping = {
-        'NA': '#1f77b4',    # 深蓝色（北美洲）
-        'SA': '#ff7f0e',    # 橙色（南美洲）
-        'EU': '#2ca02c',    # 绿色（欧洲）
-        'AS': '#d62728',    # 红色（亚洲）
-        'AF': '#9467bd',    # 紫色（非洲）
-        'OC': '#8c564b',    # 棕色（大洋洲）
-        'UN': '#7f7f7f'     # 灰色（未知大洲）
-    }
-
-    # 筛选有效节点（有坐标+total_TEU>1000），并提取TEU值用于可视化
-    port_info = {}  # 存储：{节点: (经度, 纬度, total_TEU)}
-    for node in DiG.nodes():
-        # 检查坐标是否有效
-        if node not in Port_Data or not isinstance(Port_Data[node], dict):
-            continue
-        if "longitude" not in Port_Data[node] or "latitude" not in Port_Data[node]:
-            continue
-        # 检查total_TEU是否有效且大于1000
-        try:
-            total_teu = float(DiG.nodes[node].get('total_TEU', 0))
-            if total_teu <= 1000:
-                continue
-        except (ValueError, TypeError):
-            continue
-
-        # 4. 提取双字母大洲缩写（假设存储在节点属性的'continent'键中，根据实际数据调整）
-        continent_code = DiG.nodes[node].get('continent', 'UN')  # 替换为实际键名
-        # 统一缩写格式（大写，避免'nA'/'na'等不一致）
-        continent_code = continent_code.strip().upper()
-        # 若缩写不在映射中，归为'UN'（未知）
-        if continent_code not in continent_color_mapping:
-            continent_code = 'UN'
-        # 存储有效信息
-        lon = float(Port_Data[node]["longitude"])
-        lat = float(Port_Data[node]["latitude"])
-        port_info[node] = (lon, lat, total_teu, continent_code)
-    # node 信息
-    nodes = list(port_info.keys())
-    lons = [port_info[node][0] for node in nodes]
-    lats = [port_info[node][1] for node in nodes]
-    teus = [port_info[node][2] for node in nodes]
-
-    # 筛选有效边（仅保留两端节点都在port_info中的边，避免无坐标节点）
-    edges = []
-    edge_teus = []  # 边的货运量（用于线条粗细）
-    for u, v, data in DiG.edges(data=True):
-        if u in port_info and v in port_info:  # 确保边的两端节点都有坐标
-            try:
-                # 假设边的货运量存在于'volumeTEU'属性
-                edge_teu = float(data.get('volumeTEU', 0))
-                if edge_teu > 10000:  # 过滤无货运量的边
-                    edges.append((u, v))
-                    edge_teus.append(edge_teu)
-            except (ValueError, TypeError):
-                continue
-
-    # ----------------------
-    # 2. 地图与网络可视化设置
-    # ----------------------
-    # 美国中心经纬度：西经98.5°（-98.5），北纬39.8°
-    center_lon = -98.5
-    center_lat = 39.8
-
-    # 创建画布
-    fig, ax = plt.subplots(figsize=(14, 10))
-
-
-    # 定义地图（聚焦港口集中区域，如美洲：调整经纬度范围）
-    # 若全球分布，可保留 llcrnrlon=-180, urcrnrlon=180, llcrnrlat=-90, urcrnrlat=90
-    world_map = Basemap(
-        resolution='i',  # 中分辨率（比'l'更清晰，加载速度适中）
-        projection='cyl',
-        lon_0=center_lon,  # 以港口中心为地图中心
-        lat_0=center_lat,
-        llcrnrlon=min(lons) - 10,  # 左边界：最西港口-10度
-        urcrnrlon=max(lons) + 10,  # 右边界：最东港口+10度
-        llcrnrlat=min(lats) - 30,  # 下边界：最南港口-30度
-        urcrnrlat=max(lats) + 10,  # 上边界：最北港口+10度
-        ax=ax
+    # -------------------------- 4. 绘制双折线（分别绑定左右Y轴） --------------------------
+    # -------------------------- 左侧Y轴：Nodes（假设N列是Nodes数量） --------------------------
+    ax1.plot(
+        df['time'],  # X轴：时间
+        df['avg_length'],     # Y轴：Nodes数量（绑定左侧ax1）
+        label='average path length',  # 图例名称
+        color='red',  # 颜色（可选：用十六进制色更精准，这里是深蓝色）
+        marker='o',       # 数据点标记（圆形）
+        linestyle='-',    # 线条样式（实线）
+        linewidth=2.5,    # 线条宽度（加粗更清晰）
+        markersize=7      # 数据点大小
     )
 
-    # 绘制地图要素（更细腻的配色）
-    world_map.drawmapboundary(fill_color='#A8DADC')  # 海洋：浅蓝色
-    world_map.fillcontinents(color='#F1FAEE', lake_color='#A8DADC', alpha=0.8)  # 陆地：浅灰色
-    world_map.drawcoastlines(linewidth=0.8, color='#1D3557')  # 海岸线：深蓝色
-    world_map.drawcountries(linewidth=0.6, color='#457B9D')  # 国家边界：中蓝色
-    world_map.drawmeridians(np.arange(-180, 180, 20), labels=[0, 0, 0, 1], linewidth=0.3, color='#999')  # 经度线
-    world_map.drawparallels(np.arange(-90, 90, 20), labels=[1, 0, 0, 0], linewidth=0.3, color='#999')  # 纬度线
-
-    # ----------------------
-    # 3. 绘制海运网络（边+节点）
-    # ----------------------
-    # 绘制边（航线）：用贝塞尔曲线实现弧形，线条粗细与货运量正相关
-    if edges:
-        max_edge_teu = max(edge_teus)
-        edge_widths = [0.5 + 2.5 * (teu / max_edge_teu) for teu in edge_teus]
-
-        for i, (u, v) in enumerate(edges):
-            # 获取两端节点经纬度和地图坐标
-            u_lon, u_lat, _, _ = port_info[u]
-            v_lon, v_lat, _, _ = port_info[v]
-            x1, y1 = world_map(u_lon, u_lat)
-            x2, y2 = world_map(v_lon, v_lat)
-
-            # 计算两点距离（控制弯曲程度）
-            dx = x2 - x1
-            dy = y2 - y1
-            distance = np.sqrt(dx ** 2 + dy ** 2)
-            mid_x = (x1 + x2) / 2  # 中点x
-            mid_y = (y1 + y2) / 2  # 中点y
-
-            # 【关键】判断弯曲方向：50%随机+50%按经度差（避免全随机导致混乱）
-            # 规则1：若u在v西边（u_lon < v_lon），50%概率向上，50%向下
-            # 规则2：若u在v东边（u_lon > v_lon），反向概率，增加对称性
-            if u_lon < v_lon:
-                bend_up = random.choice([True, False])  # 随机
-            else:
-                bend_up = random.choice([False, True])  # 反向随机
-
-            # 根据方向设置控制点y坐标（向上则+距离比例，向下则-）
-            bend_strength = 0.15  # 弯曲强度（越大越弯）
-            if bend_up:
-                ctrl_y = mid_y + distance * bend_strength  # 向上弯
-            else:
-                ctrl_y = mid_y - distance * bend_strength  # 向下弯
-            ctrl_x = mid_x  # 控制点x始终为中点（左右不偏移，保持对称）
-
-            # 创建贝塞尔曲线路径
-            verts = [(x1, y1), (ctrl_x, ctrl_y), (x2, y2)]
-            codes = [Path.MOVETO, Path.CURVE3, Path.CURVE3]
-            path = Path(verts, codes)
-
-            # 绘制曲线
-            curve = patches.PathPatch(
-                path,
-                facecolor='none',
-                edgecolor='#E63946',
-                linewidth=edge_widths[i],
-                alpha=0.6
-            )
-            ax.add_patch(curve)
-
-    # ----------------------
-    # 4. 按大洲着色绘制节点
-    # ----------------------
-    if port_info:
-        for node in port_info:
-            lon, lat, teu, continent_code = port_info[node]
-            x, y = world_map(lon, lat)
-
-            # 节点大小与TEU成正比（归一化到5-20）
-            max_teu = max(p[2] for p in port_info.values())
-            node_size = 5 + 15 * (teu / max_teu)
-
-            # 按大洲获取颜色
-            node_color = continent_color_mapping[continent_code]
-
-            # 绘制节点
-            world_map.plot(
-                x, y, 'o',
-                markersize=node_size,
-                color=node_color,
-                markeredgecolor='white',
-                markeredgewidth=0.8,
-                alpha=0.9
-            )
-
-    # ----------------------
-    # 5. 图例与标注（解释大洲缩写）
-    # ----------------------
-    # 大洲缩写对应的全称（用于图例说明）
-    continent_fullname = {
-        'NA': 'North America',
-        'SA': 'South America',
-        'EU': 'Europe',
-        'AS': 'Asia',
-        'AF': 'Africa',
-        'OC': 'Oceania',
-        'UN': 'Unknown'
-    }
-
-    # 生成图例（包含大洲颜色+缩写+全称）
-    legend_elements = [
-        Line2D(
-            [0], [0], marker='o', color='w',
-            markerfacecolor=color, markersize=10,
-            label=f'{code} ({continent_fullname[code]})'
-        ) for code, color in continent_color_mapping.items()
-    ]
-    # 新增航线图例
-    legend_elements.append(
-        Line2D([0], [0], color='#E63946', lw=3, label='Shipping Routes ( > 10000 TEU)')
+    # -------------------------- 右侧Y轴：Edges（假设M列是Edges数量） --------------------------
+    ax2.plot(
+        df['time'],  # X轴：时间（与左侧共享，无需重复设置）
+        df['efficiency'],     # Y轴：Edges数量（绑定右侧ax2）
+        label='efficiency',  # 图例名称
+        color='blue',  # 颜色（深红色，与左侧区分明显）
+        marker='s',       # 数据点标记（方形，与圆形区分）
+        linestyle='--',   # 线条样式（虚线，与实线区分）
+        linewidth=2.5,    # 线条宽度（与左侧一致，保持美观）
+        markersize=7      # 数据点大小（与左侧一致）
     )
 
-    ax.legend(
-        handles=legend_elements,
-        loc='lower left',
-        fontsize=9,
-        title='Continents',
-        title_fontsize=11
+    # -------------------------- 5. 美化双轴标签与标题 --------------------------
+    # -------------------------- 左侧Y轴（ax1）设置 --------------------------
+    ax1.set_xlabel('Time', fontsize=12, fontweight='bold')  # X轴标签（加粗）
+    ax1.set_ylabel('avg_length',
+                   color='red',    # 标签颜色与线条颜色一致
+                   fontsize=12,
+                   fontweight='bold')
+    ax1.tick_params(axis='y',  # 左侧Y轴刻度设置
+                    colors='red',  # 刻度颜色与线条一致
+                    labelsize=10)      # 刻度文字大小
+
+    # -------------------------- 右侧Y轴（ax2）设置 --------------------------
+    ax2.set_ylabel('efficiency',  # 右侧Y轴标签（明确对应Edges）
+                   color='blue',    # 标签颜色与线条颜色一致
+                   fontsize=12,
+                   fontweight='bold')
+    ax2.tick_params(axis='y',  # 右侧Y轴刻度设置
+                    colors='blue',  # 刻度颜色与线条一致
+                    labelsize=10)      # 刻度文字大小
+
+    # -------------------------- 标题与X轴刻度 --------------------------
+    ax1.set_title(
+        'Changes in the average degrees and efficiency in the Network Over Time',
+        fontsize=14,
+        fontweight='bold',
+        pad=20  # 标题与图表的间距（避免拥挤）
+    )
+    ax1.tick_params(axis='x', rotation=45)  # X轴时间标签旋转45度，避免文字重叠
+
+    # -------------------------- 6. 合并双轴图例（关键：避免图例重复） --------------------------
+    # 提取左右轴的图例，合并为一个（放在图表右侧，不遮挡数据）
+    lines1, labels1 = ax1.get_legend_handles_labels()  # 左侧轴图例
+    lines2, labels2 = ax2.get_legend_handles_labels()  # 右侧轴图例
+    ax1.legend(
+        lines1 + lines2,  # 合并图例线条
+        labels1 + labels2,  # 合并图例文字
+        fontsize=11,
+        loc='upper right',  # 图例位置（右上，不遮挡数据）
+        frameon=True,       # 显示图例边框
+        fancybox=True,      # 边框圆角
+        shadow=True         # 边框阴影（更立体）
     )
 
-    ax.set_title('2021 Spring Maritime Network', fontsize=16, pad=20)
+    # -------------------------- 7. 调整布局与保存 --------------------------
+    # 自动调整布局（避免标签、图例被截断）
     plt.tight_layout()
-    plt.savefig('Figure/Season/2021 Spring Maritime Network.png', dpi=300)
+    # 保存图片（dpi=300为高清，bbox_inches='tight'避免裁剪边缘）
+    plt.savefig(
+        'Figure/Season/avg_degree_efficiency_time_series.png',
+        dpi=300,
+        bbox_inches='tight',
+        facecolor='white'  # 背景色为白色（避免保存后背景透明）
+    )
+    # 显示图表（运行时弹出窗口）
     plt.show()
