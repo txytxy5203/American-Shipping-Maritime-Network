@@ -19,6 +19,7 @@ import cartopy.feature as cfeature
 from sklearn.preprocessing import minmax_scale
 from matplotlib.ticker import ScalarFormatter
 from matplotlib import patheffects
+from scipy import stats  # 用于线性回归拟合
 from scipy.stats import entropy
 from heapq import nlargest
 from collections import deque
@@ -741,6 +742,97 @@ def all_in_one(g, year, season) -> dict:
         "spectral_radius": spectral_radius,
         "mcc_sizes": mcc_sizes
     }
+def write_nm_zero_model_all_in_one():
+    """
+    nm零模型  只有n和m一样  度序列不一样
+    :return:
+    """
+    # ----------------------
+    # 1. 定义路径和时间段（根据你的数据结构修改）
+    # ----------------------
+    years = range(2017, 2022)  # 你的数据年份
+    seasons = ['Spring', 'Summer', 'Autumn', 'Winter']  # 季节（时间段）
+
+    # 存储所有时间段的最终指标（每个时间段一行）
+    all_results = []
+
+    # ----------------------
+    # 2. 循环处理每个时间段
+    # ----------------------
+    for year in years:
+        for season in seasons:
+
+            if year == 2021 and season in ['Summer', 'Autumn', 'Winter']:
+                continue
+
+            # 读取包含类别TEU的图文件（根据你的实际文件选择MulGraph/DiGraph，这里假设是MulGraph）
+            file_path = f'../Data/{year}/US/Season/{season}/US{year}_{season}_Digraph.graphml'
+            if not os.path.exists(file_path):
+                print(f'⚠️ 文件不存在: {file_path}')
+                continue
+            time = f"{year}{season}"
+            G = nx.Graph(nx.read_graphml(file_path))
+
+
+            N = G.number_of_nodes()
+            M = G.number_of_edges()
+            print(f"\n处理时间段：{year}_{season}，节点数={N}，边数={M}")
+
+            # 生成10次ER随机图并计算指标
+            num_trials = 10
+            all_metrics = []
+            for i in range(num_trials):
+                G_ER = nx.gnm_random_graph(
+                    n=N,
+                    m=M,
+                    seed=random.randint(1, 1000)
+                )
+                # 计算该时间段的指标（假设all_in_one返回包含'time'的字典）
+                # 注意：all_in_one的参数应匹配当前时间段（year和season）
+                metrics = all_in_one(G_ER, year, season)
+                all_metrics.append(metrics)
+                print(f"  完成第{i + 1}/{num_trials}次ER计算")
+
+            # ----------------------
+            # 3. 计算该时间段的指标平均值（含非平均字段）
+            # ----------------------
+            # 非平均字段（如'time'）
+            non_averaged_keys = ['time']
+            non_averaged = {
+                key: all_metrics[0][key]
+                for key in non_averaged_keys
+                if key in all_metrics[0]
+            }
+
+            # 需平均的字段
+            averaged_keys = [k for k in all_metrics[0].keys() if k not in non_averaged_keys]
+            averaged = {}
+            for key in averaged_keys:
+                values = [m[key] for m in all_metrics if not np.isnan(m[key])]
+                averaged[key] = np.mean(values) if values else np.nan
+
+            # 合并为该时间段的结果
+            final_metrics = {**averaged, **non_averaged}
+            all_results.append(final_metrics)
+            print(f"  完成{year}_{season}的指标计算")
+
+    # ----------------------
+    # 4. 保存为CSV文件
+    # ----------------------
+    if all_results:
+        # 转为DataFrame，确保第一列为'time'
+        df = pd.DataFrame(all_results)
+        # 调整列顺序：将'time'放在第一列
+        if 'time' in df.columns:
+            cols = ['time'] + [col for col in df.columns if col != 'time']
+            df = df[cols]
+
+        # 保存CSV
+
+        df.to_csv('Figure/Season/all_in_one_nm_zero_model.csv', index=False, encoding='utf-8')
+        print(f"\n所有时间段的指标已保存")
+    else:
+        print("\n未计算到任何有效指标，无法生成CSV")
 def draw_edges_nodes_time_series():
     """
     根据 all in one Digraph 的数据画出 edges和nodes变化图
@@ -2589,173 +2681,203 @@ def draw_US_Top3_category_pie_chart():
 # plt.show()
 #endregion
 
-
-# # 假设 G 是已构建的 nx.Graph() 对象
-# DiG = nx.read_graphml(f'../Data/2017/US/Season/Spring/US2017_Spring_Digraph.graphml')
-# G = nx.Graph(DiG)
-# # ----------------------
-# # 1. 计算度分布数据
-# # ----------------------
-# # 获取所有节点的度（返回字典：{节点: 度}）
-# degrees = dict(G.degree())
-#
-# # 统计每个度数对应的节点数量（键：度数，值：该度数的节点数）
-# degree_counts = defaultdict(int)
-# for d in degrees.values():
-#     degree_counts[d] += 1
-#
-# # 提取度数和对应的节点数量（排序后更美观）
-# degrees_sorted = sorted(degree_counts.keys())  # 排序的度数
-# counts = [degree_counts[d] for d in degrees_sorted]  # 对应的节点数
-#
-#
-# # ----------------------
-# # 3. 方式2：双对数散点图（适合分析幂律特性，常见于复杂网络）
-# # ----------------------
-# plt.figure(figsize=(10, 6))
-#
-# # 计算频率（节点数/总节点数，更适合分布分析）
-# total_nodes = G.number_of_nodes()
-# frequencies = [count / total_nodes for count in counts]
-#
-# # 双对数坐标（x=log(度数), y=log(频率)）
-# plt.loglog(
-#     degrees_sorted,
-#     frequencies,
-#     marker='o',      # 圆点标记
-#     linestyle='',    # 无连接线（散点图）
-#     color='#d62728', # 红色（与直方图区分）
-#     markersize=6,
-#     alpha=0.8
-# )
-#
-# # 美化标签和标题
-# plt.xlabel('log(Degree)', fontsize=12, fontweight='bold')
-# plt.ylabel('log(Frequency)', fontsize=12, fontweight='bold')
-# plt.title('Log-Log Degree Distribution (Power Law Check)', fontsize=14, fontweight='bold', pad=15)
-#
-# # 调整刻度
-# plt.xticks(fontsize=10)
-# plt.yticks(fontsize=10)
-#
-# # 添加网格线（双对数图中网格更重要）
-# plt.grid(True, which="both", linestyle='--', alpha=0.5)
-#
-# plt.tight_layout()
-# plt.show()
-
-
-
-# years = range(2017, 2022)
-# seasons = ['Spring', 'Summer', 'Autumn', 'Winter']
-# records = {}
-#
-# for year in years:
-#     for season in seasons:
-#         # 跳过2021年夏季及以后（数据不全）
-#         if year == 2021 and season in ['Summer', 'Autumn', 'Winter']:
-#             continue
-#         file_path = f'../Data/{year}/US/Season/{season}/US{year}_{season}_Digraph.graphml'
-#         if not os.path.exists(file_path):
-#             print(f'⚠️ 文件不存在: {file_path}')
-#             continue
-#         time = f"{year}_{season}"
-#         DiG = nx.read_graphml(file_path)
-#         G = nx.Graph(DiG)
-#
-#
-#         G_ER = nx.erdos_renyi_graph(G.number_of_nodes(), m=G.number_of_edges(), seed=random.randint(1, 100))
-#         calc_metrics(G_ER)
-
-
-def write_nm_zero_model_all_in_one():
+def draw_degree_distribution():
     """
-    nm零模型  只有n和m一样  度序列不一样
+    画度分布的图
     :return:
     """
-    # ----------------------
-    # 1. 定义路径和时间段（根据你的数据结构修改）
-    # ----------------------
-    years = range(2017, 2022)  # 你的数据年份
-    seasons = ['Spring', 'Summer', 'Autumn', 'Winter']  # 季节（时间段）
-
-    # 存储所有时间段的最终指标（每个时间段一行）
-    all_results = []
-
-    # ----------------------
-    # 2. 循环处理每个时间段
-    # ----------------------
+    years = range(2017, 2022)
+    seasons = ['Spring', 'Summer', 'Autumn', 'Winter']
+    # 读取数据并构建网络
     for year in years:
         for season in seasons:
-
+            # 跳过2021年夏季及以后（数据不全）
             if year == 2021 and season in ['Summer', 'Autumn', 'Winter']:
                 continue
-
-            # 读取包含类别TEU的图文件（根据你的实际文件选择MulGraph/DiGraph，这里假设是MulGraph）
             file_path = f'../Data/{year}/US/Season/{season}/US{year}_{season}_Digraph.graphml'
             if not os.path.exists(file_path):
                 print(f'⚠️ 文件不存在: {file_path}')
                 continue
-            time = f"{year}{season}"
+            time = f"{year} {season}"
             G = nx.Graph(nx.read_graphml(file_path))
 
+            # ----------------------
+            # 1. 计算度分布数据
+            # ----------------------
+            degrees = dict(G.degree())  # {节点: 度}
+            degree_counts = defaultdict(int)
+            for d in degrees.values():
+                degree_counts[d] += 1
 
-            N = G.number_of_nodes()
-            M = G.number_of_edges()
-            print(f"\n处理时间段：{year}_{season}，节点数={N}，边数={M}")
+            degrees_sorted = sorted(degree_counts.keys())  # 排序的度数
+            counts = [degree_counts[d] for d in degrees_sorted]  # 对应节点数
 
-            # 生成10次ER随机图并计算指标
-            num_trials = 10
-            all_metrics = []
-            for i in range(num_trials):
-                G_ER = nx.gnm_random_graph(
-                    n=N,
-                    m=M,
-                    seed=random.randint(1, 1000)
-                )
-                # 计算该时间段的指标（假设all_in_one返回包含'time'的字典）
-                # 注意：all_in_one的参数应匹配当前时间段（year和season）
-                metrics = all_in_one(G_ER, year, season)
-                all_metrics.append(metrics)
-                print(f"  完成第{i + 1}/{num_trials}次ER计算")
+            # 计算频率（节点数/总节点数）
+            total_nodes = G.number_of_nodes()
+            frequencies = [count / total_nodes for count in counts]
 
             # ----------------------
-            # 3. 计算该时间段的指标平均值（含非平均字段）
+            # 2. 双对数散点图 + 直线拟合
             # ----------------------
-            # 非平均字段（如'time'）
-            non_averaged_keys = ['time']
-            non_averaged = {
-                key: all_metrics[0][key]
-                for key in non_averaged_keys
-                if key in all_metrics[0]
-            }
+            plt.figure(figsize=(10, 6))
 
-            # 需平均的字段
-            averaged_keys = [k for k in all_metrics[0].keys() if k not in non_averaged_keys]
-            averaged = {}
-            for key in averaged_keys:
-                values = [m[key] for m in all_metrics if not np.isnan(m[key])]
-                averaged[key] = np.mean(values) if values else np.nan
+            # 绘制双对数散点图
+            plt.loglog(
+                degrees_sorted,
+                frequencies,
+                marker='o',
+                linestyle='',
+                color='#d62728',
+                markersize=6,
+                alpha=0.8,
+                label='Ports'
+            )
 
-            # 合并为该时间段的结果
-            final_metrics = {**averaged, **non_averaged}
-            all_results.append(final_metrics)
-            print(f"  完成{year}_{season}的指标计算")
+            # ----------------------
+            # 核心：线性回归拟合幂律直线
+            # ----------------------
+            # 对度数和频率取对数（避免log(0)，过滤掉频率为0的点）
+            log_degrees = np.log10(degrees_sorted)  # 底数为10的对数（也可用np.log自然对数）
+            log_frequencies = np.log10(frequencies)
 
-    # ----------------------
-    # 4. 保存为CSV文件
-    # ----------------------
-    if all_results:
-        # 转为DataFrame，确保第一列为'time'
-        df = pd.DataFrame(all_results)
-        # 调整列顺序：将'time'放在第一列
-        if 'time' in df.columns:
-            cols = ['time'] + [col for col in df.columns if col != 'time']
-            df = df[cols]
+            # 线性回归（y = a*x + b，其中y=log(frequency), x=log(degree)）
+            slope, intercept, r_value, p_value, std_err = stats.linregress(log_degrees, log_frequencies)
 
-        # 保存CSV
+            # 生成拟合直线的预测值（用于绘图）
+            fit_line = 10 **(intercept + slope * log_degrees)  # 转换回原尺度（10^y）
 
-        df.to_csv('Figure/Season/all_in_one_nm_zero_model.csv', index=False, encoding='utf-8')
-        print(f"\n所有时间段的指标已保存")
-    else:
-        print("\n未计算到任何有效指标，无法生成CSV")
+            # 绘制拟合直线
+            plt.loglog(
+                degrees_sorted,
+                fit_line,
+                linestyle='--',
+                color='black',
+                linewidth=2,
+                label=f'Fit: log(f) = {slope:.2f}*log(k) + {intercept:.2f}\nR² = {r_value**2:.4f}'
+            )
+
+            # ----------------------
+            # 美化与标注
+            # ----------------------
+            plt.xlabel('Degree', fontsize=12, fontweight='bold')
+            plt.ylabel('Frequency', fontsize=12, fontweight='bold')
+            plt.title(f'{time} degree distribution', fontsize=14, fontweight='bold', pad=15)
+            plt.xticks(fontsize=10)
+            plt.yticks(fontsize=10)
+            # plt.grid(True, which="both", linestyle='--', alpha=0.5)
+            plt.legend(fontsize=10, loc='upper right')  # 显示拟合公式和R²
+
+            plt.tight_layout()
+            plt.savefig(f'Figure/Season/DegreeDistribution/{time} degree distribution.png', dpi=300)
+            # plt.show()
+
+            # 输出拟合结果
+            print(f"幂律拟合结果：")
+            print(f"斜率（-γ）：{slope:.4f} → 幂指数 γ = { -slope:.4f}")
+            print(f"截距：{intercept:.4f}")
+            print(f"决定系数 R²：{r_value**2:.4f}（越接近1，拟合越好）")
+
+
+
+#region度分布 拟合有截止的度值
+# # 读取数据并构建网络
+# DiG = nx.read_graphml(f'../Data/2017/US/Season/Spring/US2017_Spring_Digraph.graphml')
+# G = nx.Graph(DiG)
+#
+# # ----------------------
+# # 1. 计算完整度分布数据（用于绘图，包含所有度数）
+# # ----------------------
+# degrees = dict(G.degree())  # {节点: 度}
+#
+# # 统计所有度数的节点数量（不筛选，用于绘图）
+# degree_counts_full = defaultdict(int)
+# for d in degrees.values():
+#     degree_counts_full[d] += 1
+#
+# # 完整的度数和频率（绘图用）
+# degrees_full = sorted(degree_counts_full.keys())
+# counts_full = [degree_counts_full[d] for d in degrees_full]
+# total_nodes = G.number_of_nodes()
+# frequencies_full = [count / total_nodes for count in counts_full]
+#
+# # ----------------------
+# # 2. 筛选拟合数据（仅度数≤100的点）
+# # ----------------------
+# # 统计度数≤100的节点数量（用于拟合）
+# degree_counts_fit = defaultdict(int)
+# for d in degrees.values():
+#     if d <= 100:
+#         degree_counts_fit[d] += 1
+#
+# # 拟合用的度数和频率（仅≤100）
+# degrees_fit = sorted(degree_counts_fit.keys())
+# counts_fit = [degree_counts_fit[d] for d in degrees_fit]
+# frequencies_fit = [count / total_nodes for count in counts_fit]
+#
+# # ----------------------
+# # 3. 双对数散点图（显示所有点）+ 拟合直线（仅用≤100的点）
+# # ----------------------
+# plt.figure(figsize=(10, 6))
+#
+# # 绘制所有度数的散点（包括>100的点）
+# plt.loglog(
+#     degrees_full,
+#     frequencies_full,
+#     marker='o',
+#     linestyle='',
+#     color='#d62728',
+#     markersize=6,
+#     alpha=0.8,
+#     label='All Degree Distribution'
+# )
+#
+# # ----------------------
+# # 核心：仅对度数≤100的点进行拟合
+# # ----------------------
+# if degrees_fit:  # 确保有可拟合的数据
+#     # 对筛选后的度数和频率取对数
+#     log_degrees_fit = np.log10(degrees_fit)
+#     log_freq_fit = np.log10(frequencies_fit)
+#
+#     # 线性回归（仅用度数≤100的点）
+#     slope, intercept, r_value, p_value, std_err = stats.linregress(log_degrees_fit, log_freq_fit)
+#
+#     # 生成拟合直线的预测值（基于拟合用的度数）
+#     fit_line = 10 **(intercept + slope * log_degrees_fit)
+#
+#     # 绘制拟合直线（仅覆盖度数≤100的范围）
+#     plt.loglog(
+#         degrees_fit,
+#         fit_line,
+#         linestyle='--',
+#         color='black',
+#         linewidth=2,
+#         label=f'Fit (k ≤ 100): log(f) = {slope:.2f}*log(k) + {intercept:.2f}\nR² = {r_value**2:.4f}'
+#     )
+#
+# # ----------------------
+# # 美化与标注
+# # ----------------------
+# plt.xlabel('log(Degree)', fontsize=12, fontweight='bold')
+# plt.ylabel('log(Frequency)', fontsize=12, fontweight='bold')
+# plt.title('Log-Log Degree Distribution (Fit for k ≤ 100)', fontsize=14, fontweight='bold', pad=15)
+# plt.xticks(fontsize=10)
+# plt.yticks(fontsize=10)
+# plt.grid(True, which="both", linestyle='--', alpha=0.5)
+# plt.legend(fontsize=10, loc='upper right')
+#
+# # 可选：添加一条垂直虚线标记k=100的位置
+# plt.axvline(x=100, color='gray', linestyle=':', linewidth=1.5, label='k=100')
+#
+# plt.tight_layout()
+# plt.show()
+#
+# # 输出拟合结果
+# if degrees_fit:
+#     print(f"幂律拟合结果（仅针对度数≤100的节点）：")
+#     print(f"斜率（-γ）：{slope:.4f} → 幂指数 γ = { -slope:.4f}")
+#     print(f"截距：{intercept:.4f}")
+#     print(f"决定系数 R²：{r_value**2:.4f}")
+# else:
+#     print("没有度数≤100的节点，无法进行拟合。")
+#endregion
