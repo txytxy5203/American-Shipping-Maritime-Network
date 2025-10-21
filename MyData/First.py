@@ -1,3 +1,4 @@
+import csv
 import heapq
 import json
 import pathlib
@@ -453,6 +454,101 @@ def draw_length_efficiency_picture():
 
 
 #regionNetwork Structure
+def draw_degree_distribution():
+    """
+    画度分布的图
+    :return:
+    """
+    years = range(2017, 2022)
+    seasons = ['Spring', 'Summer', 'Autumn', 'Winter']
+    # 读取数据并构建网络
+    for year in years:
+        for season in seasons:
+            # 跳过2021年夏季及以后（数据不全）
+            if year == 2021 and season in ['Summer', 'Autumn', 'Winter']:
+                continue
+            file_path = f'../Data/{year}/US/Season/{season}/US{year}_{season}_Digraph.graphml'
+            if not os.path.exists(file_path):
+                print(f'⚠️ 文件不存在: {file_path}')
+                continue
+            time = f"{year} {season}"
+            G = nx.Graph(nx.read_graphml(file_path))
+
+            # ----------------------
+            # 1. 计算度分布数据
+            # ----------------------
+            degrees = dict(G.degree())  # {节点: 度}
+            degree_counts = defaultdict(int)
+            for d in degrees.values():
+                degree_counts[d] += 1
+
+            degrees_sorted = sorted(degree_counts.keys())  # 排序的度数
+            counts = [degree_counts[d] for d in degrees_sorted]  # 对应节点数
+
+            # 计算频率（节点数/总节点数）
+            total_nodes = G.number_of_nodes()
+            frequencies = [count / total_nodes for count in counts]
+
+            # ----------------------
+            # 2. 双对数散点图 + 直线拟合
+            # ----------------------
+            plt.figure(figsize=(10, 6))
+
+            # 绘制双对数散点图
+            plt.loglog(
+                degrees_sorted,
+                frequencies,
+                marker='o',
+                linestyle='',
+                color='#d62728',
+                markersize=6,
+                alpha=0.8,
+                label='Ports'
+            )
+
+            # ----------------------
+            # 核心：线性回归拟合幂律直线
+            # ----------------------
+            # 对度数和频率取对数（避免log(0)，过滤掉频率为0的点）
+            log_degrees = np.log10(degrees_sorted)  # 底数为10的对数（也可用np.log自然对数）
+            log_frequencies = np.log10(frequencies)
+
+            # 线性回归（y = a*x + b，其中y=log(frequency), x=log(degree)）
+            slope, intercept, r_value, p_value, std_err = stats.linregress(log_degrees, log_frequencies)
+
+            # 生成拟合直线的预测值（用于绘图）
+            fit_line = 10 **(intercept + slope * log_degrees)  # 转换回原尺度（10^y）
+
+            # 绘制拟合直线
+            plt.loglog(
+                degrees_sorted,
+                fit_line,
+                linestyle='--',
+                color='black',
+                linewidth=2,
+                label=f'Fit: log(f) = {slope:.2f}*log(k) + {intercept:.2f}\nR² = {r_value**2:.4f}'
+            )
+
+            # ----------------------
+            # 美化与标注
+            # ----------------------
+            plt.xlabel('Degree', fontsize=12, fontweight='bold')
+            plt.ylabel('Frequency', fontsize=12, fontweight='bold')
+            plt.title(f'{time} degree distribution', fontsize=14, fontweight='bold', pad=15)
+            plt.xticks(fontsize=10)
+            plt.yticks(fontsize=10)
+            # plt.grid(True, which="both", linestyle='--', alpha=0.5)
+            plt.legend(fontsize=10, loc='upper right')  # 显示拟合公式和R²
+
+            plt.tight_layout()
+            plt.savefig(f'Figure/Season/DegreeDistribution/{time} degree distribution.png', dpi=300)
+            # plt.show()
+
+            # 输出拟合结果
+            print(f"幂律拟合结果：")
+            print(f"斜率（-γ）：{slope:.4f} → 幂指数 γ = { -slope:.4f}")
+            print(f"截距：{intercept:.4f}")
+            print(f"决定系数 R²：{r_value**2:.4f}（越接近1，拟合越好）")
 def draw_Spring_Maritime_Network():
     """
     画世界地图
@@ -1830,13 +1926,14 @@ def write_weighted_dc_sorted_ports_by_time():
     按照weighted dc排名的港口图
     :return:
     """
+    dc_type = 'out_dc'      # 'dc' 'in_dc' 'out_dc'
     file_path = 'InputData/ports_weighted_degree_centrality.json'
     degree_centrality = json.loads(pathlib.Path(file_path).read_text())
     # 1. 对每个时间段的港口按dc降序排序，提取港口名称列表
     sorted_ports_by_time = {}
     for time, data in degree_centrality.items():
         # 按dc降序排序，取港口名称（如['USLSA', 'USLGB', 'CNSHA']）
-        sorted_ports = [port for port, metrics in sorted(data.items(), key=lambda x: x[1]['dc'], reverse=True)]
+        sorted_ports = [port for port, metrics in sorted(data.items(), key=lambda x: x[1][dc_type], reverse=True)]
         sorted_ports_by_time[time] = sorted_ports
     # 2. 确定最大排名数（即所有时间段中港口数量最多的那个，保证行数足够）
     max_rank = max(len(ports) for ports in sorted_ports_by_time.values())
@@ -1848,7 +1945,7 @@ def write_weighted_dc_sorted_ports_by_time():
     # 4. 转为DataFrame，行索引设为排名（1开始）
     df = pd.DataFrame(rank_data, index=range(1, max_rank + 1))
     # 5. 保存为CSV（index_label='排名'，明确行含义）
-    df.to_csv('Figure/Season/weighted_dc_sorted_ports_by_time.csv', index_label='排名')
+    df.to_csv(f'Figure/Season/weighted_{dc_type}_sorted_ports_by_time.csv', index_label='排名')
 def draw_USLSA_USLGB_USNWK_weighted_degree_centrality_trend_chart():
     """
     美国这三个港口的加权中心性变化趋势图
@@ -2255,157 +2352,7 @@ def draw_country_teu_correlation_heatmap():
 # plt.show()
 #endregion
 #endregion
-
-#region 计算加权core number   算法太慢了，算不了，要优化
-# total_record = {}
-# in_record = {}
-# out_record = {}
-#
-# years = range(2017, 2022)
-# seasons = ['Spring','Summer','Autumn','Winter']
-# for year in years:
-#     for season in seasons:
-#         if year == 2021 and season == 'Summer':                 # 因为2021年的数据只到8月份
-#             continue
-#         file_path = f'../Data/{year}/US/Season/{season}/US{year}_{season}_Digraph.graphml'
-#         time = f"{year}_{season}"
-#         if not os.path.exists(file_path):
-#             print(f'⚠️ 文件不存在: {file_path}')
-#             continue
-#         DiGraph = nx.read_graphml(file_path)
-#
-#         print(f"{year}{season} loaded")
-#
-#         # 加权k-core
-#         k = 1
-#         core_number_dict = {}
-#         max_weight = max(dict(nx.degree(DiGraph, weight='volumeTEU')).values())
-#
-#         while k < max_weight + 2:
-#             k_core_total = weighted_k_core(DiGraph, k=k, degree_type='total')
-#             for node in k_core_total:
-#                 core_number_dict[node] = k
-#             k += 1
-#         total_record[time] = core_number_dict
-#         print(core_number_dict)
-#
-# pathlib.Path('InputData/ports_weighted_core_number_centrality.json').write_text(json.dumps(total_record, indent=2))
-#endregion
-
-
-
-#regionMain
-# structure_metrics = []
-# years = range(2017, 2022)
-# seasons = ['Spring','Summer','Autumn','Winter']
-# for year in years:
-#     for season in seasons:
-#         if year == 2021 and season == 'Summer':                 # 因为2021年的数据只到8月份
-#             continue
-#         file_path = f'../Data/{year}/US/Season/{season}/US{year}_{season}_Digraph.graphml'
-#         if not os.path.exists(file_path):
-#             print(f'⚠️ 文件不存在: {file_path}')
-#             continue
-#         DiGraph = nx.read_graphml(file_path)
-#         G = nx.Graph(DiGraph)
-#
-#         # G_null = G.copy()
-#         # nx.double_edge_swap(G_null, nswap=20000, max_tries=100000)
-#         # G_null.remove_edges_from(nx.selfloop_edges(G_null))
-#
-#         result_year = all_in_one(G, year, season)
-#         structure_metrics.append(result_year)
-#         print(f"{year} is already down!")
-#
-# # 保存成csv
-# df = pd.DataFrame(structure_metrics)
-# df.to_csv(f'Figure/all_in_one_Digraph.csv', index=False)
-#endregion
-
-
-
-
-
-#region给DiGraph添加商品种类信息
-# category_mapping = {
-#         'animal_plant': [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14],
-#         'grease': [15, 16, 17, 18, 19, 20, 21, 22, 23, 24],
-#         'minerals': [25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38],
-#         'rubber_plastics': [39, 40, 41, 42, 43],
-#         'pulpwood': [44, 45, 46, 47, 48, 49],
-#         'textile': [50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67],
-#         'metal': [71, 72, 73, 74, 75, 76, 77, 78, 79, 80, 81, 82, 83],
-#         'machinery': [84, 85, 86, 87, 88, 89],
-#         'precision_instrument': [90, 91, 92, 94, 95, 96],
-#         'special_other': [68, 69, 70, 93, 97, 98, 99]
-#     }
-# 创建反向映射：数字 -> 类别（提高查询效率）
-# number_to_category = {}
-# for category, numbers in category_mapping.items():
-#     for num in numbers:
-#         number_to_category[num] = category
-#         number_to_category[str(num)] = category  # 额外添加字符串键，避免KeyError
-#
-#
-# years = range(2017, 2022)
-# seasons = ['Spring','Summer','Autumn','Winter']
-# for year in years:
-#     for season in seasons:
-#         if year == 2021 and season == 'Summer':                 # 因为2021年的数据只到8月份
-#             continue
-#         # 读取MulGraph和DiGraph
-#         mul_file = f'../Data/{year}/US/Season/{season}/US{year}_{season}.graphml'
-#         dig_file = f'../Data/{year}/US/Season/{season}/US{year}_{season}_Digraph.graphml'
-#
-#         # 检查文件是否存在（合并检查，减少重复代码）
-#         if not (os.path.exists(mul_file) and os.path.exists(dig_file)):
-#             print(f'⚠️ 文件缺失：{mul_file} 或 {dig_file}')
-#             continue
-#
-#         MulGraph = nx.read_graphml(mul_file)
-#         DiGraph = nx.read_graphml(dig_file)
-#
-#
-#         count = 0
-#         # 先在DiGraph中创建相应的category
-#         for u,v,d in DiGraph.edges(data=True):
-#             for category_name in category_mapping.keys():
-#                 d[category_name] = 0
-#
-#         for f,t,data in MulGraph.edges(data=True):
-#             if not DiGraph.has_edge(f, t):
-#                 print("DiGraph中没有这条边")
-#                 count += 1
-#                 continue
-#                 # 处理HSCode：确保能映射到类别（捕获异常，避免程序中断）
-#             try:
-#                 hscode = data['HSCode']
-#                 # 若HSCode不在映射中，设为unknown（可选，根据需求调整）
-#                 cate = number_to_category.get(hscode, 'unknown')
-#             except KeyError:
-#                 print(f'⚠️ MulGraph边 ({f}, {t}) 无HSCode属性，跳过----{hscode}')
-#                 count += 1
-#                 continue
-#
-#             # 处理volumeTEU：确保是数值类型（避免字符串累加报错）
-#             try:
-#                 teu = float(data['volumeTEU'])
-#             except (KeyError, ValueError):
-#                 print(f'⚠️ MulGraph边 ({f}, {t}) 的volumeTEU无效，跳过')
-#                 count += 1
-#                 continue
-#
-#             # 累加TEU到对应类别（若为unknown，可选择不累加或单独处理）
-#             if cate != 'unknown':
-#                 DiGraph[f][t][cate] += teu
-#             else:
-#                 print(f'⚠️ HSCode {hscode} 无对应类别，跳过')
-#                 count += 1
-#         print(count / MulGraph.number_of_edges())
-#         nx.write_graphml(DiGraph, dig_file)
-#         print(f'✅ 成功更新并保存：{dig_file}')
-#endregion
-
+write_weighted_dc_sorted_ports_by_time()
 
 def write_US_Top3_category():
     """
@@ -2524,9 +2471,124 @@ def draw_US_Top3_category_pie_chart():
             plt.tight_layout()
             plt.savefig(f"Figure/Season/USTop3/Category/{port} {season} Import Category Distribution", dpi=300)
             plt.show()
+
+
+
+
+#region 计算加权core number   算法太慢了，算不了，要优化
+# total_record = {}
+# in_record = {}
+# out_record = {}
+#
+# years = range(2017, 2022)
+# seasons = ['Spring','Summer','Autumn','Winter']
+# for year in years:
+#     for season in seasons:
+#         if year == 2021 and season == 'Summer':                 # 因为2021年的数据只到8月份
+#             continue
+#         file_path = f'../Data/{year}/US/Season/{season}/US{year}_{season}_Digraph.graphml'
+#         time = f"{year}_{season}"
+#         if not os.path.exists(file_path):
+#             print(f'⚠️ 文件不存在: {file_path}')
+#             continue
+#         DiGraph = nx.read_graphml(file_path)
+#
+#         print(f"{year}{season} loaded")
+#
+#         # 加权k-core
+#         k = 1
+#         core_number_dict = {}
+#         max_weight = max(dict(nx.degree(DiGraph, weight='volumeTEU')).values())
+#
+#         while k < max_weight + 2:
+#             k_core_total = weighted_k_core(DiGraph, k=k, degree_type='total')
+#             for node in k_core_total:
+#                 core_number_dict[node] = k
+#             k += 1
+#         total_record[time] = core_number_dict
+#         print(core_number_dict)
+#
+# pathlib.Path('InputData/ports_weighted_core_number_centrality.json').write_text(json.dumps(total_record, indent=2))
 #endregion
-
-
+#region给DiGraph添加商品种类信息
+# category_mapping = {
+#         'animal_plant': [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14],
+#         'grease': [15, 16, 17, 18, 19, 20, 21, 22, 23, 24],
+#         'minerals': [25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38],
+#         'rubber_plastics': [39, 40, 41, 42, 43],
+#         'pulpwood': [44, 45, 46, 47, 48, 49],
+#         'textile': [50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67],
+#         'metal': [71, 72, 73, 74, 75, 76, 77, 78, 79, 80, 81, 82, 83],
+#         'machinery': [84, 85, 86, 87, 88, 89],
+#         'precision_instrument': [90, 91, 92, 94, 95, 96],
+#         'special_other': [68, 69, 70, 93, 97, 98, 99]
+#     }
+# 创建反向映射：数字 -> 类别（提高查询效率）
+# number_to_category = {}
+# for category, numbers in category_mapping.items():
+#     for num in numbers:
+#         number_to_category[num] = category
+#         number_to_category[str(num)] = category  # 额外添加字符串键，避免KeyError
+#
+#
+# years = range(2017, 2022)
+# seasons = ['Spring','Summer','Autumn','Winter']
+# for year in years:
+#     for season in seasons:
+#         if year == 2021 and season == 'Summer':                 # 因为2021年的数据只到8月份
+#             continue
+#         # 读取MulGraph和DiGraph
+#         mul_file = f'../Data/{year}/US/Season/{season}/US{year}_{season}.graphml'
+#         dig_file = f'../Data/{year}/US/Season/{season}/US{year}_{season}_Digraph.graphml'
+#
+#         # 检查文件是否存在（合并检查，减少重复代码）
+#         if not (os.path.exists(mul_file) and os.path.exists(dig_file)):
+#             print(f'⚠️ 文件缺失：{mul_file} 或 {dig_file}')
+#             continue
+#
+#         MulGraph = nx.read_graphml(mul_file)
+#         DiGraph = nx.read_graphml(dig_file)
+#
+#
+#         count = 0
+#         # 先在DiGraph中创建相应的category
+#         for u,v,d in DiGraph.edges(data=True):
+#             for category_name in category_mapping.keys():
+#                 d[category_name] = 0
+#
+#         for f,t,data in MulGraph.edges(data=True):
+#             if not DiGraph.has_edge(f, t):
+#                 print("DiGraph中没有这条边")
+#                 count += 1
+#                 continue
+#                 # 处理HSCode：确保能映射到类别（捕获异常，避免程序中断）
+#             try:
+#                 hscode = data['HSCode']
+#                 # 若HSCode不在映射中，设为unknown（可选，根据需求调整）
+#                 cate = number_to_category.get(hscode, 'unknown')
+#             except KeyError:
+#                 print(f'⚠️ MulGraph边 ({f}, {t}) 无HSCode属性，跳过----{hscode}')
+#                 count += 1
+#                 continue
+#
+#             # 处理volumeTEU：确保是数值类型（避免字符串累加报错）
+#             try:
+#                 teu = float(data['volumeTEU'])
+#             except (KeyError, ValueError):
+#                 print(f'⚠️ MulGraph边 ({f}, {t}) 的volumeTEU无效，跳过')
+#                 count += 1
+#                 continue
+#
+#             # 累加TEU到对应类别（若为unknown，可选择不累加或单独处理）
+#             if cate != 'unknown':
+#                 DiGraph[f][t][cate] += teu
+#             else:
+#                 print(f'⚠️ HSCode {hscode} 无对应类别，跳过')
+#                 count += 1
+#         print(count / MulGraph.number_of_edges())
+#         nx.write_graphml(DiGraph, dig_file)
+#         print(f'✅ 成功更新并保存：{dig_file}')
+#endregion
 #region查看港口的商品种类TEU变化趋势图
 # file_path = "Figure/Season/US_Top3_category.json"
 # record = json.loads(pathlib.Path(file_path).read_text())
@@ -2593,8 +2655,6 @@ def draw_US_Top3_category_pie_chart():
 #     # plt.savefig(f'{port}_commodity_trend.png', dpi=300, bbox_inches='tight')
 #     plt.show()
 #endregion
-
-
 #region哪些节点
 # years = range(2017, 2022)
 # seasons = ['Spring', 'Summer', 'Autumn', 'Winter']
@@ -2629,7 +2689,6 @@ def draw_US_Top3_category_pie_chart():
 #     print('------------')
 #     print(k)
 #     print(list(v)[:5])
-
 #region标准世界地图模板
 # DiG = nx.read_graphml(f'../Data/2021/US/Season/Spring/US2021_Spring_Digraph.graphml')
 # # 2. 读港口坐标
@@ -2680,105 +2739,6 @@ def draw_US_Top3_category_pie_chart():
 # # 显示地图
 # plt.show()
 #endregion
-
-def draw_degree_distribution():
-    """
-    画度分布的图
-    :return:
-    """
-    years = range(2017, 2022)
-    seasons = ['Spring', 'Summer', 'Autumn', 'Winter']
-    # 读取数据并构建网络
-    for year in years:
-        for season in seasons:
-            # 跳过2021年夏季及以后（数据不全）
-            if year == 2021 and season in ['Summer', 'Autumn', 'Winter']:
-                continue
-            file_path = f'../Data/{year}/US/Season/{season}/US{year}_{season}_Digraph.graphml'
-            if not os.path.exists(file_path):
-                print(f'⚠️ 文件不存在: {file_path}')
-                continue
-            time = f"{year} {season}"
-            G = nx.Graph(nx.read_graphml(file_path))
-
-            # ----------------------
-            # 1. 计算度分布数据
-            # ----------------------
-            degrees = dict(G.degree())  # {节点: 度}
-            degree_counts = defaultdict(int)
-            for d in degrees.values():
-                degree_counts[d] += 1
-
-            degrees_sorted = sorted(degree_counts.keys())  # 排序的度数
-            counts = [degree_counts[d] for d in degrees_sorted]  # 对应节点数
-
-            # 计算频率（节点数/总节点数）
-            total_nodes = G.number_of_nodes()
-            frequencies = [count / total_nodes for count in counts]
-
-            # ----------------------
-            # 2. 双对数散点图 + 直线拟合
-            # ----------------------
-            plt.figure(figsize=(10, 6))
-
-            # 绘制双对数散点图
-            plt.loglog(
-                degrees_sorted,
-                frequencies,
-                marker='o',
-                linestyle='',
-                color='#d62728',
-                markersize=6,
-                alpha=0.8,
-                label='Ports'
-            )
-
-            # ----------------------
-            # 核心：线性回归拟合幂律直线
-            # ----------------------
-            # 对度数和频率取对数（避免log(0)，过滤掉频率为0的点）
-            log_degrees = np.log10(degrees_sorted)  # 底数为10的对数（也可用np.log自然对数）
-            log_frequencies = np.log10(frequencies)
-
-            # 线性回归（y = a*x + b，其中y=log(frequency), x=log(degree)）
-            slope, intercept, r_value, p_value, std_err = stats.linregress(log_degrees, log_frequencies)
-
-            # 生成拟合直线的预测值（用于绘图）
-            fit_line = 10 **(intercept + slope * log_degrees)  # 转换回原尺度（10^y）
-
-            # 绘制拟合直线
-            plt.loglog(
-                degrees_sorted,
-                fit_line,
-                linestyle='--',
-                color='black',
-                linewidth=2,
-                label=f'Fit: log(f) = {slope:.2f}*log(k) + {intercept:.2f}\nR² = {r_value**2:.4f}'
-            )
-
-            # ----------------------
-            # 美化与标注
-            # ----------------------
-            plt.xlabel('Degree', fontsize=12, fontweight='bold')
-            plt.ylabel('Frequency', fontsize=12, fontweight='bold')
-            plt.title(f'{time} degree distribution', fontsize=14, fontweight='bold', pad=15)
-            plt.xticks(fontsize=10)
-            plt.yticks(fontsize=10)
-            # plt.grid(True, which="both", linestyle='--', alpha=0.5)
-            plt.legend(fontsize=10, loc='upper right')  # 显示拟合公式和R²
-
-            plt.tight_layout()
-            plt.savefig(f'Figure/Season/DegreeDistribution/{time} degree distribution.png', dpi=300)
-            # plt.show()
-
-            # 输出拟合结果
-            print(f"幂律拟合结果：")
-            print(f"斜率（-γ）：{slope:.4f} → 幂指数 γ = { -slope:.4f}")
-            print(f"截距：{intercept:.4f}")
-            print(f"决定系数 R²：{r_value**2:.4f}（越接近1，拟合越好）")
-
-
-
 #region度分布 拟合有截止的度值
 # # 读取数据并构建网络
 # DiG = nx.read_graphml(f'../Data/2017/US/Season/Spring/US2017_Spring_Digraph.graphml')
@@ -2881,3 +2841,138 @@ def draw_degree_distribution():
 # else:
 #     print("没有度数≤100的节点，无法进行拟合。")
 #endregion
+
+
+def weighted_dc_and_weighted_bc():
+    """
+    加权dc和加权bc之间的关系
+    :return:
+    """
+    years = range(2017,2022)
+    seasons = ['Spring', 'Summer', 'Autumn', 'Winter']
+    for year in years:
+        for season in seasons:
+            # 跳过2021年夏季及以后（数据不全）
+            if year == 2021 and season in ['Summer', 'Autumn', 'Winter']:
+                continue
+            # 读取数据
+            try:
+                time_period = f"{year}_{season}"
+
+                # 读取度中心性和介数中心性数据
+                dc_path = pathlib.Path('InputData/ports_weighted_degree_centrality.json')
+                bc_path = pathlib.Path('InputData/ports_betweenness_centrality.json')
+
+                dc = json.loads(dc_path.read_text())
+                bc = json.loads(bc_path.read_text())
+
+
+                # 检查时间段是否存在
+                if time_period not in dc or time_period not in bc:
+                    raise ValueError(f"Time period {time_period} not found in data")
+
+                # 提取该时间段的港口数据
+                dc_data = dc[time_period]
+                bc_data = bc[time_period]
+
+                # 获取共同港口
+                common_ports = set(dc_data.keys()) & set(bc_data.keys())
+                if not common_ports:
+                    raise ValueError(f"No common ports found in {time_period}")
+
+                # 设置绘图风格
+                plt.style.use('seaborn-v0_8-notebook')
+                plt.figure(figsize=(12, 8))
+
+                # 存储所有数据点用于后续范围调整
+                all_dc = []
+                all_bc = []
+
+                # 绘制每个港口的散点（提高透明度：alpha从0.7→0.9）
+                for port in common_ports:
+                    try:
+                        # 提取度中心性(dc)和介数中心性(bc)值
+                        dc_val = dc_data[port]['dc']  # 度中心性值（横坐标）
+                        bc_val = bc_data[port]  # 介数中心性值（纵坐标）
+
+                        # 绘制散点：提高透明度（alpha=0.9），增强节点可见性
+                        plt.scatter(
+                            dc_val, bc_val,
+                            s=60,
+                            alpha=0.9,  # 透明度提高（0→完全透明，1→完全不透明）
+                            color='steelblue',
+                            edgecolors='k',
+                            linewidth=0.8  # 略微加粗边框，与高透明度匹配
+                        )
+
+                        # 记录所有值用于调整坐标轴范围
+                        all_dc.append(dc_val)
+                        all_bc.append(bc_val)
+
+                        # 横坐标>1000 或 纵坐标>0.075 时添加标签
+                        if dc_val > 1000 or bc_val > 0.075:
+                            # 计算标签偏移量（根据数据范围动态调整，确保偏移明显）
+                            x_offset = (max(all_dc) - min(all_dc)) * 0.01 if all_dc else 50
+                            y_offset = (max(all_bc) - min(all_bc)) * 0.01 if all_bc else 0.005
+
+                            # 确定标签位置（增大偏移距离）
+                            if dc_val > 1000:
+                                # 横坐标大的点，标签向左偏移
+                                text_x = dc_val - x_offset
+                                ha = 'right'
+                            else:
+                                # 横坐标小的点，标签向右偏移
+                                text_x = dc_val + x_offset
+                                ha = 'left'
+
+                            if bc_val > 0.075:
+                                # 纵坐标大的点，标签向下偏移
+                                text_y = bc_val - y_offset
+                                va = 'top'
+                            else:
+                                # 纵坐标小的点，标签向上偏移
+                                text_y = bc_val + y_offset
+                                va = 'bottom'
+
+                            # 添加标签（带偏移）
+                            plt.text(
+                                text_x, text_y,  # 偏移后的位置
+                                port,
+                                fontsize=9,
+                                ha=ha,
+                                va=va,
+                                bbox=dict(facecolor='white', alpha=0.8, boxstyle='round,pad=0.3')  # 标签背景略加深
+                            )
+
+                    except KeyError as e:
+                        print(f"Warning: Port {port} missing field {e}, skipped")
+                    except Exception as e:
+                        print(f"Error processing port {port}: {e}, skipped")
+
+                # 设置标题和坐标轴标签（英文）
+                plt.title(f'Distribution of Weighted Degree Centrality and Betweenness Centrality ({time_period})',
+                          fontsize=14, pad=20)
+                plt.xlabel('Weighted Degree Centrality', fontsize=12, labelpad=10)
+                plt.ylabel('Betweenness Centrality', fontsize=12, labelpad=10)
+
+                # 添加网格线
+                plt.grid(True, linestyle='--', alpha=0.5)
+
+                # 调整坐标轴范围（留一定余量）
+                x_margin = (max(all_dc) - min(all_dc)) * 0.1 if all_dc else 100
+                y_margin = (max(all_bc) - min(all_bc)) * 0.1 if all_bc else 0.01
+                plt.xlim(min(all_dc) - x_margin, max(all_dc) + x_margin)
+                plt.ylim(min(all_bc) - y_margin, max(all_bc) + y_margin)
+
+                # 调整布局
+                plt.tight_layout()
+                plt.savefig(f'Figure/Season/Centrality/Distribution of Weighted Degree Centrality and Betweenness Centrality {time_period}', dpi=300)
+                # 显示图像
+                # plt.show()
+
+            except FileNotFoundError as e:
+                print(f"Error: File not found - {e}")
+            except json.JSONDecodeError:
+                print("Error: Invalid JSON format in files")
+            except Exception as e:
+                print(f"An error occurred: {e}")
