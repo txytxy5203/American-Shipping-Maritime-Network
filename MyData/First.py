@@ -453,8 +453,6 @@ def draw_length_efficiency_picture():
 #endregion
 
 
-
-
 #regionNetwork Structure
 def draw_degree_distribution():
     """
@@ -544,6 +542,111 @@ def draw_degree_distribution():
 
             plt.tight_layout()
             plt.savefig(f'Figure/Season/DegreeDistribution/{time} degree distribution.png', dpi=300)
+            # plt.show()
+
+            # 输出拟合结果
+            print(f"幂律拟合结果：")
+            print(f"斜率（-γ）：{slope:.4f} → 幂指数 γ = { -slope:.4f}")
+            print(f"截距：{intercept:.4f}")
+            print(f"决定系数 R²：{r_value**2:.4f}（越接近1，拟合越好）")
+def draw_in_degree_distribution():
+    """
+    入度分布  出度分布
+    :return:
+    """
+    degree_type = 'out'  # 出度 or 入度
+    years = range(2017, 2022)
+    seasons = ['Spring', 'Summer', 'Autumn', 'Winter']
+    # 读取数据并构建网络
+    for year in years:
+        for season in seasons:
+            # 跳过2021年夏季及以后（数据不全）
+            if year == 2021 and season in ['Summer', 'Autumn', 'Winter']:
+                continue
+            file_path = f'../Data/{year}/US/Season/{season}/US{year}_{season}_Digraph.graphml'
+            if not os.path.exists(file_path):
+                print(f'⚠️ 文件不存在: {file_path}')
+                continue
+            time = f"{year} {season}"
+            G = nx.read_graphml(file_path)
+
+            # ----------------------
+            # 1. 计算度分布数据
+            # ----------------------
+            if degree_type == 'in':
+                degrees = dict(G.in_degree())  # {节点: 度}
+            elif degree_type == 'out':
+                degrees = dict(G.out_degree())
+            else:
+                print("degree_type写错了")
+
+            # 关键修改：过滤掉度数为0的节点
+            non_zero_degrees = {node: d for node, d in degrees.items() if d > 0}
+
+            degree_counts = defaultdict(int)
+            for d in non_zero_degrees.values():
+                degree_counts[d] += 1
+
+            # 排序并过滤掉度数为0的项（即使有也排除）
+            degrees_sorted = [d for d in sorted(degree_counts.keys()) if d > 0]
+            counts = [degree_counts[d] for d in degrees_sorted]  # 对应节点数
+
+            # 计算频率（节点数/总节点数）
+            total_non_zero_nodes = len(non_zero_degrees)
+            frequencies = [count / total_non_zero_nodes for count in counts]
+
+            # ----------------------
+            # 2. 双对数散点图 + 直线拟合
+            # ----------------------
+            plt.figure(figsize=(10, 6))
+
+            # 绘制双对数散点图
+            plt.loglog(
+                degrees_sorted,
+                frequencies,
+                marker='o',
+                linestyle='',
+                color='#d62728',
+                markersize=6,
+                alpha=0.8,
+                label='Ports'
+            )
+
+            # ----------------------
+            # 核心：线性回归拟合幂律直线
+            # ----------------------
+            # 对度数和频率取对数（避免log(0)，过滤掉频率为0的点）
+            log_degrees = np.log10(degrees_sorted)  # 底数为10的对数（也可用np.log自然对数）
+            log_frequencies = np.log10(frequencies)
+
+            # 线性回归（y = a*x + b，其中y=log(frequency), x=log(degree)）
+            slope, intercept, r_value, p_value, std_err = stats.linregress(log_degrees, log_frequencies)
+
+            # 生成拟合直线的预测值（用于绘图）
+            fit_line = 10 **(intercept + slope * log_degrees)  # 转换回原尺度（10^y）
+
+            # 绘制拟合直线
+            plt.loglog(
+                degrees_sorted,
+                fit_line,
+                linestyle='--',
+                color='black',
+                linewidth=2,
+                label=f'Fit: log(f) = {slope:.2f}*log(k) + {intercept:.2f}\nR² = {r_value**2:.4f}'
+            )
+
+            # ----------------------
+            # 美化与标注
+            # ----------------------
+            plt.xlabel('Degree', fontsize=12, fontweight='bold')
+            plt.ylabel('Frequency', fontsize=12, fontweight='bold')
+            plt.title(f'{time} {degree_type} degree distribution', fontsize=14, fontweight='bold', pad=15)
+            plt.xticks(fontsize=10)
+            plt.yticks(fontsize=10)
+            plt.legend(fontsize=10, loc='upper right')  # 显示拟合公式和R²
+
+            plt.tight_layout()
+            plt.savefig(f'Figure/Season/DegreeDistribution/{degree_type} degree/{time} {degree_type} degree distribution.png', dpi=300)
             # plt.show()
 
             # 输出拟合结果
@@ -1896,7 +1999,7 @@ def physical_network_layer():
     pathlib.Path('InputData/ports_degree_centrality.json').write_text(json.dumps(dc_record, indent=2))
     pathlib.Path('InputData/ports_betweenness_centrality.json').write_text(json.dumps(bc_record, indent=2))
     pathlib.Path('InputData/ports_closeness_centrality.json').write_text(json.dumps(cc_record, indent=2))
-    pathlib.Path('InputData/ports_core_number_centrality.json').write_text(json.dumps(record, indent=2))
+    pathlib.Path('InputData/ports_core_number_centrality.json').write_text(json.dumps(core_number_record, indent=2))
 def freight_traffic_network_layer():
     """
     考虑一个DiGraph网络  权重为TEU
@@ -3130,109 +3233,123 @@ def draw_US_Top3_category_pie_chart():
 # plt.show()
 #endregion
 
-
-def draw_in_degree_distribution():
-    """
-    入度分布  出度分布
-    :return:
-    """
-    degree_type = 'out'  # 出度 or 入度
+def draw_avg_degree_and_avg_strength_time_series():
+    # 存储结果：键为时间（如"2017 Spring"），值为(平均度, 平均加权度)
+    result = {}
     years = range(2017, 2022)
     seasons = ['Spring', 'Summer', 'Autumn', 'Winter']
-    # 读取数据并构建网络
+
+    # 读取数据并计算指标
     for year in years:
         for season in seasons:
-            # 跳过2021年夏季及以后（数据不全）
+            # 跳过2021年夏季及以后
             if year == 2021 and season in ['Summer', 'Autumn', 'Winter']:
                 continue
             file_path = f'../Data/{year}/US/Season/{season}/US{year}_{season}_Digraph.graphml'
             if not os.path.exists(file_path):
                 print(f'⚠️ 文件不存在: {file_path}')
                 continue
+
             time = f"{year} {season}"
-            G = nx.read_graphml(file_path)
+            DiG = nx.read_graphml(file_path)  # 保留有向图
+            n = DiG.number_of_nodes()
+            m = DiG.number_of_edges()
 
-            # ----------------------
-            # 1. 计算度分布数据
-            # ----------------------
-            if degree_type == 'in':
-                degrees = dict(G.in_degree())  # {节点: 度}
-            elif degree_type == 'out':
-                degrees = dict(G.out_degree())
-            else:
-                print("degree_type写错了")
+            avg_degree = 2 * m / n
 
-            # 关键修改：过滤掉度数为0的节点
-            non_zero_degrees = {node: d for node, d in degrees.items() if d > 0}
+            # 2. 计算平均强度（total_TEU的平均值）
+            total_strength = 0.0
+            for node_id, node_attrs in DiG.nodes(data=True):  # 正确解析节点属性
+                # 安全获取属性，处理缺失值
+                teu = node_attrs.get('total_TEU', 0.0)
+                try:
+                    total_strength += float(teu)
+                except ValueError:
+                    # 处理属性值无法转换为float的情况（如非数值字符串）
+                    print(f"⚠️ {time} 节点 {node_id} 的 total_TEU 格式错误，跳过")
+                    continue
+            avg_strength = total_strength / n
+            print(f"{time} - 平均总度数: {avg_degree:.2f}, 平均TEU强度: {avg_strength:.2f}")
 
-            degree_counts = defaultdict(int)
-            for d in non_zero_degrees.values():
-                degree_counts[d] += 1
+            # 存储结果
+            result[time] = (avg_degree, avg_strength)
 
-            # 排序并过滤掉度数为0的项（即使有也排除）
-            degrees_sorted = [d for d in sorted(degree_counts.keys()) if d > 0]
-            counts = [degree_counts[d] for d in degrees_sorted]  # 对应节点数
+    time_list = list(result.keys())
+    # 绘制趋势图
+    # 4. 创建画布和坐标轴
+    fig, ax1 = plt.subplots(figsize=(12, 6))  # 宽12英寸，高6英寸
+    # 2. 创建右侧Y轴（与左侧Y轴共享X轴，实现双轴对齐）
+    ax2 = ax1.twinx()  # 关键：生成与ax1共享X轴的第二个Y轴
 
-            # 计算频率（节点数/总节点数）
-            total_non_zero_nodes = len(non_zero_degrees)
-            frequencies = [count / total_non_zero_nodes for count in counts]
+    # 平均度曲线
+    ax1.plot(
+        time_list,
+        [value[0] for key,value in result.items()],
+        marker='o',
+        linestyle='-',
+        color='#1f77b4',
+        label='Average Degree'
+    )
 
-            # ----------------------
-            # 2. 双对数散点图 + 直线拟合
-            # ----------------------
-            plt.figure(figsize=(10, 6))
+    # 平均加权度曲线
+    ax2.plot(
+        time_list,
+        [value[1] for key,value in result.items()],
+        marker='s',
+        linestyle='-',
+        color='#ff7f0e',
+        label='Average Weighted Degree'
+    )
 
-            # 绘制双对数散点图
-            plt.loglog(
-                degrees_sorted,
-                frequencies,
-                marker='o',
-                linestyle='',
-                color='#d62728',
-                markersize=6,
-                alpha=0.8,
-                label='Ports'
-            )
+    # 美化图表
+    ax1.set_xlabel('Time', fontsize=12, fontweight='bold')
+    ax1.set_ylabel('Degree',  # 左侧Y轴标签（明确对应Nodes）
+                   color='#1f77b4',  # 标签颜色与线条颜色一致
+                   fontsize=12,
+                   fontweight='bold')
+    ax1.tick_params(axis='y',  # 左侧Y轴刻度设置
+                    labelsize=10)  # 刻度文字大小
+    # -------------------------- 右侧Y轴（ax2）设置 --------------------------
+    ax2.set_ylabel('Number of Edges',  # 右侧Y轴标签（明确对应Edges）
+                   color='#ff7f0e',  # 标签颜色与线条颜色一致
+                   fontsize=12,
+                   fontweight='bold')
+    ax2.tick_params(axis='y',  # 右侧Y轴刻度设置
+                    labelsize=10)  # 刻度文字大小
+    # -------------------------- 标题与X轴刻度 --------------------------
+    ax1.set_title(
+        'Changes in the average degree and average strength in the Network Over Time',
+        fontsize=14,
+        fontweight='bold',
+        pad=20  # 标题与图表的间距（避免拥挤）
+    )
+    ax1.tick_params(axis='x', rotation=45)  # X轴时间标签旋转45度，避免文字重叠
 
-            # ----------------------
-            # 核心：线性回归拟合幂律直线
-            # ----------------------
-            # 对度数和频率取对数（避免log(0)，过滤掉频率为0的点）
-            log_degrees = np.log10(degrees_sorted)  # 底数为10的对数（也可用np.log自然对数）
-            log_frequencies = np.log10(frequencies)
+    # -------------------------- 6. 合并双轴图例（关键：避免图例重复） --------------------------
+    # 提取左右轴的图例，合并为一个（放在图表右侧，不遮挡数据）
+    lines1, labels1 = ax1.get_legend_handles_labels()  # 左侧轴图例
+    lines2, labels2 = ax2.get_legend_handles_labels()  # 右侧轴图例
+    ax1.legend(
+        lines1 + lines2,  # 合并图例线条
+        labels1 + labels2,  # 合并图例文字
+        fontsize=11,
+        loc='upper left',  # 图例位置（右上，不遮挡数据）
+        frameon=True,  # 显示图例边框
+        fancybox=True,  # 边框圆角
+        shadow=True  # 边框阴影（更立体）
+    )
 
-            # 线性回归（y = a*x + b，其中y=log(frequency), x=log(degree)）
-            slope, intercept, r_value, p_value, std_err = stats.linregress(log_degrees, log_frequencies)
+    # -------------------------- 7. 调整布局与保存 --------------------------
+    # 自动调整布局（避免标签、图例被截断）
+    plt.tight_layout()
 
-            # 生成拟合直线的预测值（用于绘图）
-            fit_line = 10 **(intercept + slope * log_degrees)  # 转换回原尺度（10^y）
+    # 保存图片（dpi=300为高清，bbox_inches='tight'避免裁剪边缘）
+    plt.savefig(
+        'Figure/Season/avg_degree_and_avg_strength_time_series.png',
+        dpi=300,
+        bbox_inches='tight',
+        facecolor='white'  # 背景色为白色（避免保存后背景透明）
+    )
 
-            # 绘制拟合直线
-            plt.loglog(
-                degrees_sorted,
-                fit_line,
-                linestyle='--',
-                color='black',
-                linewidth=2,
-                label=f'Fit: log(f) = {slope:.2f}*log(k) + {intercept:.2f}\nR² = {r_value**2:.4f}'
-            )
-
-            # ----------------------
-            # 美化与标注
-            # ----------------------
-            plt.xlabel('Degree', fontsize=12, fontweight='bold')
-            plt.ylabel('Frequency', fontsize=12, fontweight='bold')
-            plt.title(f'{time} {degree_type} degree distribution', fontsize=14, fontweight='bold', pad=15)
-            plt.xticks(fontsize=10)
-            plt.yticks(fontsize=10)
-            plt.legend(fontsize=10, loc='upper right')  # 显示拟合公式和R²
-
-            plt.tight_layout()
-            plt.savefig(f'Figure/Season/DegreeDistribution/{degree_type} degree/{time} {degree_type} degree distribution.png', dpi=300)
-            # plt.show()
-
-            # 输出拟合结果
-            print(f"幂律拟合结果：")
-            print(f"斜率（-γ）：{slope:.4f} → 幂指数 γ = { -slope:.4f}")
-            print(f"截距：{intercept:.4f}")
-            print(f"决定系数 R²：{r_value**2:.4f}（越接近1，拟合越好）")
+    # 显示图表（运行时弹出窗口）
+    plt.show()
