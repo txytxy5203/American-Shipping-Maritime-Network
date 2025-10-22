@@ -1255,6 +1255,126 @@ def draw_avg_length_efficiency_time_series():
     )
     # 显示图表（运行时弹出窗口）
     plt.show()
+def draw_avg_degree_and_avg_strength_time_series():
+    # 存储结果：键为时间（如"2017 Spring"），值为(平均度, 平均加权度)
+    result = {}
+    years = range(2017, 2022)
+    seasons = ['Spring', 'Summer', 'Autumn', 'Winter']
+
+    # 读取数据并计算指标
+    for year in years:
+        for season in seasons:
+            # 跳过2021年夏季及以后
+            if year == 2021 and season in ['Summer', 'Autumn', 'Winter']:
+                continue
+            file_path = f'../Data/{year}/US/Season/{season}/US{year}_{season}_Digraph.graphml'
+            if not os.path.exists(file_path):
+                print(f'⚠️ 文件不存在: {file_path}')
+                continue
+
+            time = f"{year} {season}"
+            DiG = nx.read_graphml(file_path)  # 保留有向图
+            n = DiG.number_of_nodes()
+            m = DiG.number_of_edges()
+
+            avg_degree = 2 * m / n
+
+            # 2. 计算平均强度（total_TEU的平均值）
+            total_strength = 0.0
+            for node_id, node_attrs in DiG.nodes(data=True):  # 正确解析节点属性
+                # 安全获取属性，处理缺失值
+                teu = node_attrs.get('total_TEU', 0.0)
+                try:
+                    total_strength += float(teu)
+                except ValueError:
+                    # 处理属性值无法转换为float的情况（如非数值字符串）
+                    print(f"⚠️ {time} 节点 {node_id} 的 total_TEU 格式错误，跳过")
+                    continue
+            avg_strength = total_strength / n
+            print(f"{time} - 平均总度数: {avg_degree:.2f}, 平均TEU强度: {avg_strength:.2f}")
+
+            # 存储结果
+            result[time] = (avg_degree, avg_strength)
+
+    time_list = list(result.keys())
+    # 绘制趋势图
+    # 4. 创建画布和坐标轴
+    fig, ax1 = plt.subplots(figsize=(12, 6))  # 宽12英寸，高6英寸
+    # 2. 创建右侧Y轴（与左侧Y轴共享X轴，实现双轴对齐）
+    ax2 = ax1.twinx()  # 关键：生成与ax1共享X轴的第二个Y轴
+
+    # 平均度曲线
+    ax1.plot(
+        time_list,
+        [value[0] for key,value in result.items()],
+        marker='o',
+        linestyle='-',
+        color='#1f77b4',
+        label='Average Degree'
+    )
+
+    # 平均加权度曲线
+    ax2.plot(
+        time_list,
+        [value[1] for key,value in result.items()],
+        marker='s',
+        linestyle='-',
+        color='#ff7f0e',
+        label='Average Weighted Degree'
+    )
+
+    # 美化图表
+    ax1.set_xlabel('Time', fontsize=12, fontweight='bold')
+    ax1.set_ylabel('Degree',  # 左侧Y轴标签（明确对应Nodes）
+                   color='#1f77b4',  # 标签颜色与线条颜色一致
+                   fontsize=12,
+                   fontweight='bold')
+    ax1.tick_params(axis='y',  # 左侧Y轴刻度设置
+                    labelsize=10)  # 刻度文字大小
+    # -------------------------- 右侧Y轴（ax2）设置 --------------------------
+    ax2.set_ylabel('Number of Edges',  # 右侧Y轴标签（明确对应Edges）
+                   color='#ff7f0e',  # 标签颜色与线条颜色一致
+                   fontsize=12,
+                   fontweight='bold')
+    ax2.tick_params(axis='y',  # 右侧Y轴刻度设置
+                    labelsize=10)  # 刻度文字大小
+    # -------------------------- 标题与X轴刻度 --------------------------
+    ax1.set_title(
+        'Changes in the average degree and average strength in the Network Over Time',
+        fontsize=14,
+        fontweight='bold',
+        pad=20  # 标题与图表的间距（避免拥挤）
+    )
+    ax1.tick_params(axis='x', rotation=45)  # X轴时间标签旋转45度，避免文字重叠
+
+    # -------------------------- 6. 合并双轴图例（关键：避免图例重复） --------------------------
+    # 提取左右轴的图例，合并为一个（放在图表右侧，不遮挡数据）
+    lines1, labels1 = ax1.get_legend_handles_labels()  # 左侧轴图例
+    lines2, labels2 = ax2.get_legend_handles_labels()  # 右侧轴图例
+    ax1.legend(
+        lines1 + lines2,  # 合并图例线条
+        labels1 + labels2,  # 合并图例文字
+        fontsize=11,
+        loc='upper left',  # 图例位置（右上，不遮挡数据）
+        frameon=True,  # 显示图例边框
+        fancybox=True,  # 边框圆角
+        shadow=True  # 边框阴影（更立体）
+    )
+
+    # -------------------------- 7. 调整布局与保存 --------------------------
+    # 自动调整布局（避免标签、图例被截断）
+    plt.tight_layout()
+
+    # 保存图片（dpi=300为高清，bbox_inches='tight'避免裁剪边缘）
+    plt.savefig(
+        'Figure/Season/avg_degree_and_avg_strength_time_series.png',
+        dpi=300,
+        bbox_inches='tight',
+        facecolor='white'  # 背景色为白色（避免保存后背景透明）
+    )
+
+    # 显示图表（运行时弹出窗口）
+    plt.show()
 def draw_total_teu():
     """
     画出总的TEU变化图
@@ -3233,13 +3353,19 @@ def draw_US_Top3_category_pie_chart():
 # plt.show()
 #endregion
 
-def draw_avg_degree_and_avg_strength_time_series():
-    # 存储结果：键为时间（如"2017 Spring"），值为(平均度, 平均加权度)
+def draw_degree_strength_std_time_series():
+    """
+    度值与强度的  标准差
+    :return:
+    """
+    # 存储结果：键为时间，值为(平均度, 度的标准差, 平均强度, 强度的标准差)
     result = {}
     years = range(2017, 2022)
     seasons = ['Spring', 'Summer', 'Autumn', 'Winter']
 
-    # 读取数据并计算指标
+    # 存储原始遍历顺序的时间列表
+    time_list = []
+
     for year in years:
         for season in seasons:
             # 跳过2021年夏季及以后
@@ -3252,104 +3378,113 @@ def draw_avg_degree_and_avg_strength_time_series():
 
             time = f"{year} {season}"
             DiG = nx.read_graphml(file_path)  # 保留有向图
-            n = DiG.number_of_nodes()
+            nodes = list(DiG.nodes())
+            n = len(nodes)
+            if n < 2:  # 至少2个节点才能计算标准差
+                print(f'⚠️ {time} 节点数不足（{n}个），无法计算统计量')
+                continue
             m = DiG.number_of_edges()
 
-            avg_degree = 2 * m / n
+            degrees = []
+            for node in nodes:
+                in_deg = DiG.in_degree(node)
+                out_deg = DiG.out_degree(node)
+                degrees.append(in_deg + out_deg)
 
-            # 2. 计算平均强度（total_TEU的平均值）
-            total_strength = 0.0
-            for node_id, node_attrs in DiG.nodes(data=True):  # 正确解析节点属性
-                # 安全获取属性，处理缺失值
+            deg_std = np.std(degrees, ddof=0)  # 度的样本标准差
+
+            strengths = []
+            for node_id, node_attrs in DiG.nodes(data=True):
                 teu = node_attrs.get('total_TEU', 0.0)
                 try:
-                    total_strength += float(teu)
+                    strengths.append(float(teu))
                 except ValueError:
-                    # 处理属性值无法转换为float的情况（如非数值字符串）
-                    print(f"⚠️ {time} 节点 {node_id} 的 total_TEU 格式错误，跳过")
-                    continue
-            avg_strength = total_strength / n
-            print(f"{time} - 平均总度数: {avg_degree:.2f}, 平均TEU强度: {avg_strength:.2f}")
+                    print(f"⚠️ {time} 节点 {node_id} 的 total_TEU 格式错误，按0处理")
+                    strengths.append(0.0)
 
-            # 存储结果
-            result[time] = (avg_degree, avg_strength)
+            if len(strengths) < 2:
+                print(f'⚠️ {time} 有效强度数据不足，无法计算标准差')
+                continue
 
-    time_list = list(result.keys())
-    # 绘制趋势图
-    # 4. 创建画布和坐标轴
-    fig, ax1 = plt.subplots(figsize=(12, 6))  # 宽12英寸，高6英寸
-    # 2. 创建右侧Y轴（与左侧Y轴共享X轴，实现双轴对齐）
-    ax2 = ax1.twinx()  # 关键：生成与ax1共享X轴的第二个Y轴
+            strength_std = np.std(strengths, ddof=0)  # 强度的总体标准差 ddof=0
 
-    # 平均度曲线
+            result[time] = (deg_std, strength_std)
+            time_list.append(time)
+
+    # 提取数据（按原始时间顺序）
+    deg_std_list = [result[t][0] for t in time_list]
+    strength_std_list = [result[t][1] for t in time_list]
+
+    # 绘制双轴图表（左侧：度相关，右侧：强度相关）
+    fig, ax1 = plt.subplots(figsize=(14, 7))
+    ax2 = ax1.twinx()
+
+    # 度的标准差曲线
     ax1.plot(
         time_list,
-        [value[0] for key,value in result.items()],
+        deg_std_list,
         marker='o',
         linestyle='-',
         color='#1f77b4',
-        label='Average Degree'
+        linewidth=2.5,
+        markersize=7,
+        label='Degree Std Dev'
     )
 
-    # 平均加权度曲线
+    # 强度的标准差曲线
     ax2.plot(
         time_list,
-        [value[1] for key,value in result.items()],
+        strength_std_list,
         marker='s',
-        linestyle='-',
+        linestyle='--',
         color='#ff7f0e',
-        label='Average Weighted Degree'
+        linewidth=2.5,
+        markersize=7,
+        label='Strength Std Dev'
     )
 
     # 美化图表
     ax1.set_xlabel('Time', fontsize=12, fontweight='bold')
-    ax1.set_ylabel('Degree',  # 左侧Y轴标签（明确对应Nodes）
-                   color='#1f77b4',  # 标签颜色与线条颜色一致
+    ax1.set_ylabel('Degree Metrics',
+                   color='#1f77b4',
                    fontsize=12,
                    fontweight='bold')
-    ax1.tick_params(axis='y',  # 左侧Y轴刻度设置
-                    labelsize=10)  # 刻度文字大小
-    # -------------------------- 右侧Y轴（ax2）设置 --------------------------
-    ax2.set_ylabel('Number of Edges',  # 右侧Y轴标签（明确对应Edges）
-                   color='#ff7f0e',  # 标签颜色与线条颜色一致
+    ax1.tick_params(axis='y', labelsize=10)
+
+    ax2.set_ylabel('TEU Strength Metrics',
+                   color='#ff7f0e',
                    fontsize=12,
                    fontweight='bold')
-    ax2.tick_params(axis='y',  # 右侧Y轴刻度设置
-                    labelsize=10)  # 刻度文字大小
-    # -------------------------- 标题与X轴刻度 --------------------------
+    ax2.tick_params(axis='y', labelsize=10)
+
     ax1.set_title(
-        'Changes in the average degree and average strength in the Network Over Time',
+        'Degree and Strength Std Dev Over Time',
         fontsize=14,
         fontweight='bold',
-        pad=20  # 标题与图表的间距（避免拥挤）
+        pad=20
     )
-    ax1.tick_params(axis='x', rotation=45)  # X轴时间标签旋转45度，避免文字重叠
+    ax1.tick_params(axis='x', rotation=45)  # X轴标签旋转对齐
 
-    # -------------------------- 6. 合并双轴图例（关键：避免图例重复） --------------------------
-    # 提取左右轴的图例，合并为一个（放在图表右侧，不遮挡数据）
-    lines1, labels1 = ax1.get_legend_handles_labels()  # 左侧轴图例
-    lines2, labels2 = ax2.get_legend_handles_labels()  # 右侧轴图例
+    # 合并所有图例
+    lines1, labels1 = ax1.get_legend_handles_labels()
+    lines2, labels2 = ax2.get_legend_handles_labels()
     ax1.legend(
-        lines1 + lines2,  # 合并图例线条
-        labels1 + labels2,  # 合并图例文字
-        fontsize=11,
-        loc='upper left',  # 图例位置（右上，不遮挡数据）
-        frameon=True,  # 显示图例边框
-        fancybox=True,  # 边框圆角
-        shadow=True  # 边框阴影（更立体）
+        lines1 + lines2,
+        labels1 + labels2,
+        fontsize=10,
+        loc='upper left',
+        frameon=True,
+        fancybox=True
     )
 
-    # -------------------------- 7. 调整布局与保存 --------------------------
-    # 自动调整布局（避免标签、图例被截断）
     plt.tight_layout()
 
-    # 保存图片（dpi=300为高清，bbox_inches='tight'避免裁剪边缘）
+    # 保存图片
     plt.savefig(
-        'Figure/Season/avg_degree_and_avg_strength_time_series.png',
+        'Figure/Season/degree_strength_std_time_series.png',
         dpi=300,
         bbox_inches='tight',
-        facecolor='white'  # 背景色为白色（避免保存后背景透明）
+        facecolor='white'
     )
 
-    # 显示图表（运行时弹出窗口）
     plt.show()
