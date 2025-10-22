@@ -12,6 +12,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 from mpl_toolkits.basemap import Basemap
 from scipy.special import comb
+from networkx.algorithms import community
+from networkx.algorithms.assortativity import degree_assortativity_coefficient
 from Algorithm.ConstructNetwork import ConstructNetwork
 from Algorithm.Read import Read
 from collections import Counter
@@ -809,6 +811,10 @@ def all_in_one(g, year, season) -> dict:
     std_degrees = np.std(degrees_list, ddof=0)
     homogeneity = 1 - std_degrees / avg_degrees                             # 结构同质性
 
+    # 同配性
+    # 计算无向图的度数同配性
+    assort_degree = degree_assortativity_coefficient(g)
+
 
     strength_TEU = {n : 0.0 for n in g.nodes}                   # 存放每个节点的TEU强度
     # 遍历图（主循环）
@@ -836,7 +842,8 @@ def all_in_one(g, year, season) -> dict:
         "entropy": entropy,
         "density": density,
         "spectral_radius": spectral_radius,
-        "mcc_sizes": mcc_sizes
+        "mcc_sizes": mcc_sizes,
+        "assortativity_coefficient": assort_degree
     }
 def write_nm_zero_model_all_in_one():
     """
@@ -1951,7 +1958,7 @@ def write_weighted_bc_sorted_ports_by_time():
     生成根据 加权bc值的大小 的港口排序
     :return:
     """
-    ile_path = 'InputData/ports_weighted_betweenness_centrality.json'
+    file_path = 'InputData/ports_weighted_pagerank_scores.json'
     degree_centrality = json.loads(pathlib.Path(file_path).read_text())
     # 1. 对每个时间段的港口按dc降序排序，提取港口名称列表
     sorted_ports_by_time = {}
@@ -1969,7 +1976,7 @@ def write_weighted_bc_sorted_ports_by_time():
     # 4. 转为DataFrame，行索引设为排名（1开始）
     df = pd.DataFrame(rank_data, index=range(1, max_rank + 1))
     # 5. 保存为CSV（index_label='排名'，明确行含义）
-    df.to_csv(f'Figure/Season/weighted_bc_sorted_ports_by_time.csv', index_label='排名')
+    df.to_csv(f'Figure/Season/weighted_pagerank_scores_sorted_ports_by_time.csv', index_label='排名')
 def draw_USLSA_USLGB_USNWK_weighted_degree_centrality_trend_chart():
     """
     美国这三个港口的加权中心性变化趋势图
@@ -2508,7 +2515,6 @@ def draw_weighted_dc_and_weighted_bc():
 # plt.show()
 #endregion
 #endregion
-write_weighted_dc_sorted_ports_by_time()
 
 def write_US_Top3_category():
     """
@@ -2997,6 +3003,128 @@ def draw_US_Top3_category_pie_chart():
 # else:
 #     print("没有度数≤100的节点，无法进行拟合。")
 #endregion
+#region根据社团检测的结果画图
+# # 1. 读取图数据并进行社团检测
+# DiG = nx.read_graphml('../Data/2017/US/Season/Spring/US2017_Spring_Digraph.graphml')
+# # 计算有向模块度并划分社团（weight指定边权重属性）
+#
+#
+#
+# # 2. 读取港口坐标（保持原过滤条件）
+# Port_Data = ConstructNetwork.Read_Port_Data()
+# port_coords = {
+#     node: (float(Port_Data[node]["longitude"]), float(Port_Data[node]["latitude"]))
+#     for node in G.nodes()
+#     if "longitude" in Port_Data[node]
+#        and "latitude" in Port_Data[node]
+#        and G.nodes[node].get('total_TEU', 0) > 1000
+# }
+#
+# # 3. 高饱和度配色方案（鲜艳醒目，对比度强）
+# color_palette = [
+#     '#E74C3C',  # 鲜红色
+#     '#3498DB',  # 深蓝色
+#     '#2ECC71',  # 翠绿色
+#     '#F39C12',  # 橙色
+#     '#9B59B6',  # 深紫色
+#     '#1ABC9C',  # 青绿色
+#     '#E67E22',  # 深橙色
+#     '#8E44AD',  # 暗紫色
+#     '#34495E',  # 深蓝色
+#     '#D35400'   # 赭红色
+# ]
+#
+# # 如果社团数量超过配色数量，循环使用配色（避免颜色重复过多）
+# community_colors = [color_palette[i % len(color_palette)] for i in range(num_communities)]
+#
+# # 4. 港口-社团映射
+# port_community = {}
+# for comm_idx, comm in enumerate(comms_list):
+#     for port in comm:
+#         if port in port_coords:
+#             port_community[port] = comm_idx
+#
+# # 5. 绘制地图（沿用你的模板）
+# fig, ax = plt.subplots(figsize=(12, 8))
+# world_map = Basemap(
+#     resolution='l',
+#     projection='cyl',
+#     lon_0=0,
+#     ax=ax
+# )
+#
+# # 地图要素（保持原风格）
+# world_map.drawmapboundary(fill_color='#D0CFD4')
+# world_map.fillcontinents(color='#EFEFEF', lake_color='#D0CFD4')
+# world_map.drawcoastlines(linewidth=0.5, color='#888888')
+# world_map.drawcountries(linewidth=0.5, color='#666666')
+#
+# # 6. 按社团绘制港口
+# for comm_idx in range(num_communities):
+#     comm_ports = [port for port, idx in port_community.items() if idx == comm_idx]
+#     if not comm_ports:
+#         continue
+#
+#     lons = [port_coords[port][0] for port in comm_ports]
+#     lats = [port_coords[port][1] for port in comm_ports]
+#     x, y = world_map(lons, lats)
+#
+#     # 绘制当前社团港口（使用指定配色）
+#     world_map.plot(
+#         x, y,
+#         'o',
+#         color=community_colors[comm_idx],
+#         markersize=5,
+#         markeredgecolor='white',  # 白色边缘更突出
+#         markeredgewidth=0.6,
+#         alpha=0.9
+#     )
+#
+# # 7. 添加图例
+# legend_elements = [
+#     plt.Line2D(
+#         [0], [0], marker='o', color='w',
+#         markerfacecolor=community_colors[i],
+#         markersize=8, label=f'Community {i + 1}'
+#     )
+#     for i in range(num_communities)
+# ]
+# ax.legend(handles=legend_elements, title='Communities', loc='upper right',
+#           frameon=True, framealpha=0.9, edgecolor='#AAAAAA')
+#
+# # 8. 标题
+# ax.set_title('Port Communities Distribution (2017 Spring, US)', fontsize=14, pad=20)
+#
+# # 保存或显示
+# # plt.savefig('port_communities.png', dpi=300, bbox_inches='tight')
+# plt.show()
+#endregion
 
 
-f
+
+def write_all_in_one():
+    structure_metrics = []
+    years = range(2017, 2022)
+    seasons = ['Spring','Summer','Autumn','Winter']
+    for year in years:
+        for season in seasons:
+            if year == 2021 and season == 'Summer':                 # 因为2021年的数据只到8月份
+                continue
+            file_path = f'../Data/{year}/US/Season/{season}/US{year}_{season}_Digraph.graphml'
+            if not os.path.exists(file_path):
+                print(f'⚠️ 文件不存在: {file_path}')
+                continue
+            DiGraph = nx.read_graphml(file_path)
+            G = nx.Graph(DiGraph)
+
+            # G_null = G.copy()
+            # nx.double_edge_swap(G_null, nswap=20000, max_tries=100000)
+            # G_null.remove_edges_from(nx.selfloop_edges(G_null))
+
+            result_year = all_in_one(G, year, season)
+            structure_metrics.append(result_year)
+            print(f"{year} is already down!")
+
+    # 保存成csv
+    df = pd.DataFrame(structure_metrics)
+    df.to_csv(f'Figure/Season/all_in_one_Digraph.csv', index=False)
