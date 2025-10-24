@@ -2883,6 +2883,121 @@ def draw_weighted_dc_and_weighted_bc():
                 print("Error: Invalid JSON format in files")
             except Exception as e:
                 print(f"An error occurred: {e}")
+def draw_avg_std_weighted_dc_and_weighted_bc_time_series():
+    # 读取度中心性和介数中心性数据
+    dc_path = pathlib.Path('InputData/ports_weighted_degree_centrality.json')
+    bc_path = pathlib.Path('InputData/ports_betweenness_centrality.json')
+    dc = json.loads(dc_path.read_text())
+    bc = json.loads(bc_path.read_text())
+    result = {}
+    years = range(2017, 2022)
+    seasons = ['Spring', 'Summer', 'Autumn', 'Winter']
+
+    # 读取数据并计算指标
+    for year in years:
+        for season in seasons:
+            # 跳过2021年夏季及以后
+            if year == 2021 and season in ['Summer', 'Autumn', 'Winter']:
+                continue
+            file_path = f'../Data/{year}/US/Season/{season}/US{year}_{season}_Digraph.graphml'
+            if not os.path.exists(file_path):
+                print(f'⚠️ 文件不存在: {file_path}')
+                continue
+            MulG = nx.read_graphml(file_path)
+
+            time = f"{year}_{season}"
+
+            dc_list = [value['dc'] for node,value in dc[time].items()]
+            bc_list = [value for node,value in bc[time].items()]
+            avg_dc = sum(dc_list) / len(dc_list)
+            avg_bc = sum(bc_list) / len(bc_list)
+
+            std_dc = np.std(dc_list, ddof=0)
+            std_bc = np.std(bc_list, ddof=0)
+            # 存储结果
+            # result[time] = (avg_dc, avg_bc)     # 平均值的变化
+            result[time] = (std_dc, std_bc)       # 标准差的变化
+
+
+    time_list = list(result.keys())
+    # 绘制趋势图
+    # 4. 创建画布和坐标轴
+    fig, ax1 = plt.subplots(figsize=(12, 6))  # 宽12英寸，高6英寸
+    # 2. 创建右侧Y轴（与左侧Y轴共享X轴，实现双轴对齐）
+    ax2 = ax1.twinx()  # 关键：生成与ax1共享X轴的第二个Y轴
+
+    # 平均度曲线
+    ax1.plot(
+        time_list,
+        [value[0] for key,value in result.items()],
+        marker='o',
+        linestyle='-',
+        color='#1f77b4',
+        label='Weighted Degree Centrality Std'
+    )
+
+    # 平均加权度曲线
+    ax2.plot(
+        time_list,
+        [value[1] for key,value in result.items()],
+        marker='s',
+        linestyle='-',
+        color='#ff7f0e',
+        label='Weighted Betweenness Centrality Std'
+    )
+
+    # 美化图表
+    ax1.set_xlabel('Time', fontsize=12, fontweight='bold')
+    ax1.set_ylabel('weighted degree centrality\'s std',  # 左侧Y轴标签（明确对应Nodes）
+                   color='#1f77b4',  # 标签颜色与线条颜色一致
+                   fontsize=12,
+                   fontweight='bold')
+    ax1.tick_params(axis='y',  # 左侧Y轴刻度设置
+                    labelsize=10)  # 刻度文字大小
+    # -------------------------- 右侧Y轴（ax2）设置 --------------------------
+    ax2.set_ylabel('weighted betweenness centrality\'s std',  # 右侧Y轴标签（明确对应Edges）
+                   color='#ff7f0e',  # 标签颜色与线条颜色一致
+                   fontsize=12,
+                   fontweight='bold')
+    ax2.tick_params(axis='y',  # 右侧Y轴刻度设置
+                    labelsize=10)  # 刻度文字大小
+    # -------------------------- 标题与X轴刻度 --------------------------
+    ax1.set_title(
+        'Changes in the std weighted degree centrality and std weighted betweenness over time',
+        fontsize=14,
+        fontweight='bold',
+        pad=20  # 标题与图表的间距（避免拥挤）
+    )
+    ax1.tick_params(axis='x', rotation=45)  # X轴时间标签旋转45度，避免文字重叠
+
+    # -------------------------- 6. 合并双轴图例（关键：避免图例重复） --------------------------
+    # 提取左右轴的图例，合并为一个（放在图表右侧，不遮挡数据）
+    lines1, labels1 = ax1.get_legend_handles_labels()  # 左侧轴图例
+    lines2, labels2 = ax2.get_legend_handles_labels()  # 右侧轴图例
+    ax1.legend(
+        lines1 + lines2,  # 合并图例线条
+        labels1 + labels2,  # 合并图例文字
+        fontsize=11,
+        loc='upper left',  # 图例位置（右上，不遮挡数据）
+        frameon=True,  # 显示图例边框
+        fancybox=True,  # 边框圆角
+        shadow=True  # 边框阴影（更立体）
+    )
+
+    # -------------------------- 7. 调整布局与保存 --------------------------
+    # 自动调整布局（避免标签、图例被截断）
+    plt.tight_layout()
+
+    # 保存图片（dpi=300为高清，bbox_inches='tight'避免裁剪边缘）
+    plt.savefig(
+        'Figure/Season/std_weighted_degree_centrality_and_std_weighted_betweenness_time_series.png',
+        dpi=300,
+        bbox_inches='tight',
+        facecolor='white'  # 背景色为白色（避免保存后背景透明）
+    )
+
+    # 显示图表（运行时弹出窗口）
+    plt.show()
 #region非美国港口中心性变化趋势图
 # # port_target = ['BEANT', 'NLROT', 'CNSHA', 'SGSGP', 'KRBUS',
 # #                'BSFRT', 'DEHAM', 'HKHKG', 'DEBHN', 'MXATM', 'CNYTN']
@@ -3621,118 +3736,91 @@ def draw_US_Top3_category_pie_chart():
 #endregion
 
 
-def draw_avg_std_weighted_dc_and_weighted_bc_time_series():
-    # 读取度中心性和介数中心性数据
-    dc_path = pathlib.Path('InputData/ports_weighted_degree_centrality.json')
-    bc_path = pathlib.Path('InputData/ports_betweenness_centrality.json')
-    dc = json.loads(dc_path.read_text())
-    bc = json.loads(bc_path.read_text())
-    result = {}
-    years = range(2017, 2022)
-    seasons = ['Spring', 'Summer', 'Autumn', 'Winter']
+# 1. 构建或加载网络（以示例网络为例，可替换为你的港口网络）
+# 示例：生成一个异配网络（如无标度网络），模拟港口的“核心-边缘”结构
+# G = nx.barabasi_albert_graph(n=100, m=2, seed=42)  # n=节点数，m=每次新增节点连接数
+def draw_k_knn(G, time):
+    """
+    画 k 与 knn（k） 的关系图
+    :return:
+    """
+    def calculate_knn(G):
+        """
 
-    # 读取数据并计算指标
-    for year in years:
-        for season in seasons:
-            # 跳过2021年夏季及以后
-            if year == 2021 and season in ['Summer', 'Autumn', 'Winter']:
-                continue
-            file_path = f'../Data/{year}/US/Season/{season}/US{year}_{season}_Digraph.graphml'
-            if not os.path.exists(file_path):
-                print(f'⚠️ 文件不存在: {file_path}')
-                continue
-            MulG = nx.read_graphml(file_path)
+        :param G: 无向无权的图
+        :return: 返回 {k: knn(k)} 的字典
+        """
+        # 计算每个节点的度
+        node_degrees = dict(G.degree())  # {节点: 度k}
 
-            time = f"{year}_{season}"
+        # 按节点度 k 分组，收集所有邻居的度
+        degree_groups = defaultdict(list)  # {k: [邻居的度列表]}
+        for node in G.nodes:
+            k = node_degrees[node]  # 当前节点的度
+            # 获取所有邻居的度
+            neighbors = G.neighbors(node)
+            neighbor_degrees = [node_degrees[neigh] for neigh in neighbors]
+            # 加入对应分组
+            degree_groups[k].extend(neighbor_degrees)
 
-            dc_list = [value['dc'] for node,value in dc[time].items()]
-            bc_list = [value for node,value in bc[time].items()]
-            avg_dc = sum(dc_list) / len(dc_list)
-            avg_bc = sum(bc_list) / len(bc_list)
+        # 计算每个 k 对应的 knn(k)（邻居度的平均值）
+        knn_dict = {}
+        for k, neighbor_degs in degree_groups.items():
+            if neighbor_degs:  # 避免空列表（孤立节点）
+                knn_dict[k] = np.mean(neighbor_degs)
+        return knn_dict
 
-            std_dc = np.std(dc_list, ddof=0)
-            std_bc = np.std(bc_list, ddof=0)
-            # 存储结果
-            # result[time] = (avg_dc, avg_bc)     # 平均值的变化
-            result[time] = (std_dc, std_bc)       # 标准差的变化
+    # 3. 执行计算
+    knn_dict = calculate_knn(G)
+    print(knn_dict)
+    # 3. 提取 k 和 knn(k) 的值（按 k 排序，便于绘图）
+    k_values = sorted(knn_dict.keys())  # 度 k 的取值（升序）
+    knn_values = [knn_dict[k] for k in k_values]  # 对应的邻居平均度
 
 
-    time_list = list(result.keys())
-    # 绘制趋势图
-    # 4. 创建画布和坐标轴
-    fig, ax1 = plt.subplots(figsize=(12, 6))  # 宽12英寸，高6英寸
-    # 2. 创建右侧Y轴（与左侧Y轴共享X轴，实现双轴对齐）
-    ax2 = ax1.twinx()  # 关键：生成与ax1共享X轴的第二个Y轴
+    # 4. 绘制 k 与 knn(k) 的关系图
+    plt.figure(figsize=(8, 5))
 
-    # 平均度曲线
-    ax1.plot(
-        time_list,
-        [value[0] for key,value in result.items()],
+    # 散点图 + 折线图（更清晰展示趋势）
+    plt.loglog(
+        k_values,
+        knn_values,
+        color='blue',
+        alpha=0.6,
         marker='o',
-        linestyle='-',
-        color='#1f77b4',
-        label='Weighted Degree Centrality Std'
+        linestyle='',
     )
 
-    # 平均加权度曲线
-    ax2.plot(
-        time_list,
-        [value[1] for key,value in result.items()],
-        marker='s',
-        linestyle='-',
-        color='#ff7f0e',
-        label='Weighted Betweenness Centrality Std'
-    )
 
-    # 美化图表
-    ax1.set_xlabel('Time', fontsize=12, fontweight='bold')
-    ax1.set_ylabel('weighted degree centrality\'s std',  # 左侧Y轴标签（明确对应Nodes）
-                   color='#1f77b4',  # 标签颜色与线条颜色一致
-                   fontsize=12,
-                   fontweight='bold')
-    ax1.tick_params(axis='y',  # 左侧Y轴刻度设置
-                    labelsize=10)  # 刻度文字大小
-    # -------------------------- 右侧Y轴（ax2）设置 --------------------------
-    ax2.set_ylabel('weighted betweenness centrality\'s std',  # 右侧Y轴标签（明确对应Edges）
-                   color='#ff7f0e',  # 标签颜色与线条颜色一致
-                   fontsize=12,
-                   fontweight='bold')
-    ax2.tick_params(axis='y',  # 右侧Y轴刻度设置
-                    labelsize=10)  # 刻度文字大小
-    # -------------------------- 标题与X轴刻度 --------------------------
-    ax1.set_title(
-        'Changes in the std weighted degree centrality and std weighted betweenness over time',
-        fontsize=14,
-        fontweight='bold',
-        pad=20  # 标题与图表的间距（避免拥挤）
-    )
-    ax1.tick_params(axis='x', rotation=45)  # X轴时间标签旋转45度，避免文字重叠
+    # 标注与美化
+    plt.xlabel('k', fontsize=12)
+    plt.ylabel('knn(k)', fontsize=12)
+    plt.title(f'k and knn(k) {time}', fontsize=14)
 
-    # -------------------------- 6. 合并双轴图例（关键：避免图例重复） --------------------------
-    # 提取左右轴的图例，合并为一个（放在图表右侧，不遮挡数据）
-    lines1, labels1 = ax1.get_legend_handles_labels()  # 左侧轴图例
-    lines2, labels2 = ax2.get_legend_handles_labels()  # 右侧轴图例
-    ax1.legend(
-        lines1 + lines2,  # 合并图例线条
-        labels1 + labels2,  # 合并图例文字
-        fontsize=11,
-        loc='upper left',  # 图例位置（右上，不遮挡数据）
-        frameon=True,  # 显示图例边框
-        fancybox=True,  # 边框圆角
-        shadow=True  # 边框阴影（更立体）
-    )
-
-    # -------------------------- 7. 调整布局与保存 --------------------------
-    # 自动调整布局（避免标签、图例被截断）
+    plt.legend()
     plt.tight_layout()
-
-    # 保存图片（dpi=300为高清，bbox_inches='tight'避免裁剪边缘）
     plt.savefig(
-        'Figure/Season/std_weighted_degree_centrality_and_std_weighted_betweenness_time_series.png',
-        dpi=300,
-        bbox_inches='tight',
-        facecolor='white'  # 背景色为白色（避免保存后背景透明）
+        f'OutPut/Undirected/KAndKnn/k and knn(k) {time}',
+        dpi=300
     )
 
-    # 显示图表（运行时弹出窗口）
-    plt.show()
+
+
+# years = range(2017, 2022)
+# seasons = ['Spring', 'Summer', 'Autumn', 'Winter']
+#
+# for year in years:
+#     for season in seasons:
+#         # 跳过2021年夏季及以后（数据不全）
+#         if year == 2021 and season in ['Summer', 'Autumn', 'Winter']:
+#             continue
+#         file_path = f'../Data/{year}/US/Season/{season}/US{year}_{season}_Digraph.graphml'
+#         if not os.path.exists(file_path):
+#             print(f'⚠️ 文件不存在: {file_path}')
+#             continue
+#         time = f"{year} {season}"
+#         DiG = nx.read_graphml(file_path)
+#         G = nx.Graph(DiG)
+#         draw_k_knn(G, time)
+
+
