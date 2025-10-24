@@ -145,97 +145,122 @@ from collections import deque
 
 
 
+result = {}
+years = range(2017, 2022)
+seasons = ['Spring', 'Summer', 'Autumn', 'Winter']
 
+# 读取数据并计算指标
+for year in years:
+    for season in seasons:
+        # 跳过2021年夏季及以后
+        if year == 2021 and season in ['Summer', 'Autumn', 'Winter']:
+            continue
+        file_path = f'../Data/{year}/US/Season/{season}/US{year}_{season}_Digraph.graphml'
+        if not os.path.exists(file_path):
+            print(f'⚠️ 文件不存在: {file_path}')
+            continue
 
+        time = f"{year} {season}"
+        DiG = nx.read_graphml(file_path)  # 保留有向图
+        n = DiG.number_of_nodes()
+        m = DiG.number_of_edges()
 
-# -------------------------- 示例用法 --------------------------
-if __name__ == "__main__":
-    # 1. 读取数据
-    df = pd.read_csv('Figure/Season/all_in_one_Digraph.csv')
-    # 4. 创建画布和坐标轴
-    fig, ax1 = plt.subplots(figsize=(12, 6))  # 宽12英寸，高6英寸
-    # 2. 创建右侧Y轴（与左侧Y轴共享X轴，实现双轴对齐）
-    ax2 = ax1.twinx()  # 关键：生成与ax1共享X轴的第二个Y轴
+        avg_degree = 2 * m / n
 
-    # -------------------------- 4. 绘制双折线（分别绑定左右Y轴） --------------------------
-    # -------------------------- 左侧Y轴：Nodes（假设N列是Nodes数量） --------------------------
-    ax1.plot(
-        df['time'],  # X轴：时间
-        df['N'],  # Y轴：Nodes数量（绑定左侧ax1）
-        label='Nodes',  # 图例名称
-        color='red',  # 颜色（可选：用十六进制色更精准，这里是深蓝色）
-        marker='o',  # 数据点标记（圆形）
-        linestyle='-',  # 线条样式（实线）
-        linewidth=2.5,  # 线条宽度（加粗更清晰）
-        markersize=7  # 数据点大小
-    )
+        # 2. 计算平均强度（total_TEU的平均值）
+        total_strength = 0.0
+        for node_id, node_attrs in DiG.nodes(data=True):  # 正确解析节点属性
+            # 安全获取属性，处理缺失值
+            teu = node_attrs.get('total_TEU', 0.0)
+            try:
+                total_strength += float(teu)
+            except ValueError:
+                # 处理属性值无法转换为float的情况（如非数值字符串）
+                print(f"⚠️ {time} 节点 {node_id} 的 total_TEU 格式错误，跳过")
+                continue
+        avg_strength = total_strength / n
+        print(f"{time} - 平均总度数: {avg_degree:.2f}, 平均TEU强度: {avg_strength:.2f}")
 
-    # -------------------------- 右侧Y轴：Edges（假设M列是Edges数量） --------------------------
-    ax2.plot(
-        df['time'],  # X轴：时间（与左侧共享，无需重复设置）
-        df['M'],  # Y轴：Edges数量（绑定右侧ax2）
-        label='Edges',  # 图例名称
-        color='blue',  # 颜色（深红色，与左侧区分明显）
-        marker='s',  # 数据点标记（方形，与圆形区分）
-        linestyle='--',  # 线条样式（虚线，与实线区分）
-        linewidth=2.5,  # 线条宽度（与左侧一致，保持美观）
-        markersize=7  # 数据点大小（与左侧一致）
-    )
+        # 存储结果
+        result[time] = (avg_degree, avg_strength)
 
-    # -------------------------- 5. 美化双轴标签与标题 --------------------------
-    # -------------------------- 左侧Y轴（ax1）设置 --------------------------
-    ax1.set_xlabel('Time', fontsize=12, fontweight='bold')  # X轴标签（加粗）
-    ax1.set_ylabel('Number of Nodes',  # 左侧Y轴标签（明确对应Nodes）
-                   color='red',  # 标签颜色与线条颜色一致
-                   fontsize=12,
-                   fontweight='bold')
-    ax1.tick_params(axis='y',  # 左侧Y轴刻度设置
-                    colors='red',  # 刻度颜色与线条一致
-                    labelsize=10)  # 刻度文字大小
+time_list = list(result.keys())
+# 绘制趋势图
+# 4. 创建画布和坐标轴
+fig, ax1 = plt.subplots(figsize=(12, 6))  # 宽12英寸，高6英寸
+# 2. 创建右侧Y轴（与左侧Y轴共享X轴，实现双轴对齐）
+ax2 = ax1.twinx()  # 关键：生成与ax1共享X轴的第二个Y轴
 
-    # -------------------------- 右侧Y轴（ax2）设置 --------------------------
-    ax2.set_ylabel('Number of Edges',  # 右侧Y轴标签（明确对应Edges）
-                   color='blue',  # 标签颜色与线条颜色一致
-                   fontsize=12,
-                   fontweight='bold')
-    ax2.tick_params(axis='y',  # 右侧Y轴刻度设置
-                    colors='blue',  # 刻度颜色与线条一致
-                    labelsize=10)  # 刻度文字大小
+# 平均度曲线
+ax1.plot(
+    time_list,
+    [value[0] for key,value in result.items()],
+    marker='o',
+    linestyle='-',
+    color='#1f77b4',
+    label='Average Degree'
+)
 
-    # -------------------------- 标题与X轴刻度 --------------------------
-    ax1.set_title(
-        'Changes in the Number of Edges and Nodes in the Network Over Time',
-        fontsize=14,
-        fontweight='bold',
-        pad=20  # 标题与图表的间距（避免拥挤）
-    )
-    ax1.tick_params(axis='x', rotation=45)  # X轴时间标签旋转45度，避免文字重叠
+# 平均加权度曲线
+ax2.plot(
+    time_list,
+    [value[1] for key,value in result.items()],
+    marker='s',
+    linestyle='-',
+    color='#ff7f0e',
+    label='Average Weighted Degree'
+)
 
-    # -------------------------- 6. 合并双轴图例（关键：避免图例重复） --------------------------
-    # 提取左右轴的图例，合并为一个（放在图表右侧，不遮挡数据）
-    lines1, labels1 = ax1.get_legend_handles_labels()  # 左侧轴图例
-    lines2, labels2 = ax2.get_legend_handles_labels()  # 右侧轴图例
-    ax1.legend(
-        lines1 + lines2,  # 合并图例线条
-        labels1 + labels2,  # 合并图例文字
-        fontsize=11,
-        loc='upper right',  # 图例位置（右上，不遮挡数据）
-        frameon=True,  # 显示图例边框
-        fancybox=True,  # 边框圆角
-        shadow=True  # 边框阴影（更立体）
-    )
+# 美化图表
+ax1.set_xlabel('Time', fontsize=12, fontweight='bold')
+ax1.set_ylabel('Degree',  # 左侧Y轴标签（明确对应Nodes）
+               color='#1f77b4',  # 标签颜色与线条颜色一致
+               fontsize=12,
+               fontweight='bold')
+ax1.tick_params(axis='y',  # 左侧Y轴刻度设置
+                labelsize=10)  # 刻度文字大小
+# -------------------------- 右侧Y轴（ax2）设置 --------------------------
+ax2.set_ylabel('Number of Edges',  # 右侧Y轴标签（明确对应Edges）
+               color='#ff7f0e',  # 标签颜色与线条颜色一致
+               fontsize=12,
+               fontweight='bold')
+ax2.tick_params(axis='y',  # 右侧Y轴刻度设置
+                labelsize=10)  # 刻度文字大小
+# -------------------------- 标题与X轴刻度 --------------------------
+ax1.set_title(
+    'Changes in the average degree and average strength in the Network Over Time',
+    fontsize=14,
+    fontweight='bold',
+    pad=20  # 标题与图表的间距（避免拥挤）
+)
+ax1.tick_params(axis='x', rotation=45)  # X轴时间标签旋转45度，避免文字重叠
 
-    # -------------------------- 7. 调整布局与保存 --------------------------
-    # 自动调整布局（避免标签、图例被截断）
-    plt.tight_layout()
+# -------------------------- 6. 合并双轴图例（关键：避免图例重复） --------------------------
+# 提取左右轴的图例，合并为一个（放在图表右侧，不遮挡数据）
+lines1, labels1 = ax1.get_legend_handles_labels()  # 左侧轴图例
+lines2, labels2 = ax2.get_legend_handles_labels()  # 右侧轴图例
+ax1.legend(
+    lines1 + lines2,  # 合并图例线条
+    labels1 + labels2,  # 合并图例文字
+    fontsize=11,
+    loc='upper left',  # 图例位置（右上，不遮挡数据）
+    frameon=True,  # 显示图例边框
+    fancybox=True,  # 边框圆角
+    shadow=True  # 边框阴影（更立体）
+)
 
-    # 保存图片（dpi=300为高清，bbox_inches='tight'避免裁剪边缘）
-    plt.savefig(
-        'Figure/Season/edges_nodes_time_series.png',
-        dpi=300,
-        bbox_inches='tight',
-        facecolor='white'  # 背景色为白色（避免保存后背景透明）
-    )
+# -------------------------- 7. 调整布局与保存 --------------------------
+# 自动调整布局（避免标签、图例被截断）
+plt.tight_layout()
 
-    # 显示图表（运行时弹出窗口）
-    plt.show()
+# 保存图片（dpi=300为高清，bbox_inches='tight'避免裁剪边缘）
+plt.savefig(
+    'Figure/Season/avg_degree_and_avg_strength_time_series.png',
+    dpi=300,
+    bbox_inches='tight',
+    facecolor='white'  # 背景色为白色（避免保存后背景透明）
+)
+
+# 显示图表（运行时弹出窗口）
+plt.show()
+
