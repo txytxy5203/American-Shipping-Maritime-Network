@@ -30,6 +30,10 @@ from collections import defaultdict
 from matplotlib.path import Path
 import matplotlib.patches as patches
 import sys
+
+from MyData.Draw import Draw
+from MyData.NullModel import NullModel
+
 sys.path.append('../Algorithm')
 
 
@@ -3820,7 +3824,87 @@ def draw_k_knn(G, time):
 #             continue
 #         time = f"{year} {season}"
 #         DiG = nx.read_graphml(file_path)
+#
 #         G = nx.Graph(DiG)
-#         draw_k_knn(G, time)
+#         null_model = NullModel.create_degree_distribution_null_model(G)
+#
+#         def calculate_knn(G):
+#             """
+#
+#             :param G: 无向无权的图
+#             :return: 返回 {k: knn(k)} 的字典
+#             """
+#             # 计算每个节点的度
+#             node_degrees = dict(G.degree())  # {节点: 度k}
+#
+#             # 按节点度 k 分组，收集所有邻居的度
+#             degree_groups = defaultdict(list)  # {k: [邻居的度列表]}
+#             for node in G.nodes:
+#                 k = node_degrees[node]  # 当前节点的度
+#                 # 获取所有邻居的度
+#                 neighbors = G.neighbors(node)
+#                 neighbor_degrees = [node_degrees[neigh] for neigh in neighbors]
+#                 # 加入对应分组
+#                 degree_groups[k].extend(neighbor_degrees)
+#
+#             # 计算每个 k 对应的 knn(k)（邻居度的平均值）
+#             knn_dict = {}
+#             for k, neighbor_degs in degree_groups.items():
+#                 if neighbor_degs:  # 避免空列表（孤立节点）
+#                     knn_dict[k] = np.mean(neighbor_degs)
+#             return knn_dict
+#
+#         # 3. 执行计算
+#         knn_dict = calculate_knn(G)
+#         # 3. 提取 k 和 knn(k) 的值（按 k 排序，便于绘图）
+#         k_values = sorted(knn_dict.keys())  # 度 k 的取值（升序）
+#         knn_values = [knn_dict[k] for k in k_values]  # 对应的邻居平均度
+#
+#         null_model_knn_dict = calculate_knn(null_model)
+#         null_model_k_values = sorted(null_model_knn_dict.keys())  # 度 k 的取值（升序）
+#         null_model_knn_values = [null_model_knn_dict[k] for k in null_model_k_values]  # 对应的邻居平均度
+
+
+
+
+        # # 4. 绘制 k 与 knn(k) 的关系图
+        # plt.figure(figsize=(8, 5))
+        # # 散点图 +
+        # plt.loglog(
+        #     k_values,
+        #     knn_values,
+        #     color='blue',
+        #     alpha=0.6,
+        #     marker='o',
+        #     linestyle='',
+        # )
+        # plt.loglog(
+        #     null_model_k_values,
+        #     null_model_knn_values,
+        #     color='grey',
+        #     alpha=0.6,
+        #     marker='o',
+        #     linestyle='',
+        # )
+        #
+        # # 标注与美化
+        # plt.xlabel('k', fontsize=12)
+        # plt.ylabel('knn(k)', fontsize=12)
+        # plt.title(f'k and knn(k)', fontsize=14)
+        #
+        # plt.legend()
+        # plt.tight_layout()
+        # plt.savefig(
+        #     f'OutPut/Undirected/KAndKnn/k and knn(k) {time}',
+        #     dpi=300
+        # )
+
+
+
+data = {
+        "US": [(28.5, 3), (35.2,3), (22.8, 34), (41.1,4)],
+        "CN": [(5, 5), (1,3), (22, 3), (40.1,5)]
+}
+df = pd.DataFrame(data)
 
 
