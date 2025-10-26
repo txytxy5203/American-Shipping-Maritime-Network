@@ -3742,32 +3742,12 @@ def draw_US_Top3_category_pie_chart():
 
 
 
-def calculate_knn(G):
-    """
-    计算一个网络的 knn
-    :param G: 无向无权的图
-    :return: 返回 {k: knn(k)} 的字典
-    """
-    # 计算每个节点的度
-    node_degrees = dict(G.degree())  # {节点: 度k}
-
-    # 按节点度 k 分组，收集所有邻居的度
-    degree_groups = defaultdict(list)  # {k: [邻居的度列表]}
-    for node in G.nodes:
-        k = node_degrees[node]  # 当前节点的度
-        # 获取所有邻居的度
-        neighbors = G.neighbors(node)
-        neighbor_degrees = [node_degrees[neigh] for neigh in neighbors]
-        # 加入对应分组
-        degree_groups[k].extend(neighbor_degrees)
-
-    # 计算每个 k 对应的 knn(k)（邻居度的平均值）
-    knn_dict = {}
-    for k, neighbor_degs in degree_groups.items():
-        if neighbor_degs:  # 避免空列表（孤立节点）
-            knn_dict[k] = np.mean(neighbor_degs)
-    return knn_dict
+#regionMain
 def k_and_knn():
+    """
+    画 k 与 knn(k) 的散点图
+    :return:
+    """
     years = range(2017, 2022)
     seasons = ['Spring', 'Summer', 'Autumn', 'Winter']
 
@@ -3787,8 +3767,8 @@ def k_and_knn():
             null_model = NullModel.create_degree_distribution_null_model(G)
 
             # 3. 执行计算
-            knn_dict = calculate_knn(G)
-            null_model_knn_dict = calculate_knn(null_model)
+            knn_dict = Undirected.calculate_knn(G)
+            null_model_knn_dict = Undirected.calculate_knn(null_model)
 
             data = {
                 "Origin Network": [(k, v) for k,v in knn_dict.items()],
@@ -3803,25 +3783,39 @@ def k_and_knn():
                 f"k and knn(k) {time}",
                 'loglog'
             )
+def nodes_or_edges_and_avg_path_length():
+    data = {
+        "network": []
+    }
+    years = range(2017, 2022)
+    seasons = ['Spring', 'Summer', 'Autumn', 'Winter']
+
+    for year in years:
+        for season in seasons:
+            # 跳过2021年夏季及以后（数据不全）
+            if year == 2021 and season in ['Summer', 'Autumn', 'Winter']:
+                continue
+            file_path = f'../Data/{year}/US/Season/{season}/US{year}_{season}_Digraph.graphml'
+            if not os.path.exists(file_path):
+                print(f'⚠️ 文件不存在: {file_path}')
+                continue
+            time = f"{year} {season}"
+            DiG = nx.read_graphml(file_path)
+
+            G = nx.Graph(DiG)
+            data["network"].append((
+                G.number_of_nodes(),
+                Undirected.calculate_average_shortest_path_length(G))
+            )
+    df = pd.DataFrame(data)
+    Draw.draw_scatter(df,
+                      "Undirected/EdgesOrNodesAndAvgPathLength/",
+                      "Nodes",
+                      "Average shortest path length",
+                      "Nodes And Avg Shortest Path Length"
+                      )
+#endregion
 
 
 
-years = range(2017, 2022)
-seasons = ['Spring', 'Summer', 'Autumn', 'Winter']
-
-for year in years:
-    for season in seasons:
-        # 跳过2021年夏季及以后（数据不全）
-        if year == 2021 and season in ['Summer', 'Autumn', 'Winter']:
-            continue
-        file_path = f'../Data/{year}/US/Season/{season}/US{year}_{season}_Digraph.graphml'
-        if not os.path.exists(file_path):
-            print(f'⚠️ 文件不存在: {file_path}')
-            continue
-        time = f"{year} {season}"
-        DiG = nx.read_graphml(file_path)
-
-        G = nx.Graph(DiG)
-        print(time)
-        print(Undirected.calculate_average_shortest_path_length(G))
 

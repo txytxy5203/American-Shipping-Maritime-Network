@@ -8,6 +8,21 @@ class Undirected:
     专门用于计算无向无权的网络的相关参数的 class
     """
     @classmethod
+    def get_largest_connected_component(cls, g: nx.Graph) -> nx.Graph:
+        """
+        返回网络的最大连通分量的 拷贝
+        :param g:
+        :return:
+        """
+        print("网络不连通，使用最大连通分量计算")
+
+        components = list(nx.connected_components(g))  # 转为列表便于处理
+        # 找到节点数最多的最大连通分量
+        largest_component = max(components, key=len)  # 按节点数取最大值
+        # 提取最大连通分量的子图（保留边和节点属性）
+        g_largest = g.subgraph(largest_component).copy()  # .copy() 确保可修改
+        return g_largest
+    @classmethod
     def calculate_knn(cls, g:nx.Graph):
         """
         计算网络的 knn(k)
@@ -46,14 +61,7 @@ class Undirected:
             # 3. 计算直径
             diameter = nx.diameter(g)
         else:
-            print("网络不连通，使用最大连通分量计算直径")
-            components = list(nx.connected_components(g))  # 转为列表便于处理
-
-            # 3. 找到节点数最多的最大连通分量
-            largest_component = max(components, key=len)  # 按节点数取最大值
-
-            # 4. 提取最大连通分量的子图（保留边和节点属性）
-            g_largest = g.subgraph(largest_component).copy()  # .copy() 确保可修改
+            g_largest = cls.get_largest_connected_component(g)
             diameter = nx.diameter(g_largest)
         return diameter
 
@@ -64,11 +72,8 @@ class Undirected:
         :param g:
         :return:
         """
-        components = list(nx.connected_components(g))  # 转为列表便于处理
-
-        # 3. 找到节点数最多的最大连通分量
-        largest_component = max(components, key=len)  # 按节点数取最大值
-
-        # 4. 提取最大连通分量的子图（保留边和节点属性）
-        g_largest = g.subgraph(largest_component).copy()  # .copy() 确保可修改
-        return nx.average_shortest_path_length(g_largest)
+        if nx.is_connected(g):
+            return nx.average_shortest_path_length(g)
+        else:
+            g_largest = cls.get_largest_connected_component(g)
+            return nx.average_shortest_path_length(g_largest)

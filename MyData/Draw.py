@@ -29,9 +29,7 @@ class Draw:
         plt.yscale('log')
 
     _scale_handlers: dict[str, Callable] = {
-        """
-        模式名 -> 处理函数 的映射
-        """
+        # 模式名 -> 处理函数 的映射
         'linear': _scale_linear,
         'logx': _scale_logx,
         'logy': _scale_logy,
@@ -119,6 +117,7 @@ class Draw:
         :param title:
         :param scale:  横纵坐标的缩放模式
         """
+        print(scale)
         plt.figure(figsize=(10, 6))
         # 顶刊配色和标记
         markers = [
@@ -151,7 +150,7 @@ class Draw:
                 alpha=0.8  # 透明度
             )
 
-        if scale not in cls._scale_handlers:
+        if scale not in cls._scale_handlers.keys():
             raise ValueError("没有这种scale模式")
         cls._scale_handlers[scale]()   # 执行对应的缩放模式
 
