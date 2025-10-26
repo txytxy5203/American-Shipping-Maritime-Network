@@ -53,6 +53,22 @@ class Undirected:
             largest_component = max(components, key=len)  # 按节点数取最大值
 
             # 4. 提取最大连通分量的子图（保留边和节点属性）
-            G_largest = g.subgraph(largest_component).copy()  # .copy() 确保可修改
-            diameter = nx.diameter(G_largest)
+            g_largest = g.subgraph(largest_component).copy()  # .copy() 确保可修改
+            diameter = nx.diameter(g_largest)
         return diameter
+
+    @classmethod
+    def calculate_average_shortest_path_length(cls, g:nx.Graph):
+        """
+        计算网络（或者最大连通分量）的平均最短路径
+        :param g:
+        :return:
+        """
+        components = list(nx.connected_components(g))  # 转为列表便于处理
+
+        # 3. 找到节点数最多的最大连通分量
+        largest_component = max(components, key=len)  # 按节点数取最大值
+
+        # 4. 提取最大连通分量的子图（保留边和节点属性）
+        g_largest = g.subgraph(largest_component).copy()  # .copy() 确保可修改
+        return nx.average_shortest_path_length(g_largest)
