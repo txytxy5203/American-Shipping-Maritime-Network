@@ -20,8 +20,7 @@ class NullModel:
 
         original_degree_sequence = [d for n, d in original_g.degree()]  # 格式：[节点0的度, 节点1的度, ...]
         null_model_degree_sequence = [d for n, d in null_model.degree()]
-        print(original_degree_sequence)
-        print(null_model_degree_sequence)
+
         if original_degree_sequence == null_model_degree_sequence:
             return null_model
         else:

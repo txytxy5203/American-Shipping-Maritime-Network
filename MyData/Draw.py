@@ -1,9 +1,43 @@
+from typing import Callable
+
 from matplotlib import pyplot as plt
 from pandas import DataFrame
 
 
 class Draw:
-    basic_path = 'Output'
+    basic_path = 'Output'       # 保存的时候都在 Output中
+
+    @staticmethod
+    def _scale_linear():
+        """线性坐标轴 不做处理"""
+        pass
+
+    @staticmethod
+    def _scale_logx():
+        """x轴缩放"""
+        plt.xscale('log')
+
+    @staticmethod
+    def _scale_logy():
+        """y轴缩放"""
+        plt.yscale('log')
+
+    @staticmethod
+    def _scale_loglog():
+        """x y 轴缩放"""
+        plt.xscale('log')
+        plt.yscale('log')
+
+    _scale_handlers: dict[str, Callable] = {
+        """
+        模式名 -> 处理函数 的映射
+        """
+        'linear': _scale_linear,
+        'logx': _scale_logx,
+        'logy': _scale_logy,
+        'loglog': _scale_loglog
+    }
+
     @classmethod
     def draw_plot(cls, df:DataFrame, save_path:str, y_label:str, title:str):
         """
@@ -49,6 +83,7 @@ class Draw:
                 marker=markers[i],
                 color=colors[i]
             )
+
         # 添加标签和标题
         plt.xlabel(x_col, fontsize=12)
         plt.ylabel(y_label, fontsize=12)
@@ -63,9 +98,15 @@ class Draw:
                     bbox_inches = 'tight'  # 去除图片周围多余空白
         )
     @classmethod
-    def draw_scatter(cls, df:DataFrame, save_path:str, x_label, y_label:str, title:str):
+    def draw_scatter(cls,
+                     df:DataFrame,
+                     save_path:str,
+                     x_label:str,
+                     y_label:str,
+                     title:str,
+                     scale:str = 'linear'):
         """
-
+        画散点的函数
         :param df:
         Example：
         data = {
@@ -76,7 +117,7 @@ class Draw:
         :param x_label:
         :param y_label:
         :param title:
-        :return:
+        :param scale:  横纵坐标的缩放模式
         """
         plt.figure(figsize=(10, 6))
         # 顶刊配色和标记
@@ -87,30 +128,43 @@ class Draw:
             'D',
             'p'
         ]
-        colors = ['#2E86AB',  # 深海蓝（主色1，沉稳）
-                  '#A23B72',  # 深玫红（主色2，醒目不刺眼）
-                  '#F18F01',  # 暖橙（辅助色1，中和冷色）
-                  '#C73E1D',  # 暗红（辅助色2，小范围强调）
-                  '#7209B7',  # 深紫（补充色1，低饱和不突兀）
-                  '#024059'  # 墨蓝（补充色2，适合背景或次要曲线）
-                  ]
+        # colors = ['#2E86AB',  # 深海蓝（主色1，沉稳）
+        #           '#A23B72',  # 深玫红（主色2，醒目不刺眼）
+        #           '#F18F01',  # 暖橙（辅助色1，中和冷色）
+        #           '#C73E1D',  # 暗红（辅助色2，小范围强调）
+        #           '#7209B7',  # 深紫（补充色1，低饱和不突兀）
+        #           '#024059'  # 墨蓝（补充色2，适合背景或次要曲线）
+        #           ]
+        colors = ['blue', 'grey']
         for i, col in enumerate(df.columns):
             coordinates = df[col]
             x = [coord[0] for coord in coordinates]
             y = [coord[1] for coord in coordinates]
+
             plt.scatter(
-                x=x,
-                y=y,
+                x,
+                y,
                 label=col,  # 图例用国家名（US/CN）
                 color=colors[i % len(colors)],
                 marker=markers[i % len(markers)],
                 s=60,  # 散点大小
                 alpha=0.8  # 透明度
             )
+
+        if scale not in cls._scale_handlers:
+            raise ValueError("没有这种scale模式")
+        cls._scale_handlers[scale]()   # 执行对应的缩放模式
+
         # 添加标签和标题
         plt.xlabel(x_label, fontsize=12)
         plt.ylabel(y_label, fontsize=12)
         plt.title(title, fontsize=14)
         plt.legend()
         plt.tight_layout()
-        plt.show()
+
+        for for_mat in ["png", "eps"]:      # png and eps
+            plt.savefig(f'{cls.basic_path}/{save_path}{title}.{for_mat}',
+                        format=for_mat,  # 显式指定格式（可选，但更稳妥）
+                        dpi=300,
+                        bbox_inches='tight'  # 去除图片周围多余空白
+            )
