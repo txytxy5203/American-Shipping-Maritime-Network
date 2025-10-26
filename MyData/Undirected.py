@@ -33,3 +33,26 @@ class Undirected:
             if neighbor_degrees:  # 避免空列表（孤立节点）
                 knn_dict[k] = np.mean(neighbor_degrees)
         return knn_dict
+
+    @classmethod
+    def calculate_diameter(cls, g:nx.Graph):
+        """
+        计算网络（或者是最大连通分量）的直径
+        :param g:
+        :return: 网络（或者是最大连通分量）的直径
+        """
+        # 2. 检查网络是否连通（直径仅对连通网络有意义）
+        if nx.is_connected(g):
+            # 3. 计算直径
+            diameter = nx.diameter(g)
+        else:
+            print("网络不连通，使用最大连通分量计算直径")
+            components = list(nx.connected_components(g))  # 转为列表便于处理
+
+            # 3. 找到节点数最多的最大连通分量
+            largest_component = max(components, key=len)  # 按节点数取最大值
+
+            # 4. 提取最大连通分量的子图（保留边和节点属性）
+            G_largest = g.subgraph(largest_component).copy()  # .copy() 确保可修改
+            diameter = nx.diameter(G_largest)
+        return diameter

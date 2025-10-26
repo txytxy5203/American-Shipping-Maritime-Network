@@ -33,6 +33,7 @@ import sys
 
 from MyData.Draw import Draw
 from MyData.NullModel import NullModel
+from MyData.Undirected import Undirected
 
 sys.path.append('../Algorithm')
 
@@ -3804,4 +3805,22 @@ def k_and_knn():
             )
 
 
+
+# years = range(2017, 2022)
+# seasons = ['Spring', 'Summer', 'Autumn', 'Winter']
+#
+# for year in years:
+#     for season in seasons:
+#         # 跳过2021年夏季及以后（数据不全）
+#         if year == 2021 and season in ['Summer', 'Autumn', 'Winter']:
+#             continue
+#         file_path = f'../Data/{year}/US/Season/{season}/US{year}_{season}_Digraph.graphml'
+#         if not os.path.exists(file_path):
+#             print(f'⚠️ 文件不存在: {file_path}')
+#             continue
+#         time = f"{year} {season}"
+#         DiG = nx.read_graphml(file_path)
+#
+#         G = nx.Graph(DiG)
+#         print(Undirected.calculate_diameter(G))
 
