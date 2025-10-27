@@ -3784,6 +3784,10 @@ def k_and_knn():
                 'loglog'
             )
 def nodes_or_edges_and_avg_path_length():
+    """
+    nodes or edges and avg path length 的 关系
+    :return:
+    """
     data = {
         "network": []
     }
@@ -3816,6 +3820,16 @@ def nodes_or_edges_and_avg_path_length():
                       )
 #endregion
 
-
-
+G = nx.DiGraph()
+G.add_edges_from(
+    [(0, 1),
+     (0, 2),
+     (2, 3),
+     (1, 3),
+     (0, 3),
+     (1, 2),
+     (1, 0)]
+)
+avg = 2 * G.number_of_edges() / G.number_of_nodes()
+print(avg)
 
