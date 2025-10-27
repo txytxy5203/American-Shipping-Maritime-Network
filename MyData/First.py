@@ -1,4 +1,3 @@
-import csv
 import heapq
 import json
 import pathlib
@@ -12,18 +11,11 @@ import numpy as np
 import matplotlib.pyplot as plt
 from mpl_toolkits.basemap import Basemap
 from scipy.special import comb
-from networkx.algorithms import community
 from networkx.algorithms.assortativity import degree_assortativity_coefficient
 from Algorithm.ConstructNetwork import ConstructNetwork
-from Algorithm.Read import Read
-from collections import Counter
-import cartopy.crs as ccrs
-import cartopy.feature as cfeature
 from sklearn.preprocessing import minmax_scale
-from matplotlib.ticker import ScalarFormatter
 from matplotlib import patheffects
 from scipy import stats  # 用于线性回归拟合
-from scipy.stats import entropy
 from heapq import nlargest
 from collections import deque
 from collections import defaultdict
@@ -33,6 +25,7 @@ import sys
 
 from MyData.Draw import Draw
 from MyData.NullModel import NullModel
+from MyData.DirectedWeighted import DirectedWeighted
 from MyData.Undirected import Undirected
 
 sys.path.append('../Algorithm')
@@ -3820,16 +3813,37 @@ def nodes_or_edges_and_avg_path_length():
                       )
 #endregion
 
-G = nx.DiGraph()
-G.add_edges_from(
-    [(0, 1),
-     (0, 2),
-     (2, 3),
-     (1, 3),
-     (0, 3),
-     (1, 2),
-     (1, 0)]
-)
-avg = 2 * G.number_of_edges() / G.number_of_nodes()
-print(avg)
 
+
+data = {
+    "time":[],
+    "average degree":[],
+    "average weighted degree": []
+}
+years = range(2017, 2022)
+seasons = ['Spring', 'Summer', 'Autumn', 'Winter']
+
+for year in years:
+    for season in seasons:
+        # 跳过2021年夏季及以后（数据不全）
+        if year == 2021 and season in ['Summer', 'Autumn', 'Winter']:
+            continue
+        file_path = f'../Data/{year}/US/Season/{season}/US{year}_{season}_Digraph.graphml'
+        if not os.path.exists(file_path):
+            print(f'⚠️ 文件不存在: {file_path}')
+            continue
+        time = f"{year} {season}"
+        DiG = nx.read_graphml(file_path)
+
+        data["time"].append(time)
+        data["average degree"].append(
+            DirectedWeighted.calculate_average_degree(DiG)
+        )
+        data["average weighted degree"].append(
+            DirectedWeighted.calculate_average_strength(DiG)
+        )
+df = pd.DataFrame(data)
+Draw.draw_dual_axis_plot(df,
+                  "DirectedWeighted/AverageDegreeAndWeightedDegree/",
+                  "Average Degree And Weighted Degree"
+)
