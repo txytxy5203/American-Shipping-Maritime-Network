@@ -3836,11 +3836,14 @@ for year in years:
         DiG = nx.read_graphml(file_path)
 
         data["time"].append(time)
+
+        _,_,average_degree = DirectedWeighted.calculate_average_degree(DiG)
         data["average degree"].append(
-            DirectedWeighted.calculate_average_degree(DiG)
+            average_degree
         )
+        _,_,average_weighted_degree = DirectedWeighted.calculate_average_weighted_degree(DiG)
         data["average weighted degree"].append(
-            DirectedWeighted.calculate_average_strength(DiG)
+            average_weighted_degree
         )
 df = pd.DataFrame(data)
 Draw.draw_dual_axis_plot(df,
