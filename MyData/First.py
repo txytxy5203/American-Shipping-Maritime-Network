@@ -3814,39 +3814,39 @@ def nodes_or_edges_and_avg_path_length():
 #endregion
 
 
+def degree_and_weighted_average_or_std():
+    data = {
+        "time":[],
+        "degree standard deviation":[],
+        "weighted degree standard deviation": []
+    }
+    years = range(2017, 2022)
+    seasons = ['Spring', 'Summer', 'Autumn', 'Winter']
 
-data = {
-    "time":[],
-    "average degree":[],
-    "average weighted degree": []
-}
-years = range(2017, 2022)
-seasons = ['Spring', 'Summer', 'Autumn', 'Winter']
+    for year in years:
+        for season in seasons:
+            # 跳过2021年夏季及以后（数据不全）
+            if year == 2021 and season in ['Summer', 'Autumn', 'Winter']:
+                continue
+            file_path = f'../Data/{year}/US/Season/{season}/US{year}_{season}_Digraph.graphml'
+            if not os.path.exists(file_path):
+                print(f'⚠️ 文件不存在: {file_path}')
+                continue
+            time = f"{year} {season}"
+            DiG = nx.read_graphml(file_path)
 
-for year in years:
-    for season in seasons:
-        # 跳过2021年夏季及以后（数据不全）
-        if year == 2021 and season in ['Summer', 'Autumn', 'Winter']:
-            continue
-        file_path = f'../Data/{year}/US/Season/{season}/US{year}_{season}_Digraph.graphml'
-        if not os.path.exists(file_path):
-            print(f'⚠️ 文件不存在: {file_path}')
-            continue
-        time = f"{year} {season}"
-        DiG = nx.read_graphml(file_path)
+            data["time"].append(time)
 
-        data["time"].append(time)
-
-        _,_,average_degree = DirectedWeighted.calculate_average_degree(DiG)
-        data["average degree"].append(
-            average_degree
-        )
-        _,_,average_weighted_degree = DirectedWeighted.calculate_average_weighted_degree(DiG)
-        data["average weighted degree"].append(
-            average_weighted_degree
-        )
-df = pd.DataFrame(data)
-Draw.draw_dual_axis_plot(df,
-                  "DirectedWeighted/AverageDegreeAndWeightedDegree/",
-                  "Average Degree And Weighted Degree"
-)
+            _,_,degree_std = DirectedWeighted.calculate_degree_standard_deviation(DiG)
+            data["degree standard deviation"].append(
+                degree_std
+            )
+            _,_,weighted_degree_std = DirectedWeighted.calculate_weighted_degree_standard_deviation(DiG)
+            data["weighted degree standard deviation"].append(
+                weighted_degree_std
+            )
+    df = pd.DataFrame(data)
+    Draw.draw_dual_axis_plot(df,
+                      "DirectedWeighted/AverageDegreeAndWeightedDegree/",
+                      "Degree And Weighted Degree \'s Standard Deviation"
+    )
