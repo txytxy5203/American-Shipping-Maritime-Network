@@ -272,8 +272,3 @@ def degree_distribution():
 #endregion
 
 
-# 读取你的港口网络（无向图，若为有向图需先转为无向图）
-file_path = f'../Data/2021/US/Season/Spring/US2021_Spring_Digraph.graphml'
-DiG = nx.read_graphml(file_path)
-G = nx.Graph(DiG)  # 代数连通性仅适用于无向图
-
