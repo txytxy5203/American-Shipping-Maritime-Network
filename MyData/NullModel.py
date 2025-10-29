@@ -28,3 +28,23 @@ class NullModel:
             raise ValueError(
                 "零模型与原始网络的度序列不一致！\n"
             )
+
+    @classmethod
+    def create_edges_nodes_null_model(cls, original_g: nx.Graph) -> nx.Graph:
+        """
+        仅仅只是 edges 和 nodes 一样的 null model
+        :param original_g:
+        :return:
+        """
+        N = original_g.number_of_nodes()
+        M = original_g.number_of_edges()
+
+        # 使用随机图生成 null model
+        null_model = nx.gnm_random_graph(
+            n=N,
+            m=M,
+            seed=random.randint(1, 1000)
+        )
+        return null_model
+
+    # TODO 生成一个权重分布一样的 null model
