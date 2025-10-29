@@ -6,6 +6,17 @@ from pandas import DataFrame
 class Draw:
     basic_path = 'Output'       # 保存的时候都在 Output中
 
+    # 通用配色/标记库（各模式可复用）
+    _normal_colors = [
+        '#2E86AB', '#A23B72', '#F18F01',
+        '#C73E1D', '#7209B7', '#024059'
+    ]
+    _normal_markers = ['o', 's', '^', 'D', 'p']
+
+    # 专门针对港口的  一种配色 一种标记
+    _ports_colors = ['blue']
+    _ports_markers = ['o']
+
     @staticmethod
     def _scale_linear():
         """线性坐标轴 不做处理"""
@@ -33,6 +44,19 @@ class Draw:
         'logx': _scale_logx,
         'logy': _scale_logy,
         'loglog': _scale_loglog
+    }
+    _mode_configs:dict[str, dict] = {
+        # 配置
+        'normal': {
+            'colors': _normal_colors,
+            'markers': _normal_markers,
+            'show_legend': True
+        },
+        'ports': {
+            'colors': _ports_colors,
+            'markers': _ports_markers,
+            'show_legend': False
+        }
     }
 
     @classmethod
@@ -108,9 +132,13 @@ class Draw:
                      x_label:str,
                      y_label:str,
                      title:str,
-                     scale:str = 'linear'):
+                     scale:str = 'linear',
+                     mode:str = 'normal'
+                     ):
         """
         画散点的函数
+        TODO 加一个在散点图上显示标签的功能  比如说大于多少就显示标签
+
         :param df:
         Example：
         data = {
@@ -122,25 +150,39 @@ class Draw:
         :param y_label:
         :param title:
         :param scale:  横纵坐标的缩放模式
+        :param mode: 画图的模式  具体有哪些配置看上边的 _mode_configs
         """
-        print(scale)
+
+        # 模式的合法性
+        if scale not in cls._scale_handlers.keys():
+            raise ValueError("没有这种scale模式")
+        if mode not in cls._mode_configs.keys():
+            raise ValueError("没有这种mode模式")
+
+        # 获取配置信息
+        mode_config = cls._mode_configs[mode]
+        colors = mode_config['colors']
+        markers = mode_config['markers']
+        show_legend = mode_config['show_legend']
+
         plt.figure(figsize=(10, 6))
-        # 顶刊配色和标记
-        markers = [
-            'o',
-            's',
-            '^',
-            'D',
-            'p'
-        ]
-        # colors = ['#2E86AB',  # 深海蓝（主色1，沉稳）
-        #           '#A23B72',  # 深玫红（主色2，醒目不刺眼）
-        #           '#F18F01',  # 暖橙（辅助色1，中和冷色）
-        #           '#C73E1D',  # 暗红（辅助色2，小范围强调）
-        #           '#7209B7',  # 深紫（补充色1，低饱和不突兀）
-        #           '#024059'  # 墨蓝（补充色2，适合背景或次要曲线）
-        #           ]
-        colors = ['blue', 'grey']
+        # # 顶刊配色和标记
+        # markers = [
+        #     'o',
+        #     's',
+        #     '^',
+        #     'D',
+        #     'p'
+        # ]
+        # # colors = ['#2E86AB',  # 深海蓝（主色1，沉稳）
+        # #           '#A23B72',  # 深玫红（主色2，醒目不刺眼）
+        # #           '#F18F01',  # 暖橙（辅助色1，中和冷色）
+        # #           '#C73E1D',  # 暗红（辅助色2，小范围强调）
+        # #           '#7209B7',  # 深紫（补充色1，低饱和不突兀）
+        # #           '#024059'  # 墨蓝（补充色2，适合背景或次要曲线）
+        # #           ]
+        # # colors = ['blue', 'grey']
+        # colors = ['blue']
         for i, col in enumerate(df.columns):
             coordinates = df[col]
             x = [coord[0] for coord in coordinates]
@@ -153,18 +195,18 @@ class Draw:
                 color=colors[i % len(colors)],
                 marker=markers[i % len(markers)],
                 s=60,  # 散点大小
-                alpha=0.8  # 透明度
+                alpha=0.8,  # 透明度
+                linewidth=0.8  # 略微加粗边框，与高透明度匹配
             )
 
-        if scale not in cls._scale_handlers.keys():
-            raise ValueError("没有这种scale模式")
-        cls._scale_handlers[scale]()   # 执行对应的缩放模式
 
+        cls._scale_handlers[scale]()   # 执行对应的缩放模式
         # 添加标签和标题
         plt.xlabel(x_label, fontsize=12)
         plt.ylabel(y_label, fontsize=12)
         plt.title(title, fontsize=14)
-        plt.legend()
+        if show_legend:
+            plt.legend()
         plt.tight_layout()
 
         for for_mat in ["png", "eps"]:      # png and eps

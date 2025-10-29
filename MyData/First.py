@@ -3811,10 +3811,11 @@ def nodes_or_edges_and_avg_path_length():
                       "Average shortest path length",
                       "Nodes And Avg Shortest Path Length"
                       )
-#endregion
-
-
 def degree_and_weighted_average_or_std():
+    """
+    度和加权度的平均值or标准差的变化
+    :return:
+    """
     data = {
         "time":[],
         "degree standard deviation":[],
@@ -3850,3 +3851,70 @@ def degree_and_weighted_average_or_std():
                       "DirectedWeighted/AverageDegreeAndWeightedDegree/",
                       "Degree And Weighted Degree \'s Standard Deviation"
     )
+def degree_and_weighted_degree():
+        """
+        度和加权度的关系
+        :return:
+        """
+        years = range(2017, 2022)
+        seasons = ['Spring', 'Summer', 'Autumn', 'Winter']
+
+        for year in years:
+            for season in seasons:
+                # 跳过2021年夏季及以后（数据不全）
+                if year == 2021 and season in ['Summer', 'Autumn', 'Winter']:
+                    continue
+                file_path = f'../Data/{year}/US/Season/{season}/US{year}_{season}_Digraph.graphml'
+                if not os.path.exists(file_path):
+                    print(f'⚠️ 文件不存在: {file_path}')
+                    continue
+
+                time = f"{year} {season}"
+                DiG = nx.read_graphml(file_path)
+                data = {
+                    "Ports": [(DiG.degree(port), attr['total_TEU']) for port, attr in DiG.nodes(data=True)]
+                }
+                df = pd.DataFrame(data)
+
+                Draw.draw_scatter(df,
+                                  "DirectedWeighted/DegreeAndWeightedDegree/",
+                                  "Degree",
+                                  "Weighted Degree",
+                                  f"Degree And Weighted Degree {time} loglog",
+                                  "loglog"
+                                  )
+#endregion
+def weighted_degree_and_directed_betweenness():
+    """
+    画每个港口 加权度和有向介数中心性之间的关系
+    :return:
+    """
+    years = range(2017, 2022)
+    seasons = ['Spring', 'Summer', 'Autumn', 'Winter']
+
+    for year in years:
+        for season in seasons:
+            # 跳过2021年夏季及以后（数据不全）
+            if year == 2021 and season in ['Summer', 'Autumn', 'Winter']:
+                continue
+            file_path = f'../Data/{year}/US/Season/{season}/US{year}_{season}_Digraph.graphml'
+            if not os.path.exists(file_path):
+                print(f'⚠️ 文件不存在: {file_path}')
+                continue
+
+            time = f"{year} {season}"
+            DiG = nx.read_graphml(file_path)
+            data = {}
+            bc_dict = nx.betweenness_centrality(DiG, normalized=True)  # 有向网络的介数中心性
+            for node,attr in DiG.nodes(data=True):
+                dc = attr['total_TEU']
+                bc = bc_dict[node]
+                data[node] = [(dc, bc)]
+            df = pd.DataFrame(data)
+            Draw.draw_scatter(df,
+                              "DirectedWeighted/WeightedDegreeAndDirectedBetweenness/",
+                              "Weighted Degree",
+                              "Directed Betweenness",
+                              f"Weighted Degree And Directed Betweenness {time}",
+                              mode='ports'
+            )
