@@ -137,7 +137,7 @@ class Draw:
                      ):
         """
         画散点的函数
-        TODO 加一个在散点图上显示标签的功能  比如说大于多少就显示标签
+        TODO 加一个在散点图上显示标签的功能  比如说大于多少就 显示标签
 
         :param df:
         Example：
@@ -166,23 +166,7 @@ class Draw:
         show_legend = mode_config['show_legend']
 
         plt.figure(figsize=(10, 6))
-        # # 顶刊配色和标记
-        # markers = [
-        #     'o',
-        #     's',
-        #     '^',
-        #     'D',
-        #     'p'
-        # ]
-        # # colors = ['#2E86AB',  # 深海蓝（主色1，沉稳）
-        # #           '#A23B72',  # 深玫红（主色2，醒目不刺眼）
-        # #           '#F18F01',  # 暖橙（辅助色1，中和冷色）
-        # #           '#C73E1D',  # 暗红（辅助色2，小范围强调）
-        # #           '#7209B7',  # 深紫（补充色1，低饱和不突兀）
-        # #           '#024059'  # 墨蓝（补充色2，适合背景或次要曲线）
-        # #           ]
-        # # colors = ['blue', 'grey']
-        # colors = ['blue']
+
         for i, col in enumerate(df.columns):
             coordinates = df[col]
             x = [coord[0] for coord in coordinates]

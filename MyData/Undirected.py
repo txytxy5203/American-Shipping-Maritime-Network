@@ -77,3 +77,21 @@ class Undirected:
         else:
             g_largest = cls.get_largest_connected_component(g)
             return nx.average_shortest_path_length(g_largest)
+
+    @classmethod
+    def calculate_algebraic_connectivity(cls, g:nx.Graph):
+        """
+        基于 laplcian 矩阵计算图的 代数连通性
+        :param g:
+        :return:
+        """
+        # 1. 计算拉普拉斯矩阵
+        laplacian = nx.laplacian_matrix(g).todense()  # 转为稠密矩阵（便于计算特征值）
+
+        # 2. 求解拉普拉斯矩阵的特征值，并排序
+        eigenvalues = np.linalg.eigvals(laplacian)
+        eigenvalues_sorted = np.sort(np.real(eigenvalues))  # 取实部并排序（避免数值误差）
+
+        # 3. 代数连通性 = 第二小的特征值（lambda_1）
+        algebraic_connectivity = eigenvalues_sorted[1]
+        return algebraic_connectivity
