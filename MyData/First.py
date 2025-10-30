@@ -269,8 +269,6 @@ def degree_distribution():
                 "loglog",
                 "ports"
             )
-#endregion
-
 def write_network_structure_metric():
     """
     将网络和null model的结构指标写入csv文件
@@ -306,3 +304,28 @@ def write_network_structure_metric():
     origin_df.to_csv('Output/Undirected/StructureMetrics/network_structure_metrics.csv')
     null_model_df = pd.DataFrame(null_model_data, index=metrics)
     null_model_df.to_csv('Output/Undirected/StructureMetrics/null_model_structure_metrics.csv')
+#endregion
+
+def get_network():
+    """
+    网络生成器函数
+    :return: 每次生成对应的 DiG  G  time
+    """
+    years = range(2017, 2022)
+    seasons = ['Spring', 'Summer', 'Autumn', 'Winter']
+    # 读取数据并构建网络
+    for year in years:
+        for season in seasons:
+            # 跳过2021年夏季及以后（数据不全）
+            if year == 2021 and season in ['Summer', 'Autumn', 'Winter']:
+                continue
+            file_path = f'../Data/{year}/US/Season/{season}/US{year}_{season}_Digraph.graphml'
+            if not os.path.exists(file_path):
+                print(f'⚠️ 文件不存在: {file_path}')
+                continue
+            time = f"{year} {season}"
+
+            DiG = nx.read_graphml(file_path)
+            G = nx.Graph(DiG)
+            yield DiG, G, time
+
