@@ -271,4 +271,38 @@ def degree_distribution():
             )
 #endregion
 
+def write_network_structure_metric():
+    """
+    将网络和null model的结构指标写入csv文件
+    :return:
+    """
+    origin_data = {}
+    null_model_data = {}
+    years = range(2017, 2022)
+    seasons = ['Spring', 'Summer', 'Autumn', 'Winter']
+    # 读取数据并构建网络
+    for year in years:
+        for season in seasons:
+            # 跳过2021年夏季及以后（数据不全）
+            if year == 2021 and season in ['Summer', 'Autumn', 'Winter']:
+                continue
+            file_path = f'../Data/{year}/US/Season/{season}/US{year}_{season}_Digraph.graphml'
+            if not os.path.exists(file_path):
+                print(f'⚠️ 文件不存在: {file_path}')
+                continue
+            time = f"{year} {season}"
 
+            # 导入网络 生成零模型
+            G = nx.Graph(nx.read_graphml(file_path))
+            null_model = NullModel.create_edges_nodes_null_model(G)
+            # 计算拓扑指标
+            origin_metrics_dict = Undirected.get_network_structure_metrics(G)
+            null_model_metrics_dict = Undirected.get_network_structure_metrics(null_model)
+            metrics = list(origin_metrics_dict.keys())
+
+            origin_data[time] = list(origin_metrics_dict.values())
+            null_model_data[time] = list(null_model_metrics_dict.values())
+    origin_df = pd.DataFrame(origin_data, index=metrics)
+    origin_df.to_csv('Output/Undirected/StructureMetrics/network_structure_metrics.csv')
+    null_model_df = pd.DataFrame(null_model_data, index=metrics)
+    null_model_df.to_csv('Output/Undirected/StructureMetrics/null_model_structure_metrics.csv')

@@ -14,7 +14,7 @@ class Undirected:
         :param g:
         :return:
         """
-        print("网络不连通，使用最大连通分量计算")
+        # print("网络不连通，使用最大连通分量计算")
 
         components = list(nx.connected_components(g))  # 转为列表便于处理
         # 找到节点数最多的最大连通分量
@@ -85,8 +85,9 @@ class Undirected:
         :param g:
         :return:
         """
+        mcc_g = cls.get_largest_connected_component(g)      # 用最大连通分量计算  因为有些图不连通
         # 1. 计算拉普拉斯矩阵
-        laplacian = nx.laplacian_matrix(g).todense()  # 转为稠密矩阵（便于计算特征值）
+        laplacian = nx.laplacian_matrix(mcc_g).todense()    # 转为稠密矩阵（便于计算特征值）
 
         # 2. 求解拉普拉斯矩阵的特征值，并排序
         eigenvalues = np.linalg.eigvals(laplacian)
@@ -115,16 +116,12 @@ class Undirected:
         A = nx.adjacency_matrix(g)
         spectral_radius = max(abs(np.linalg.eigvals(A.toarray())))  # 无权谱半径
 
-        # 平均路径长度 and 全局效率
-        if nx.is_connected(g):
-            avg_length = nx.average_shortest_path_length(g)
-            efficiency = nx.global_efficiency(g)
-        else:
-            h = cls.get_largest_connected_component(g)
-            avg_length = nx.average_shortest_path_length(h)
-            efficiency = nx.global_efficiency(h)
-
+        # 不管是不是连通图  直接用最大连通分量计算就行了
+        h = cls.get_largest_connected_component(g)
+        avg_length = nx.average_shortest_path_length(h)
+        efficiency = nx.global_efficiency(h)
         mcc_sizes = len(h)          # 最大连通分量的大小
+
         # 结构同质性
         degrees = dict(nx.degree(g))
         degrees_list = list(degrees.values())
@@ -134,6 +131,9 @@ class Undirected:
         # 同配性
         # 计算无向图的度数同配性
         assort_degree = nx.degree_assortativity_coefficient(g)
+
+        # 代数连通性
+        algebraic_connectivity = cls.calculate_algebraic_connectivity(g)
 
         return {
             "N": N,
@@ -146,5 +146,6 @@ class Undirected:
             "density": density,
             "spectral_radius": spectral_radius,
             "mcc_sizes": mcc_sizes,
-            "assortativity_coefficient": assort_degree
+            "assortativity_coefficient": assort_degree,
+            "algebraic_connectivity": algebraic_connectivity
         }
