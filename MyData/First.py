@@ -225,9 +225,6 @@ def write_network_structure_metric():
     origin_df.to_csv('Output/Undirected/StructureMetrics/network_structure_metrics.csv')
     null_model_df = pd.DataFrame(null_model_data, index=metrics)
     null_model_df.to_csv('Output/Undirected/StructureMetrics/null_model_structure_metrics.csv')
-#endregion
-
-
 def k_core_and_nodes():
     """
     画每个k core含有的nodes个数
@@ -249,8 +246,6 @@ def k_core_and_nodes():
             k_core = nx.k_core(G, k=k, core_number=core_numbers)
             k_core_counts[k] = len(k_core.nodes())
 
-        data = {"K Core":[(key, value) for key, value in k_core_counts.items()]}
-
         # 调整数据格式：转为包含 'k' 和 'nodes' 列的DataFrame（适合绘图）
         df = pd.DataFrame(
             list(k_core_counts.items()),
@@ -265,3 +260,33 @@ def k_core_and_nodes():
             "Nodes",
             f"K core numbers {time}",
         )
+#endregion
+
+for DiG, G, time in get_network():
+    core_numbers = nx.core_number(G)
+    # 确定最大k值（所有节点核数的最大值）
+    max_k = max(core_numbers.values())
+    # 存储每个k对应的数量
+    k_core_counts = {}
+    k_core = nx.k_core(G, k=max_k, core_number=core_numbers)
+
+    center_nodes = [node for node, attr in k_core.nodes(data=True) if attr['total_TEU'] > 100000]
+
+    data = {
+        "Port": [],
+        "TEU": [],
+        "Continent": []
+    }
+    for node in center_nodes:
+        data["Port"].append(node)
+        data["TEU"].append(DiG.nodes[node]['total_TEU'])
+        data["Continent"].append(DiG.nodes[node]['continent'])
+
+    df = pd.DataFrame(data)
+    Draw.draw_world_ports_map(df,
+                              "WorldMap/CenterPorts/",
+                              f"Center Ports {time}"
+    )
+
+
+

@@ -1,7 +1,12 @@
+import numpy as np
+import pandas as pd
 from typing import Callable
 from matplotlib import pyplot as plt
+from matplotlib.lines import Line2D
+from mpl_toolkits.basemap import Basemap
 from pandas import DataFrame
 
+from Read import Read
 
 class Draw:
     basic_path = 'Output'       # 保存的时候都在 Output中
@@ -364,3 +369,145 @@ class Draw:
                         dpi=300,
                         bbox_inches='tight'  # 去除图片周围多余空白
             )
+
+    @classmethod
+    def draw_world_ports_map(cls,
+                             df:DataFrame,
+                             save_path:str,
+                             title:str
+                             ):
+        """
+        画港口的函数
+        :param df: {
+            "Port": ['USLGB'],
+            "Continent": ["NA"],
+            "TEU": [10000]
+        }
+        :param save_path:
+        :param title:
+        :return:
+        """
+
+        # 读取港口坐标数据
+        Port_Data = Read.Read_Port_Data()
+
+        # 假设缩写规则：NA=北美洲, SA=南美洲, EU=欧洲, AS=亚洲, AF=非洲, OC=大洋洲, UN=未知
+        continent_color_mapping = {
+            'NA': '#1f77b4',  # 深蓝色（北美洲）
+            'SA': '#ff7f0e',  # 橙色（南美洲）
+            'EU': '#2ca02c',  # 绿色（欧洲）
+            'AS': '#d62728',  # 红色（亚洲）
+            'AF': '#9467bd',  # 紫色（非洲）
+            'OC': '#8c564b',  # 棕色（大洋洲）
+            'UN': '#7f7f7f'  # 灰色（未知大洲）
+        }
+
+        port_info = {}  # key 为港口   value为各种信息组成的tuple
+        for idx, port_data in df.iterrows():
+            # 检查坐标是否有效
+            node = port_data['Port']
+            if node not in Port_Data:
+                print(f"{node} 不在港口信息表中")
+                continue
+            if "longitude" not in Port_Data[node] or "latitude" not in Port_Data[node]:
+                print(f"{node} 没有经纬度信息")
+                continue
+
+            # 存储有效信息
+            lon = float(Port_Data[node]["longitude"])
+            lat = float(Port_Data[node]["latitude"])
+            port_info[node] = (lon, lat, port_data['TEU'], port_data['Continent'])
+
+        # 2. 地图与网络可视化设置
+        # 美国中心经纬度：西经98.5°（-98.5），北纬39.8°
+        center_lon = -98.5
+        center_lat = 39.8
+        # 创建画布
+        fig, ax = plt.subplots(figsize=(14, 10))
+        # 定义地图（聚焦港口集中区域，如美洲：调整经纬度范围）
+        # 若全球分布，可保留 llcrnrlon=-180, urcrnrlon=180, llcrnrlat=-90, urcrnrlat=90
+        world_map = Basemap(
+            resolution='i',  # 中分辨率（比'l'更清晰，加载速度适中）
+            projection='cyl',
+            # lon_0=center_lon,  # 以港口中心为地图中心
+            # lat_0=center_lat,
+            llcrnrlon=-180,  # 左边界：最西港口-10度
+            urcrnrlon=180,  # 右边界：最东港口+10度
+            llcrnrlat=-70,  # 下边界：最南港口-30度
+            urcrnrlat=70,  # 上边界：最北港口+10度
+            ax=ax
+        )
+
+        # 绘制地图要素（更细腻的配色）
+        world_map.drawmapboundary(fill_color='#A8DADC')  # 海洋：浅蓝色
+        world_map.fillcontinents(color='#F1FAEE', lake_color='#A8DADC', alpha=0.8)  # 陆地：浅灰色
+        world_map.drawcoastlines(linewidth=0.8, color='#1D3557')  # 海岸线：深蓝色
+        world_map.drawcountries(linewidth=0.6, color='#457B9D')  # 国家边界：中蓝色
+        world_map.drawmeridians(np.arange(-180, 180, 20), labels=[0, 0, 0, 1], linewidth=0.3, color='#999')  # 经度线
+        world_map.drawparallels(np.arange(-90, 90, 20), labels=[1, 0, 0, 0], linewidth=0.3, color='#999')  # 纬度线
+
+        for node, attr in port_info.items():
+            lon, lat, teu, continent_code = port_info[node]
+            x, y = world_map(lon, lat)
+
+            # 节点大小与TEU成正比（归一化到5-20）
+            max_teu = max(p[2] for p in port_info.values())
+            node_size = 5 + 15 * (teu / max_teu)
+
+            # 按大洲获取颜色
+            node_color = continent_color_mapping[continent_code]
+
+            # 绘制节点
+            world_map.plot(
+                x,
+                y,
+                'o',
+                markersize=node_size,
+                color=node_color,
+                markeredgecolor='white',
+                markeredgewidth=0.8,
+                alpha=0.9
+            )
+
+        # ----------------------
+        # 5. 图例与标注（解释大洲缩写）
+        # ----------------------
+        # 大洲缩写对应的全称（用于图例说明）
+        continent_fullname = {
+            'NA': 'North America',
+            'SA': 'South America',
+            'EU': 'Europe',
+            'AS': 'Asia',
+            'AF': 'Africa',
+            'OC': 'Oceania',
+            'UN': 'Unknown'
+        }
+
+        # 生成图例（包含大洲颜色+缩写+全称）
+        legend_elements = [
+            Line2D(
+                [0], [0], marker='o', color='w',
+                markerfacecolor=color, markersize=10,
+                label=f'{code} ({continent_fullname[code]})'
+            ) for code, color in continent_color_mapping.items()
+        ]
+
+        ax.legend(
+            handles=legend_elements,
+            loc='lower left',
+            fontsize=9,
+            title='Continents',
+            title_fontsize=11
+        )
+
+        ax.set_title('2021 Spring Maritime Network', fontsize=16, pad=20)
+        plt.tight_layout()
+        # 保存图片
+        for for_mat in ["png", "eps"]:  # png and eps
+            plt.savefig(f'{cls.basic_path}/{save_path}{title}.{for_mat}',
+                        format=for_mat,  # 显式指定格式（可选，但更稳妥）
+                        dpi=300,
+                        bbox_inches='tight'  # 去除图片周围多余空白
+            )
+
+

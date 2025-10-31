@@ -1,18 +1,6 @@
-import csv
-import json
-import powerlaw
-import numpy as np
-import pandas as pd
-import networkx as nx
-import matplotlib.pyplot as plt
-from matplotlib.pyplot import scatter
-from mpl_toolkits.basemap import Basemap
-
-import Algorithm.Basic_Topology
-from Algorithm.ConstructNetwork import *
 # from Algorithm.Basic_Topology import *
 from Algorithm.Map import *
-from Algorithm.Read import *
+from MyData.Read import *
 
 
 def generate_graph(is_mul: bool):

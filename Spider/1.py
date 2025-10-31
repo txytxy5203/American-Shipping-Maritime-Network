@@ -2,14 +2,13 @@ import json
 
 import networkx as nx
 import pandas as pd
-import difflib
 import re
 import sys
 sys.path.append('..')
-import Algorithm.Read
+import MyData.Read
 
 
-HSCode = Algorithm.Read.read_USImpHSCode()
+HSCode = MyData.Read.read_USImpHSCode()
 data_path = "../Data/2019/Port/Port_Info_Json.json"
 # 一次性读取整个JSON文件
 with open(data_path, "r", encoding="utf-8") as file:

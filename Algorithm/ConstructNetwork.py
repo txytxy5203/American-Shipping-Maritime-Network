@@ -4,10 +4,9 @@ import json
 import sys
 sys.path.append('../Algorithm')
 import pandas as pd
-import numpy as np
 import networkx as nx
 import unicodedata
-from Read import Read
+from MyData.Read import Read
 
 
 # Port_Name = Algorithm.Read.read_port_name_info()
@@ -15,7 +14,6 @@ from Read import Read
 
 
 class ConstructNetwork:
-
 
     @classmethod
     def Read_Port_Data(cls):

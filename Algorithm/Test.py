@@ -1,18 +1,9 @@
 import matplotlib.pyplot as plt
-import numpy as np
 import pandas as pd
-import networkx as nx
 import sys
-import difflib
-import csv
-import re
 
 sys.path.append('..')
-import Algorithm.Basic_Topology
 import Algorithm.Draw
-import Algorithm.Read
-import Algorithm.Map
-import Algorithm.ConstructNetwork
 from mpl_toolkits.basemap import Basemap
 
 
