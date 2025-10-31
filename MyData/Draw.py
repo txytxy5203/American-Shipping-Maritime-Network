@@ -305,3 +305,62 @@ class Draw:
                         dpi=300,
                         bbox_inches='tight'  # 去除图片周围多余空白
             )
+
+    @classmethod
+    def draw_step(cls,
+            df: DataFrame,  # 包含k值和节点数的DataFrame
+            save_path:str,  # 保存路径
+            x_label: str,  # x轴标签
+            y_label: str,  # y轴标签
+            title: str,  # 图表标题
+            step_where:str ='post'   # 阶梯对齐方式：'pre'/'post'/'mid'
+    ):
+        """
+
+        :param df:
+        示例：
+        df = {
+            "k":     [1,  2,  4],
+            "nodes": [10, 6,  2]
+        }
+        :param save_path:
+        :param x_label:
+        :param y_label:
+        :param title:
+        :param step_where:
+        :return:
+        """
+
+
+        # 提取x和y数据（确保k值按顺序排列）
+        k_values = df['k'].sort_values().values  # x轴：k值（排序）
+        node_counts = df['nodes'].values  # y轴：节点数
+
+        # 绘制阶梯图
+        plt.figure(figsize=(8, 5))
+        plt.step(
+            k_values,
+            node_counts,
+            where=step_where,  # 阶梯对齐方式
+            color='blue',
+            linewidth=2,
+            # marker='o',  # 标记每个k值对应的点
+            markersize=6,
+            linestyle='-'  # 阶梯线样式
+        )
+
+        # 设置坐标轴和标题
+        plt.xlabel(x_label, fontsize=12)
+        plt.ylabel(y_label, fontsize=12)
+        plt.title(title, fontsize=14, pad=15)
+        plt.grid(alpha=0.3)  # 添加网格线
+        plt.xticks(k_values)  # x轴刻度与k值一致
+        plt.tight_layout()  # 自动调整布局
+
+        # 保存图片
+        for for_mat in ["png", "eps"]:  # png and eps
+            plt.savefig(f'{cls.basic_path}/{save_path}{title}.{for_mat}',
+                        format=for_mat,  # 显式指定格式（可选，但更稳妥）
+                        dpi=300,
+                        bbox_inches='tight'  # 去除图片周围多余空白
+            )
