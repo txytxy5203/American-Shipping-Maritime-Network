@@ -418,18 +418,14 @@ class Draw:
             lat = float(Port_Data[node]["latitude"])
             port_info[node] = (lon, lat, port_data['TEU'], port_data['Continent'])
 
-        # 2. 地图与网络可视化设置
-        # 美国中心经纬度：西经98.5°（-98.5），北纬39.8°
-        center_lon = -98.5
-        center_lat = 39.8
+        # 地图与网络可视化设置
         # 创建画布
         fig, ax = plt.subplots(figsize=(14, 10))
-        # 定义地图（聚焦港口集中区域，如美洲：调整经纬度范围）
-        # 若全球分布，可保留 llcrnrlon=-180, urcrnrlon=180, llcrnrlat=-90, urcrnrlat=90
+        # 定义地图
         world_map = Basemap(
             resolution='i',  # 中分辨率（比'l'更清晰，加载速度适中）
             projection='cyl',
-            # lon_0=center_lon,  # 以港口中心为地图中心
+            # lon_0=center_lon,
             # lat_0=center_lat,
             llcrnrlon=-180,  # 左边界：最西港口-10度
             urcrnrlon=180,  # 右边界：最东港口+10度

@@ -262,31 +262,37 @@ def k_core_and_nodes():
         )
 #endregion
 
-for DiG, G, time in get_network():
-    core_numbers = nx.core_number(G)
-    # 确定最大k值（所有节点核数的最大值）
-    max_k = max(core_numbers.values())
-    # 存储每个k对应的数量
-    k_core_counts = {}
-    k_core = nx.k_core(G, k=max_k, core_number=core_numbers)
+def center_ports_map():
+    """
+    每个网络的Center Ports
+    目前定义的是 k-core最大的节点 && 加权中心性 > 10 0000
+    :return:
+    """
+    for DiG, G, time in get_network():
+        core_numbers = nx.core_number(G)
+        # 确定最大k值（所有节点核数的最大值）
+        max_k = max(core_numbers.values())
+        # 存储每个k对应的数量
+        k_core_counts = {}
+        k_core = nx.k_core(G, k=max_k, core_number=core_numbers)
 
-    center_nodes = [node for node, attr in k_core.nodes(data=True) if attr['total_TEU'] > 100000]
+        center_nodes = [node for node, attr in k_core.nodes(data=True) if attr['total_TEU'] > 100000]
 
-    data = {
-        "Port": [],
-        "TEU": [],
-        "Continent": []
-    }
-    for node in center_nodes:
-        data["Port"].append(node)
-        data["TEU"].append(DiG.nodes[node]['total_TEU'])
-        data["Continent"].append(DiG.nodes[node]['continent'])
+        data = {
+            "Port": [],
+            "TEU": [],
+            "Continent": []
+        }
+        for node in center_nodes:
+            data["Port"].append(node)
+            data["TEU"].append(DiG.nodes[node]['total_TEU'])
+            data["Continent"].append(DiG.nodes[node]['continent'])
 
-    df = pd.DataFrame(data)
-    Draw.draw_world_ports_map(df,
-                              "WorldMap/CenterPorts/",
-                              f"Center Ports {time}"
-    )
+        df = pd.DataFrame(data)
+        Draw.draw_world_ports_map(df,
+                                  "WorldMap/CenterPorts/",
+                                  f"Center Ports {time}"
+        )
 
 
 
