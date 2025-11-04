@@ -64,6 +64,19 @@ class Draw:
         }
     }
 
+    #regionWorldMap
+    # 假设缩写规则：NA=北美洲, SA=南美洲, EU=欧洲, AS=亚洲, AF=非洲, OC=大洋洲, UN=未知
+    continent_color_mapping = {
+        'NA': '#1f77b4',  # 深蓝色（北美洲）
+        'SA': '#ff7f0e',  # 橙色（南美洲）
+        'EU': '#2ca02c',  # 绿色（欧洲）
+        'AS': '#d62728',  # 红色（亚洲）
+        'AF': '#9467bd',  # 紫色（非洲）
+        'OC': '#8c564b',  # 棕色（大洋洲）
+        'UN': '#7f7f7f'  # 灰色（未知大洲）
+    }
+    #endregion
+
     @classmethod
     def draw_plot(cls,
                   df:DataFrame,
@@ -377,11 +390,12 @@ class Draw:
                              title:str
                              ):
         """
-        画港口的函数
+        画港口的函数  港口的颜色抛给外部处理
         :param df: {
             "Port": ['USLGB'],
             "Continent": ["NA"],
-            "TEU": [10000]
+            "TEU": [10000],
+            "Colors": ['red']
         }
         :param save_path:
         :param title:
@@ -391,16 +405,7 @@ class Draw:
         # 读取港口坐标数据
         Port_Data = Read.Read_Port_Data()
 
-        # 假设缩写规则：NA=北美洲, SA=南美洲, EU=欧洲, AS=亚洲, AF=非洲, OC=大洋洲, UN=未知
-        continent_color_mapping = {
-            'NA': '#1f77b4',  # 深蓝色（北美洲）
-            'SA': '#ff7f0e',  # 橙色（南美洲）
-            'EU': '#2ca02c',  # 绿色（欧洲）
-            'AS': '#d62728',  # 红色（亚洲）
-            'AF': '#9467bd',  # 紫色（非洲）
-            'OC': '#8c564b',  # 棕色（大洋洲）
-            'UN': '#7f7f7f'  # 灰色（未知大洲）
-        }
+
 
         port_info = {}  # key 为港口   value为各种信息组成的tuple
         for idx, port_data in df.iterrows():
@@ -416,7 +421,10 @@ class Draw:
             # 存储有效信息
             lon = float(Port_Data[node]["longitude"])
             lat = float(Port_Data[node]["latitude"])
-            port_info[node] = (lon, lat, port_data['TEU'], port_data['Continent'])
+            port_info[node] = (lon, lat,
+                               port_data['TEU'],
+                               port_data['Continent'],
+                               port_data['Colors'])
 
         # 地图与网络可视化设置
         # 创建画布
@@ -443,15 +451,13 @@ class Draw:
         world_map.drawparallels(np.arange(-90, 90, 20), labels=[1, 0, 0, 0], linewidth=0.3, color='#999')  # 纬度线
 
         for node, attr in port_info.items():
-            lon, lat, teu, continent_code = port_info[node]
+            lon, lat, teu, continent_code, color = port_info[node]
             x, y = world_map(lon, lat)
 
             # 节点大小与TEU成正比（归一化到5-20）
             max_teu = max(p[2] for p in port_info.values())
-            node_size = 5 + 15 * (teu / max_teu)
+            node_size = 5 + 10 * (teu / max_teu)
 
-            # 按大洲获取颜色
-            node_color = continent_color_mapping[continent_code]
 
             # 绘制节点
             world_map.plot(
@@ -459,7 +465,7 @@ class Draw:
                 y,
                 'o',
                 markersize=node_size,
-                color=node_color,
+                color=color,
                 markeredgecolor='white',
                 markeredgewidth=0.8,
                 alpha=0.9
@@ -479,13 +485,30 @@ class Draw:
             'UN': 'Unknown'
         }
 
-        # 生成图例（包含大洲颜色+缩写+全称）
+        # # 生成图例（包含大洲颜色+缩写+全称）   TODO 图例之后是一个问题  暂时先这么用着
+        # legend_elements = [
+        #     Line2D(
+        #         [0], [0], marker='o', color='w',
+        #         markerfacecolor=color, markersize=10,
+        #         label=f'{code} ({continent_fullname[code]})'
+        #     ) for code, color in cls.continent_color_mapping.items()
+        # ]
+        # 图例：红色=remove，蓝色=add（替换原大洲图例逻辑）
         legend_elements = [
+            # 蓝色节点：add
             Line2D(
                 [0], [0], marker='o', color='w',
-                markerfacecolor=color, markersize=10,
-                label=f'{code} ({continent_fullname[code]})'
-            ) for code, color in continent_color_mapping.items()
+                markerfacecolor='#1f77b4',  # 蓝色（可根据需求调整色号）
+                markersize=10,
+                label='add (Blue)'  # 标签：状态+颜色
+            ),
+            # 红色节点：remove
+            Line2D(
+                [0], [0], marker='o', color='w',
+                markerfacecolor='#d62728',  # 红色（可根据需求调整色号）
+                markersize=10,
+                label='remove (Red)'  # 标签：状态+颜色
+            )
         ]
 
         ax.legend(
@@ -496,7 +519,7 @@ class Draw:
             title_fontsize=11
         )
 
-        ax.set_title('2021 Spring Maritime Network', fontsize=16, pad=20)
+        ax.set_title(f'{title}', fontsize=16, pad=20)
         plt.tight_layout()
         # 保存图片
         for for_mat in ["png", "eps"]:  # png and eps

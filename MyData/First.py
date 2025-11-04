@@ -52,6 +52,31 @@ def get_network():
             DiG = nx.read_graphml(file_path)
             G = nx.Graph(DiG)
             yield DiG, G, time
+def get_network_certain_time(year_season:str):
+    """
+    得到某个时间段具体的network
+    :param year_season:
+    :return:
+    """
+    years = range(2017, 2022)
+    seasons = ['Spring', 'Summer', 'Autumn', 'Winter']
+    # 读取数据并构建网络
+    for year in years:
+        for season in seasons:
+            # 跳过2021年夏季及以后（数据不全）
+            if year == 2021 and season in ['Summer', 'Autumn', 'Winter']:
+                continue
+            file_path = f'../Data/{year}/US/Season/{season}/US{year}_{season}_Digraph.graphml'
+            if not os.path.exists(file_path):
+                print(f'⚠️ 文件不存在: {file_path}')
+                continue
+            time = f"{year} {season}"
+
+            DiG = nx.read_graphml(file_path)
+            G = nx.Graph(DiG)
+            if time == year_season:
+                return DiG, G, time
+    return None, None
 def k_and_knn():
     """
     画 k 与 knn(k) 的散点图
@@ -260,11 +285,9 @@ def k_core_and_nodes():
             "Nodes",
             f"K core numbers {time}",
         )
-#endregion
-
 def center_ports_map():
     """
-    每个网络的Center Ports
+    保存和画出 每个网络的Center Ports
     目前定义的是 k-core最大的节点 && 加权中心性 > 10 0000
     :return:
     """
@@ -272,8 +295,7 @@ def center_ports_map():
         core_numbers = nx.core_number(G)
         # 确定最大k值（所有节点核数的最大值）
         max_k = max(core_numbers.values())
-        # 存储每个k对应的数量
-        k_core_counts = {}
+
         k_core = nx.k_core(G, k=max_k, core_number=core_numbers)
 
         center_nodes = [node for node, attr in k_core.nodes(data=True) if attr['total_TEU'] > 100000]
@@ -281,18 +303,105 @@ def center_ports_map():
         data = {
             "Port": [],
             "TEU": [],
-            "Continent": []
+            "Continent": [],
+            "Colors":[]
         }
         for node in center_nodes:
             data["Port"].append(node)
             data["TEU"].append(DiG.nodes[node]['total_TEU'])
-            data["Continent"].append(DiG.nodes[node]['continent'])
+
+            continent = DiG.nodes[node]['continent']
+            data["Continent"].append(continent)
+            data["Colors"].append(Draw.continent_color_mapping[continent])
 
         df = pd.DataFrame(data)
+        df.to_csv(f'Output/WorldMap/CenterPorts/CenterPort{time}.csv',
+                  index=False)
         Draw.draw_world_ports_map(df,
                                   "WorldMap/CenterPorts/",
                                   f"Center Ports {time}"
         )
+#endregion
 
 
 
+
+
+def get_common_and_unique(last:list, next:list):
+    # 转换为集合
+    last_set = set(last)
+    next_set = set(next)
+
+    # 重合的元素（交集）
+    common_elements = last_set & next_set
+
+    # last独有的元素（差集）
+    last_unique = last_set - next_set
+
+    # next独有的元素（差集）
+    next_unique = next_set - last_set
+
+    return common_elements, last_unique, next_unique
+
+def center_ports_change_map(last_time:str, next_time:str):
+    df_last = pd.read_csv(f"Output/WorldMap/CenterPorts/CenterPort{last_time}.csv",
+                          dtype={
+                         'Port': 'string',
+                         'TEU': 'float64',
+                         'Continent': 'string',  # 或者 'object'
+                         'Colors': 'string'
+                          },
+                          keep_default_na=False  # 不使用默认的缺失值识别    因为它会把NA识别成缺失
+    )
+    last_list = list(df_last["Port"])
+    df_next = pd.read_csv(f"Output/WorldMap/CenterPorts/CenterPort{next_time}.csv",
+                         dtype={
+                         'Port': 'string',
+                         'TEU': 'float64',
+                         'Continent': 'string',  # 或者 'object'
+                         'Colors': 'string'
+                         },
+                         keep_default_na=False  # 不使用默认的缺失值识别    因为它会把NA识别成缺失
+    )
+    next_list = list(df_next["Port"])
+    data = {
+        "Port":[],
+        "TEU":[],
+        "Continent":[],
+        "Colors":[]
+    }
+    lastDiG = nx.read_graphml(f'../Data/2017/US/Season/Spring/US2017_Spring_Digraph.graphml')
+    nextDiG = nx.read_graphml(f'../Data/2021/US/Season/Spring/US2021_Spring_Digraph.graphml')
+
+    common_elements_ports, last_unique_ports, next_unique_ports = get_common_and_unique(last_list, next_list)
+    # for port in common_elements_ports:
+    #     last_teu = lastDiG.nodes[port]['total_TEU']
+    #     next_teu = nextDiG.nodes[port]['total_TEU']
+    #     data['Port'].append(port)
+    #     # data['TEU'].append(next_teu - last_teu)
+    #     data['TEU'].append(1000)
+    #     data['Continent'].append(lastDiG.nodes[port]['continent'])
+    #     data['Colors'].append('grey')
+    for port in last_unique_ports:
+        last_teu = lastDiG.nodes[port]['total_TEU']
+        next_teu = nextDiG.nodes[port]['total_TEU']
+        data['Port'].append(port)
+        # data['TEU'].append(next_teu - last_teu)
+        data['TEU'].append(10000)
+        data['Continent'].append(lastDiG.nodes[port]['continent'])
+        data['Colors'].append('red')
+    for port in next_unique_ports:
+        last_teu = lastDiG.nodes[port]['total_TEU']
+        next_teu = nextDiG.nodes[port]['total_TEU']
+        data['Port'].append(port)
+        # data['TEU'].append(next_teu - last_teu)
+        data['TEU'].append(10000)
+        data['Continent'].append(lastDiG.nodes[port]['continent'])
+        data['Colors'].append('blue')
+    df = pd.DataFrame(data)
+
+    Draw.draw_world_ports_map(
+                df,
+        "WorldMap/CenterPortsChanges/",
+        "Center Port 2017Spring To 2021Spring Change"
+    )
