@@ -1,5 +1,11 @@
+import json
+import pathlib
+
 import numpy as np
 import networkx as nx
+from Read import Read
+
+
 
 class DirectedWeighted:
     """
@@ -78,3 +84,52 @@ class DirectedWeighted:
         in_weighted_degrees, out_weighted_degrees, total_weighted_degrees = cls.get_network_weighted_degree(g)
 
         return np.std(in_weighted_degrees, ddof=0), np.std(out_weighted_degrees, ddof=0), np.std(total_weighted_degrees, ddof=0)
+
+    @classmethod
+    def write_ports_centrality(cls):
+        """
+        把港口的节点中心性写入json文件
+        :return:
+        """
+        weighted_dc_record = {}
+        weighted_bc_record = {}
+        weighted_pagerank_record = {}
+
+        for DiG, G, time in Read.get_network():
+
+            weighted_degree = dict(DiG.degree(weight='volumeTEU'))
+            weighted_in_degree = dict(DiG.in_degree(weight='volumeTEU'))
+            weighted_out_degree = dict(DiG.out_degree(weight='volumeTEU'))
+
+            # 这边都不需要除以 n-1 不需要归一化
+            dc = {node: d for node, d in weighted_degree.items()}
+            in_dc = {node: d for node, d in weighted_in_degree.items()}
+            out_dc = {node: d for node, d in weighted_out_degree.items()}
+
+            # weighted node centrality
+            node_dc = {}
+            for node in DiG.nodes():
+                node_dc[node] = {
+                    'dc': dc[node],
+                    'in_dc': in_dc[node],
+                    'out_dc': out_dc[node]
+                }
+            weighted_dc_record[time] = node_dc
+
+            # weighted betweenness centrality
+            weighted_bc_record[time] = nx.betweenness_centrality(DiG, normalized=True)
+
+            # weighted pagerank scores
+            weighted_pagerank_record[time] = nx.pagerank(
+                DiG,
+                alpha=0.85,
+                weight='volumeTEU',
+                tol=1e-6
+            )
+
+        pathlib.Path('Output/DirectedWeighted/PortsWeightedDegree/ports_weighted_degree_centrality.json').write_text(
+            json.dumps(weighted_dc_record, indent=2))
+        pathlib.Path('Output/DirectedWeighted/PortsDirectedBetweenness/ports_weighted_betweenness_centrality.json').write_text(
+            json.dumps(weighted_bc_record, indent=2))
+        pathlib.Path('Output/DirectedWeighted/PortsWeightedPageRank/ports_weighted_pagerank_scores.json').write_text(
+            json.dumps(weighted_pagerank_record, indent=2))

@@ -14241,8 +14241,8 @@
         "port_code": "GBTHP",
         "country": "英国",
         "country_english": "United Kingdom",
-        "longitude": 120.7287595,
-        "latitude": 51.0,
+        "longitude": 0.66666,
+        "latitude": 51.3333,
         "isLocation": true
     },
     "GBDOU": {
@@ -38827,8 +38827,8 @@
         "port_code": "USFNA",
         "country": "美国",
         "country_english": "United States",
-        "longitude": -91.4821482,
-        "latitude": -0.4123801,
+        "longitude": -81.4821482,
+        "latitude": 30.666,
         "isLocation": true
     },
     "USDET": {

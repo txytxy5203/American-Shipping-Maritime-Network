@@ -43,6 +43,7 @@ class Draw:
         plt.xscale('log')
         plt.yscale('log')
 
+
     _scale_handlers: dict[str, Callable] = {
         # 模式名 -> 处理函数 的映射
         'linear': _scale_linear,
@@ -56,11 +57,6 @@ class Draw:
             'colors': _normal_colors,
             'markers': _normal_markers,
             'show_legend': True
-        },
-        'ports': {
-            'colors': _ports_colors,
-            'markers': _ports_markers,
-            'show_legend': False
         }
     }
 
@@ -142,48 +138,54 @@ class Draw:
                         format=for_mat,  # 显式指定格式（可选，但更稳妥）
                         dpi=300,
                         bbox_inches='tight'  # 去除图片周围多余空白
-                        )
+            )
     @classmethod
-    def draw_scatter(cls,
-                     df:DataFrame,
-                     save_path:str,
-                     x_label:str,
-                     y_label:str,
-                     title:str,
-                     scale:str = 'linear',
-                     mode:str = 'normal'
-                     ):
+    def draw_scatter_list(cls,
+                          df:DataFrame,
+                          save_path:str,
+                          x_label:str,
+                          y_label:str,
+                          title:str,
+                          scale:str = 'linear',
+                          label:bool = False
+                          ):
         """
         画散点的函数
         TODO 加一个在散点图上显示标签的功能  比如说大于多少就 显示标签
-
+        TODO 这个mode之后要修改  颜色、标签等等自己管自己的
         :param df:
         Example：
-        data = {
+        TODO 以下的两种数据情况一定要再好好处理一下  就分不同的模块处理 实在不行就分成两个函数吧
+        data1 = {
             "US": [(28.5, 3), (35.2,3), (22.8, 34), (41.1,4)],
             "CN": [(5, 5), (1,3), (22, 3), (40.1,5)]
+        }
+        data2 = {
+            "USLGB": [(1, 3)],
+            "CNSHN": [(2, 3)]
         }
         :param save_path:
         :param x_label:
         :param y_label:
         :param title:
         :param scale:  横纵坐标的缩放模式
-        :param mode: 画图的模式  具体有哪些配置看上边的 _mode_configs
+        :param mode:   画图的模式  具体有哪些配置看上边的 _mode_configs
+        :param label:
         """
 
         # 模式的合法性
         if scale not in cls._scale_handlers.keys():
             raise ValueError("没有这种scale模式")
-        if mode not in cls._mode_configs.keys():
-            raise ValueError("没有这种mode模式")
+
 
         # 获取配置信息
-        mode_config = cls._mode_configs[mode]
+        mode_config = cls._mode_configs["normal"]
         colors = mode_config['colors']
         markers = mode_config['markers']
         show_legend = mode_config['show_legend']
 
         plt.figure(figsize=(10, 6))
+
 
         for i, col in enumerate(df.columns):
             coordinates = df[col]
@@ -198,9 +200,95 @@ class Draw:
                 marker=markers[i % len(markers)],
                 s=60,  # 散点大小
                 alpha=0.8,  # 透明度
-                linewidth=0.8  # 略微加粗边框，与高透明度匹配
+                linewidth=0.8,  # 略微加粗边框，与高透明度匹配
+                edgecolors = 'k',
             )
 
+        cls._scale_handlers[scale]()   # 执行对应的缩放模式
+        # 添加标签和标题
+        plt.xlabel(x_label, fontsize=12)
+        plt.ylabel(y_label, fontsize=12)
+        plt.title(title, fontsize=14)
+        if show_legend:
+            plt.legend()
+        plt.tight_layout()
+
+        for for_mat in ["png", "eps"]:      # png and eps
+            plt.savefig(f'{cls.basic_path}/{save_path}{title}.{for_mat}',
+                        format=for_mat,  # 显式指定格式（可选，但更稳妥）
+                        dpi=300,
+                        bbox_inches='tight'  # 去除图片周围多余空白
+            )
+    @classmethod
+    def draw_scatter_ports(cls,
+                     df:DataFrame,
+                     save_path:str,
+                     x_label:str,
+                     y_label:str,
+                     title:str,
+                     scale:str = 'linear',
+                     label:bool = False
+                     ):
+        """
+        画散点的函数
+        key就是港口  value中的list每一列就是不同的值
+        :param df:
+        Example：
+        data2 = {
+            "USLGB": [1, 3],
+            "CNSHN": [2, 3]
+        }
+        :param save_path:
+        :param x_label:
+        :param y_label:
+        :param title:
+        :param scale:  横纵坐标的缩放模式
+        :param label:
+        """
+
+        # 模式的合法性
+        if scale not in cls._scale_handlers.keys():
+            raise ValueError("没有这种scale模式")
+
+
+        plt.figure(figsize=(10, 6))
+
+        for i, port in enumerate(df.columns):
+            coordinates = df[port]
+            x = coordinates[0][0]       # 这个地方要取两次值
+            y = coordinates[0][1]
+
+            plt.scatter(
+                x,
+                y,
+                label=port,  # 图例用国家名（US/CN）
+                marker='o',
+                s=60,  # 散点大小
+                alpha=0.8,  # 透明度
+                linewidth=0.8,  # 略微加粗边框，与高透明度匹配
+                color = 'steelblue',
+                edgecolors = 'k',
+            )
+
+            # -------------------------- 关键：plt.text() 添加标签 --------------------------
+            if label and (x > 7e5 or y > 0.04):
+                plt.text(
+                    # 注意这里是坐标系中的数值偏移
+                    x + 0.5,  # 文本的 x 坐标（在散点 x 基础上右移1，避免重叠）
+                    y - 0.003,  # 文本的 y 坐标（在散点 y 基础上上移1）
+                    s=port,  # 标签内容（港口名）
+                    fontsize=9,  # 字体大小
+                    color='black',  # 字体颜色
+                    weight='bold',  # 加粗（可选）
+                    ha='left',  # 文本水平对齐方式（left/center/right）
+                    va='bottom',  # 文本垂直对齐方式（bottom/center/top）
+                    bbox=dict(  # 半透明背景框（可选，增强可读性）
+                        boxstyle='round,pad=0.2',
+                        facecolor='white',
+                        alpha=0.7,
+                        edgecolor='black'
+                )
+            )
 
         cls._scale_handlers[scale]()   # 执行对应的缩放模式
         # 添加标签和标题
@@ -222,14 +310,20 @@ class Draw:
     def draw_dual_axis_plot(cls,
                   df:DataFrame,
                   save_path:str,
-                  title:str):
+                  title:str,
+                  loc:str
+        ):
         """
         两个不同尺度的数据画在一起
         :param df:
         :param save_path:
         :param title:
+        :param loc: 图例的位置
         :return:
         """
+        # 数据先保存
+        df.to_csv(f'{cls.basic_path}/{save_path}{title}.csv',
+                  index=False)
 
         time_col = df.columns[0]
         left_col = df.columns[1]
@@ -307,7 +401,7 @@ class Draw:
             lines1 + lines2,  # 合并图例线条
             labels1 + labels2,  # 合并图例文字
             fontsize=11,
-            loc='upper left',  # 图例位置（右上，不遮挡数据）
+            loc=loc,
             frameon=True,  # 显示图例边框
             fancybox=True,  # 边框圆角
             shadow=True  # 边框阴影（更立体）
@@ -390,6 +484,7 @@ class Draw:
                              title:str
                              ):
         """
+        TODO 这个画WorldMap的工作之后再处理 有点乱
         画港口的函数  港口的颜色抛给外部处理
         :param df: {
             "Port": ['USLGB'],
@@ -466,10 +561,32 @@ class Draw:
                 'o',
                 markersize=node_size,
                 color=color,
-                markeredgecolor='white',
+                markeredgecolor='black',
                 markeredgewidth=0.8,
                 alpha=0.9
             )
+            # # 【新增】给节点添加标签（以港口名为例，可替换为其他内容）
+            # # 1. 标签内容：从port_info的attr中获取港口名（根据你的数据结构调整，确保有该字段）
+            # label_text = node
+            #
+            # # 2. 添加标签：x,y是节点坐标，label_text是标签内容
+            # ax.text(
+            #     x,  # 标签x轴偏移（向右移1.5个单位，避免覆盖节点）
+            #     y - 3.5,  # 标签y轴偏移（向上移0.5个单位，避免覆盖节点）
+            #     label_text,
+            #     fontsize=7,  # 字体大小（根据节点密度调整，避免杂乱）
+            #     color='#333333',  # 标签颜色（深灰色，比黑色柔和，可读性强）
+            #     ha='left',  # 标签水平对齐方式（左对齐，配合x偏移）
+            #     va='center',  # 标签垂直对齐方式（居中）
+            #     alpha=0.9,  # 标签透明度（与节点一致）
+            #     bbox=dict(
+            #         boxstyle='round,pad=0.2',  # 边框样式：round（圆角），pad=0.2（文本与边框的内边距）
+            #         facecolor='white',  # 背景色：白色
+            #         edgecolor='black',  # 边框色：黑色
+            #         linewidth=0.8,  # 边框宽度：0.8（与节点边框宽度一致，视觉统一）
+            #         alpha=0.9  # 背景透明度：0.9（与标签、节点透明度一致）
+            #     )
+            # )
 
         # ----------------------
         # 5. 图例与标注（解释大洲缩写）
@@ -498,14 +615,14 @@ class Draw:
             # 蓝色节点：add
             Line2D(
                 [0], [0], marker='o', color='w',
-                markerfacecolor='#1f77b4',  # 蓝色（可根据需求调整色号）
+                markerfacecolor='blue',  # 蓝色（可根据需求调整色号）
                 markersize=10,
                 label='add (Blue)'  # 标签：状态+颜色
             ),
             # 红色节点：remove
             Line2D(
                 [0], [0], marker='o', color='w',
-                markerfacecolor='#d62728',  # 红色（可根据需求调整色号）
+                markerfacecolor='red',  # 红色（可根据需求调整色号）
                 markersize=10,
                 label='remove (Red)'  # 标签：状态+颜色
             )

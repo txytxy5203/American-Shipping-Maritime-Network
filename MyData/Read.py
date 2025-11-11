@@ -1,10 +1,15 @@
+import os
 import re
 import csv
 import json
 
+import networkx as nx
 
 
 class Read:
+    """
+    对于有固定操作流程的读取文件的函数 都放在这个类里面
+    """
     @classmethod
     def read_USImpHSCode(cls):
         '''
@@ -94,3 +99,27 @@ class Read:
         with open(data_path, "r", encoding="utf-8") as file:
             port_data = json.load(file)
         return port_data
+
+    @classmethod
+    def get_network(cls):
+        """
+        网络生成器函数
+        :return: 每次生成对应的 DiG  G  time
+        """
+        years = range(2017, 2022)
+        seasons = ['Spring', 'Summer', 'Autumn', 'Winter']
+        # 读取数据并构建网络
+        for year in years:
+            for season in seasons:
+                # 跳过2021年夏季及以后（数据不全）
+                if year == 2021 and season in ['Summer', 'Autumn', 'Winter']:
+                    continue
+                file_path = f'../Data/{year}/US/Season/{season}/US{year}_{season}_Digraph.graphml'
+                if not os.path.exists(file_path):
+                    print(f'⚠️ 文件不存在: {file_path}')
+                    continue
+                time = f"{year} {season}"
+
+                DiG = nx.read_graphml(file_path)
+                G = nx.Graph(DiG)
+                yield DiG, G, time
