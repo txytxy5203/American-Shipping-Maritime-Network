@@ -27,6 +27,7 @@ from MyData.Draw import Draw
 from MyData.NullModel import NullModel
 from MyData.DirectedWeighted import DirectedWeighted
 from MyData.Undirected import Undirected
+from MyData.Read import Read
 sys.path.append('../Algorithm')
 
 #regionTools
@@ -48,28 +49,6 @@ def get_common_and_unique(last:list, next:list):
 #endregion
 
 #regionMain
-def get_network():
-    """
-    网络生成器函数
-    :return: 每次生成对应的 DiG  G  time
-    """
-    years = range(2017, 2022)
-    seasons = ['Spring', 'Summer', 'Autumn', 'Winter']
-    # 读取数据并构建网络
-    for year in years:
-        for season in seasons:
-            # 跳过2021年夏季及以后（数据不全）
-            if year == 2021 and season in ['Summer', 'Autumn', 'Winter']:
-                continue
-            file_path = f'../Data/{year}/US/Season/{season}/US{year}_{season}_Digraph.graphml'
-            if not os.path.exists(file_path):
-                print(f'⚠️ 文件不存在: {file_path}')
-                continue
-            time = f"{year} {season}"
-
-            DiG = nx.read_graphml(file_path)
-            G = nx.Graph(DiG)
-            yield DiG, G, time
 def get_network_certain_time(year_season:str):
     """
     得到某个时间段具体的network
@@ -656,4 +635,6 @@ def generate_simple_weighted_digraph(num_nodes=10, weight_range=(1,10), edge_den
 # )
 
 
-DirectedWeighted.write_ports_centrality()
+
+
+DirectedWeighted.write_ports_weighted_betweenness_centrality_rank()
