@@ -1,11 +1,15 @@
 import os
 import networkx as nx
+import pandas as pd
+
+from MyData.Draw import Draw
 
 
 class Main:
     """
     主类  所有出结果的函数全部放在这里面
     """
+    #region网络生成器
     @classmethod
     def get_certain_networks_by_seasons(cls, year_season: str):
         """
@@ -112,3 +116,28 @@ class Main:
                 DiG = nx.read_graphml(file_path)
                 G = nx.Graph(DiG)
                 yield DiG, G, time
+    #endregion
+
+    @classmethod
+    def nodes_and_edges(cls):
+        """
+        节点和边的数量变化趋势图
+        :return:
+        """
+        data = {
+            "time":[],
+            "nodes":[],
+            "edges":[]
+        }
+        for DiG, G, time in cls.get_networks_by_months():
+            data["time"].append(time)
+            data["nodes"].append(G.number_of_nodes())
+            data["edges"].append(G.number_of_edges())
+        df = pd.DataFrame(data)
+        Draw.draw_dual_axis_plot(
+            df,
+            "Months/Undirected/NodesAndEdges/",
+            "Nodes And Edges",
+            "lower left"
+        )
+

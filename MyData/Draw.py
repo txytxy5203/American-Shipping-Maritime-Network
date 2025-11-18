@@ -155,14 +155,9 @@ class Draw:
         TODO 这个mode之后要修改  颜色、标签等等自己管自己的
         :param df:
         Example：
-        TODO 以下的两种数据情况一定要再好好处理一下  就分不同的模块处理 实在不行就分成两个函数吧
         data1 = {
             "US": [(28.5, 3), (35.2,3), (22.8, 34), (41.1,4)],
             "CN": [(5, 5), (1,3), (22, 3), (40.1,5)]
-        }
-        data2 = {
-            "USLGB": [(1, 3)],
-            "CNSHN": [(2, 3)]
         }
         :param save_path:
         :param x_label:
@@ -311,7 +306,9 @@ class Draw:
                   df:DataFrame,
                   save_path:str,
                   title:str,
-                  loc:str
+                  loc:str,
+                  linewidth:int = 2,
+                  markersize:int = 5
         ):
         """
         两个不同尺度的数据画在一起
@@ -319,6 +316,8 @@ class Draw:
         :param save_path:
         :param title:
         :param loc: 图例的位置
+        :param markersize:
+        :param linewidth:
         :return:
         """
         # 数据先保存
@@ -330,7 +329,7 @@ class Draw:
         right_col = df.columns[2]
         time = df[time_col]
 
-        colors = ['blue', 'grey']
+        colors = ['#2878b4', '#373535']
         markers = ['o', 's']
 
         # 创建画布和坐标轴
@@ -345,9 +344,9 @@ class Draw:
             label=left_col,  # 图例名称
             color=colors[0],  # 颜色（可选：用十六进制色更精准，这里是深蓝色）
             marker=markers[0],  # 数据点标记（圆形）
-            linestyle='-',  # 线条样式（实线）
-            linewidth=2.5,  # 线条宽度（加粗更清晰）
-            markersize=7  # 数据点大小
+            linestyle='-',
+            linewidth=linewidth,  # 线条宽度（加粗更清晰）
+            markersize=markersize  # 数据点大小
         )
 
         # -------------------------- 右侧Y轴：Edges（假设M列是Edges数量） --------------------------
@@ -358,8 +357,8 @@ class Draw:
             color=colors[1],  # 颜色（深红色，与左侧区分明显）
             marker=markers[1],  # 数据点标记（方形，与圆形区分）
             linestyle='--',  # 线条样式（虚线，与实线区分）
-            linewidth=2.5,  # 线条宽度（与左侧一致，保持美观）
-            markersize=7  # 数据点大小（与左侧一致）
+            linewidth=linewidth,  # 线条宽度（与左侧一致，保持美观）
+            markersize=markersize  # 数据点大小（与左侧一致）
         )
 
         # -------------------------- 5. 美化双轴标签与标题 --------------------------
@@ -369,20 +368,20 @@ class Draw:
 
 
         ax1.set_ylabel(left_col,  # 左侧Y轴标签（明确对应Nodes）
-                       color=colors[0],  # 标签颜色与线条颜色一致
+                       color='black',  # 标签颜色与线条颜色一致
                        fontsize=12,
                        fontweight='bold')
         ax1.tick_params(axis='y',  # 左侧Y轴刻度设置
-                        colors=colors[0],  # 刻度颜色与线条一致
+                        colors='black',  # 刻度颜色与线条一致
                         labelsize=10)  # 刻度文字大小
 
         # -------------------------- 右侧Y轴（ax2）设置 --------------------------
         ax2.set_ylabel(right_col,  # 右侧Y轴标签（明确对应Edges）
-                       color=colors[1],  # 标签颜色与线条颜色一致
+                       color='black',  # 标签颜色与线条颜色一致
                        fontsize=12,
                        fontweight='bold')
         ax2.tick_params(axis='y',  # 右侧Y轴刻度设置
-                        colors=colors[1],  # 刻度颜色与线条一致
+                        colors='black',  # 刻度颜色与线条一致
                         labelsize=10)  # 刻度文字大小
 
         # -------------------------- 标题与X轴刻度 --------------------------

@@ -52,32 +52,6 @@ def get_common_and_unique(last:list, next:list):
 #endregion
 
 #regionMain
-def get_network_certain_time(year_season:str):
-    """
-    得到某个时间段具体的network
-    例如： 2017 Spring
-    :param year_season:
-    :return:
-    """
-    years = range(2017, 2022)
-    seasons = ['Spring', 'Summer', 'Autumn', 'Winter']
-    # 读取数据并构建网络
-    for year in years:
-        for season in seasons:
-            # 跳过2021年夏季及以后（数据不全）
-            if year == 2021 and season in ['Summer', 'Autumn', 'Winter']:
-                continue
-            file_path = f'../Data/{year}/US/Season/{season}/US{year}_{season}_Digraph.graphml'
-            if not os.path.exists(file_path):
-                print(f'⚠️ 文件不存在: {file_path}')
-                continue
-            time = f"{year} {season}"
-
-            DiG = nx.read_graphml(file_path)
-            G = nx.Graph(DiG)
-            if time == year_season:
-                return DiG, G
-    return None, None
 def k_and_knn():
     """
     画 k 与 knn(k) 的散点图
@@ -672,4 +646,4 @@ def generate_simple_weighted_digraph(num_nodes=10, weight_range=(1,10), edge_den
 #     )
 #endregion
 
-
+Main.nodes_and_edges()
