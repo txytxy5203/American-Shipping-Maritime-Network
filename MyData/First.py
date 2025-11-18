@@ -646,4 +646,4 @@ def generate_simple_weighted_digraph(num_nodes=10, weight_range=(1,10), edge_den
 #     )
 #endregion
 
-Main.nodes_and_edges()
+Main.average_shortest_length()

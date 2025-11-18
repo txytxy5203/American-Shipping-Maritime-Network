@@ -3,7 +3,8 @@ import networkx as nx
 import pandas as pd
 
 from MyData.Draw import Draw
-
+from MyData.NullModel import NullModel
+from MyData.Undirected import Undirected
 
 class Main:
     """
@@ -140,4 +141,35 @@ class Main:
             "Nodes And Edges",
             "lower left"
         )
+
+    @classmethod
+    def average_shortest_length(cls):
+        """
+        平均最短路径长度的变化趋势
+        :return:
+        """
+        data = {
+            "time":[],
+            "Network":[],
+            "Null Model":[]
+        }
+        for DiG, G, time in cls.get_networks_by_months():
+            null_model = NullModel.create_edges_nodes_null_model(G)
+
+            avg_shortest_length = Undirected.calculate_average_shortest_path_length(G)
+            avg_shortest_length_null_model = Undirected.calculate_average_shortest_path_length(null_model)
+
+            data["time"].append(time)
+            data["Network"].append(avg_shortest_length)
+            data["Null Model"].append(avg_shortest_length_null_model)
+        df = pd.DataFrame(data)
+        Draw.draw_plot(
+            df,
+            "Months/Undirected/AverageShortestLength/",
+            "<L>",
+            "Average Shortest Path Length",
+            0.5
+        )
+
+
 

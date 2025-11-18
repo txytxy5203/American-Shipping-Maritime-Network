@@ -78,21 +78,26 @@ class Draw:
                   df:DataFrame,
                   save_path:str,
                   y_label:str,
-                  title:str
+                  title:str,
+                  margin_rate:float=0.2,
                   ):
         """
         适用于大家的横坐标一样  比如说时间
         :param df:
         示例
         data = {
-                "Time": ["2017", "2018", "2019", "2020"],
+                "time": ["2017", "2018", "2019", "2020"],
                 "US": [28.5, 35.2, 22.8, 41.1],
                 "CN": [14, 28, 20, 40.1]
         }
         :param save_path: 保存路径 只需要写文件夹即可
         :param y_label: y轴的label
         :param title:   图片的名字
+        :param margin_rate:
         """
+        # 数据先保存
+        df.to_csv(f'{cls.basic_path}/{save_path}{title}.csv',
+                  index=False)
 
         x_col = df.columns[0]  # 第一列列名
         y_cols = df.columns[1:]  # 后面的列名
@@ -107,8 +112,8 @@ class Draw:
             'D',
             'p'
         ]
-        colors = ['#2E86AB',  # 深海蓝（主色1，沉稳）
-                  '#A23B72',  # 深玫红（主色2，醒目不刺眼）
+        colors = ['#2878b4',
+                  '#373535',
                   '#F18F01',  # 暖橙（辅助色1，中和冷色）
                   '#C73E1D',  # 暗红（辅助色2，小范围强调）
                   '#7209B7',  # 深紫（补充色1，低饱和不突兀）
@@ -123,6 +128,17 @@ class Draw:
                 marker=markers[i],
                 color=colors[i]
             )
+
+
+        # ---------------------- 核心修改：自适应范围 + 留边距 ----------------------
+        # 计算所有 Y 数据的最小值和最大值
+        all_y_data = df[y_cols].values.flatten()  # 合并所有 Y 列数据
+        y_min = all_y_data.min()
+        y_max = all_y_data.max()
+        # 预留的边距（可调整比例）
+        margin = (y_max - y_min) * margin_rate
+        plt.ylim(bottom=y_min - margin, top=y_max + margin)
+
 
         # 添加标签和标题
         plt.xlabel(x_col, fontsize=12)
