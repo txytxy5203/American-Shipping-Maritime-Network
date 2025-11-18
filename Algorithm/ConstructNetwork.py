@@ -150,6 +150,8 @@ class ConstructNetwork:
                     G.nodes[node]['out_TEU'] = TEU_out
                     G.nodes[node]['total_TEU'] = TEU_in + TEU_out
                 nx.write_graphml(G, file_path)
+
+    # TODO 后续的商品种类也可以添加
     #endregion
 
 

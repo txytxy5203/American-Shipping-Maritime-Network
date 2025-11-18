@@ -14,6 +14,7 @@ from Read import Read
 class DirectedWeighted:
     """
     专门用于计算有向加权网络的相关参数
+    也就是说一般来说函数需要传入一个Digrah 如果不是这样最好不要放在这个函数里面
     """
 
     @classmethod
