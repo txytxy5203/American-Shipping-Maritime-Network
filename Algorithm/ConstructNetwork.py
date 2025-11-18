@@ -119,6 +119,37 @@ class ConstructNetwork:
 
                 # 使用 GraphML 保存图
                 nx.write_graphml(D, f'../Data/{year}/US/Month/{month_str}/US_{year}_{month_str}_Digraph.graphml')
+
+    @classmethod
+    def Add_Total_TEU_Attr(cls):
+        """
+        给上一步的Digraph添加total_TEU属性
+        :return:
+        """
+        years = range(2017, 2022)
+        months = list(range(1, 13))
+        for year in years:
+            for month in months:
+                month_str = f"{month:02d}"
+
+                file_path = f'../Data/{year}/US/Month/{month_str}/US_{year}_{month_str}_Digraph.graphml'
+                if not os.path.exists(file_path):
+                    print(f'⚠️ 文件不存在: {file_path}')
+                    continue
+                G = nx.read_graphml(file_path)
+
+                for node in G.nodes:
+                    G.nodes[node]['in_TEU'] = G.nodes[node]['out_TEU'] = G.nodes[node]['total_TEU'] = 0
+                    TEU_in = 0
+                    TEU_out = 0
+                    for _, _, attr in G.in_edges(node, data=True):
+                        TEU_in += attr.get("volumeTEU", 0)
+                    for _, _, attr in G.out_edges(node, data=True):
+                        TEU_out += attr.get("volumeTEU", 0)
+                    G.nodes[node]['in_TEU'] = TEU_in
+                    G.nodes[node]['out_TEU'] = TEU_out
+                    G.nodes[node]['total_TEU'] = TEU_in + TEU_out
+                nx.write_graphml(G, file_path)
     #endregion
 
 
