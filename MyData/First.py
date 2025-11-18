@@ -2,6 +2,9 @@ import heapq
 import json
 import pathlib
 import random
+import re
+from typing import Set
+
 from matplotlib.lines import Line2D
 import os
 import networkx as nx
@@ -265,20 +268,31 @@ def write_network_structure_metric():
     :return:
     """
     origin_data = {}
-    null_model_data = {}
-    for DiG, G, time in get_network():
+    null_model_data = {}        # 0阶零模型
+    one_null_model_data = {}    # 1阶零模型
+    for DiG, G, time in Read.get_network():
         null_model = NullModel.create_edges_nodes_null_model(G)
+        one_null_model = NullModel.create_degree_distribution_null_model(G)
+
         # 计算拓扑指标
         origin_metrics_dict = Undirected.get_network_structure_metrics(G)
         null_model_metrics_dict = Undirected.get_network_structure_metrics(null_model)
+        one_null_model_metrics_dict = Undirected.get_network_structure_metrics(one_null_model)
+
         metrics = list(origin_metrics_dict.keys())
 
         origin_data[time] = list(origin_metrics_dict.values())
         null_model_data[time] = list(null_model_metrics_dict.values())
+        one_null_model_data[time] = list(one_null_model_metrics_dict.values())
+
     origin_df = pd.DataFrame(origin_data, index=metrics)
     origin_df.to_csv('Output/Undirected/StructureMetrics/network_structure_metrics.csv')
+
     null_model_df = pd.DataFrame(null_model_data, index=metrics)
     null_model_df.to_csv('Output/Undirected/StructureMetrics/null_model_structure_metrics.csv')
+
+    one_null_model_df = pd.DataFrame(one_null_model_data, index=metrics)
+    one_null_model_df.to_csv('Output/Undirected/StructureMetrics/one_null_model_structure_metrics.csv')
 def k_core_and_nodes():
     """
     画每个k core含有的nodes个数
@@ -634,7 +648,104 @@ def generate_simple_weighted_digraph(num_nodes=10, weight_range=(1,10), edge_den
 #                   label=True
 # )
 
+#region出出、出入、入出、入入
+# strength_type = "out"
+# neighbors_strength_type = "out"
+#
+# for DiG, G, time in Read.get_network():
+#     # 3. 执行计算
+#     knn_dict = DirectedWeighted.calculate_knn_strength(DiG)
+#     # null_model_knn_dict = DirectedWeighted.calculate_knn_strength(null_model)
+#
+#     data = {
+#         "Origin Network": [(k, v) for k,v in knn_dict.items()]
+#         # "Null Model": [(k, v) for k,v in null_model_knn_dict.items()]
+#     }
+#     df = pd.DataFrame(data)
+#     Draw.draw_scatter_list(
+#         df,
+#         "Undirected/KAndKnn/",
+#         "k",
+#         "knn(k)",
+#         f"k and knn(k) {time}",
+#         'loglog'
+#     )
+#endregion
 
 
+# TODO 整理这部分代码
+#regioncombine Export and Import to Total
+# years = range(2017, 2022)
+# months = list(range(1,13))
+#
+# for year in years:
+#     for month in months:
+#         # 核心修改：将month格式化为两位数字（01-12）
+#         month_str = f"{month:02d}"
+#
+#         G_Im = nx.read_graphml(f'../Data/{year}/US/Month/{month_str}/USImport_{year}_{month_str}.graphml')
+#         G_Ex = nx.read_graphml(f'../Data/{year}/US/Month/{month_str}/USExport_{year}_{month_str}.graphml')
+#
+#         # 合并两个图
+#         G_combined = nx.compose(G_Im, G_Ex)
+#
+#         print("N:", G_combined.number_of_nodes())
+#         print("M:", G_combined.number_of_edges())
+#
+#         # 使用 GraphML 保存图
+#         nx.write_graphml(G_combined, f'../Data/{year}/US/Month/{month_str}/US_{year}_{month_str}.graphml')
+#endregion
 
-DirectedWeighted.write_ports_weighted_betweenness_centrality_rank()
+
+# years = range(2017, 2022)
+# months = list(range(1, 13))
+#
+# for year in years:
+#     for month in months:
+#         month_str = f"{month:02d}"
+#
+#         file_path = f'../Data/{year}/US/Month/{month_str}/US_{year}_{month_str}.graphml'
+#         if not os.path.exists(file_path):
+#             print(f'⚠️ 文件不存在: {file_path}')
+#             continue
+#         Multi_G = nx.read_graphml(file_path)
+#
+#         # 假设 G 是 MultiDiGraph，边有 total_TEU 属性
+#         D = nx.DiGraph()  # 目标简单有向图
+#         D.add_nodes_from(Multi_G.nodes(data=True))  # 1. 先拷节点属性
+#
+#         # 2. 把平行边的 TEU 累加
+#         for u, v, data in Multi_G.edges(data=True):
+#             teu = data.get('volumeTEU', 0)
+#             if D.has_edge(u, v):
+#                 D[u][v]['volumeTEU'] += teu
+#             else:
+#                 D.add_edge(u, v, volumeTEU=teu)
+#
+#         # 使用 GraphML 保存图
+#         nx.write_graphml(D, f'../Data/{year}/US/Month/{month_str}/US_{year}_{month_str}_Digraph.graphml')
+
+years = range(2017, 2022)
+months = list(range(1, 13))
+for year in years:
+    for month in months:
+        month_str = f"{month:02d}"
+
+        file_path = f'../Data/{year}/US/Month/{month_str}/US_{year}_{month_str}_Digraph.graphml'
+        if not os.path.exists(file_path):
+            print(f'⚠️ 文件不存在: {file_path}')
+            continue
+        G = nx.read_graphml(file_path)
+
+        for node in G.nodes:
+            G.nodes[node]['in_TEU'] = G.nodes[node]['out_TEU'] = G.nodes[node]['total_TEU'] = 0
+            TEU_in = 0
+            TEU_out = 0
+            for _, _, attr in G.in_edges(node, data=True):
+                TEU_in += attr.get("volumeTEU", 0)
+            for _, _, attr in G.out_edges(node, data=True):
+                TEU_out += attr.get("volumeTEU", 0)
+            G.nodes[node]['in_TEU'] = TEU_in
+            G.nodes[node]['out_TEU'] = TEU_out
+            G.nodes[node]['total_TEU'] = TEU_in + TEU_out
+        nx.write_graphml(G, file_path)

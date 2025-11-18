@@ -1,10 +1,12 @@
 import json
 import pathlib
+from collections import defaultdict
 
 import numpy as np
 import networkx as nx
 import pandas as pd
 
+from MyData.Draw import Draw
 from Read import Read
 
 
@@ -13,6 +15,74 @@ class DirectedWeighted:
     """
     专门用于计算有向加权网络的相关参数
     """
+
+    @classmethod
+    def calculate_knn_strength(cls,
+                               g: nx.DiGraph,
+                               strength_type: str = "out",
+                               neighbors_strength_type: str = "out",
+                               ) -> dict:
+        """
+        计算有向加权网络的「强度的平均邻居强度」
+        :param g: 有向加权图（nx.DiGraph，边属性需含'weight'）
+        :param strength_type: 计算类型：
+            - "out"：按节点「出强度」分组，计算「出邻居的平均入强度」（默认）
+            - "in"：按节点「入强度」分组，计算「入邻居的平均出强度」
+        :param neighbors_strength_type:
+            邻居算出强度还是入强度
+        :return: {s: knn(s)} 的字典（s=节点强度，knn(s)=该强度组的平均邻居强度）
+        """
+        # ----------------------
+        # 1. 计算所有节点的出强度和入强度（替代原有的度）
+        # ----------------------
+        # 出强度：节点所有出边的权重之和（s_out(v) = sum(weight(v→u))）
+        node_out_strength = dict(nx.out_degree_centrality(g, weight='total_TEU'))
+        # 入强度：节点所有入边的权重之和（s_in(v) = sum(weight(u→v))）
+        node_in_strength = dict(nx.in_degree_centrality(g, weight='total_TEU'))
+
+        # ----------------------
+        # 2. 按目标强度分组，收集对应邻居的强度
+        # ----------------------
+        strength_groups = defaultdict(list)  # {目标强度s: [邻居强度列表]}
+
+        for node in g.nodes:
+            # 2.1 确定当前节点的「目标强度」（按 strength_type 选择出/入强度）
+            if strength_type == "out":
+                target_strength = node_out_strength[node]  # 按出强度分组
+                # 出邻居：当前节点指向的节点（v→u），取邻居的「入强度」（u的入强度包含v→u的权重）
+                neighbors = g.successors(node)  # 有向图出邻居（successors）
+                if neighbors_strength_type == "out":
+                    neighbor_strengths = [node_out_strength[neigh] for neigh in neighbors]
+                elif neighbors_strength_type == "in":
+                    neighbor_strengths = [node_in_strength[neigh] for neigh in neighbors]
+                else:
+                    raise ValueError("neighbor_strength_type 只能是 'out' 或 'in'")
+            elif strength_type == "in":
+                target_strength = node_in_strength[node]  # 按入强度分组
+                # 入邻居：指向当前节点的节点（u→v），取邻居的「出强度」（u的出强度包含u→v的权重）
+                neighbors = g.predecessors(node)  # 有向图入邻居（predecessors）
+                if neighbors_strength_type == "out":
+                    neighbor_strengths = [node_out_strength[neigh] for neigh in neighbors]
+                elif neighbors_strength_type == "in":
+                    neighbor_strengths = [node_in_strength[neigh] for neigh in neighbors]
+                else:
+                    raise ValueError("neighbor_strength_type 只能是 'out' 或 'in'")
+            else:
+                raise ValueError("neighbor_strength_type 只能是 'out' 或 'in'")
+
+            # 2.2 将邻居强度加入对应强度组（避免浮点数精度问题，保留3位小数）
+            target_strength_rounded = round(target_strength, 3)
+            strength_groups[target_strength_rounded].extend(neighbor_strengths)
+
+        # ----------------------
+        # 3. 计算每个强度组的平均邻居强度（knn(s)）
+        # ----------------------
+        knn_strength_dict = {}
+        for s, neighbor_strengths in strength_groups.items():
+            if neighbor_strengths:  # 跳过无邻居的节点（孤立节点）
+                knn_strength_dict[s] = round(np.mean(neighbor_strengths), 3)  # 结果保留3位小数
+
+        return knn_strength_dict
 
     @classmethod
     def calculate_average_degree(cls, g: nx.DiGraph):
@@ -87,6 +157,7 @@ class DirectedWeighted:
 
         return np.std(in_weighted_degrees, ddof=0), np.std(out_weighted_degrees, ddof=0), np.std(total_weighted_degrees, ddof=0)
 
+    #region讲道理这些东西要放在class里面吗
     @classmethod
     def write_ports_centrality(cls):
         """
@@ -155,6 +226,12 @@ class DirectedWeighted:
             for time, data in degree_centrality.items():
                 # 按dc降序排序，取港口名称（如['USLSA', 'USLGB', 'CNSHA']）
                 sorted_ports = [port for port, metrics in sorted(data.items(), key=lambda x: x[1][type[0]], reverse=True)]
+
+                # 如果要筛选国家就使用下面这个 而且后面的保存文件名要修改
+                # sorted_ports = [port for port, metrics in
+                #                 sorted(data.items(), key=lambda x: x[1][type[0]], reverse=True)
+                #                 if port_info[port]["country_english"] == 'China']
+
                 sorted_ports_by_time[time] = sorted_ports
             # 2. 确定最大排名数（即所有时间段中港口数量最多的那个，保证行数足够）
             max_rank = max(len(ports) for ports in sorted_ports_by_time.values())
@@ -194,3 +271,41 @@ class DirectedWeighted:
         df = pd.DataFrame(rank_data, index=range(1, max_rank + 1))
         # 5. 保存为CSV（index_label='排名'，明确行含义）
         df.to_csv(f'Output/DirectedWeighted/PortsDirectedBetweenness/ports_weighted_bc_sorted_ports_by_time.csv', index_label='排名')
+
+    # TODO PageRank排名还没有写
+
+    @classmethod
+    def draw_ports_degree_centrality_change(cls,
+                                            target_ports:list,
+                                            target_centrality:str,
+        ):
+        """
+        画港口的度中心性变化趋势图
+        使用的时候记得自己改名字
+        :param target_ports: 例如 ： target_ports = ['VNVUT', 'KRBUS']]
+        :param target_centrality: "dc", "in_dc", "out_dc
+        :return:
+        """
+        file_path = f'Output/DirectedWeighted/PortsWeightedDegree/ports_weighted_degree_centrality.json'
+        degree_centrality = json.loads(pathlib.Path(file_path).read_text())
+
+        data = {
+            "Time": []
+        }
+        for port in target_ports:
+            data[port] = []  # 为每个港口初始化空列表，避免KeyError
+        for time, port_info in degree_centrality.items():
+            data["Time"].append(time)
+            for port in target_ports:
+                data[port].append(port_info[port][target_centrality])
+
+        # 3. 空格连接（如 "VNVUT KRBUS"）
+        str_joined_space = ' '.join(target_ports)
+        df = pd.DataFrame(data)
+        Draw.draw_plot(
+            df,
+            'DirectedWeighted/PortsCentralityChangeByTime/',
+            f'{target_centrality}',
+            f'{str_joined_space} {target_centrality} change by time'
+        )
+    #endregion

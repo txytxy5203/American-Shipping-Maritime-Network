@@ -2,6 +2,10 @@ import networkx as nx
 import numpy as np
 from collections import defaultdict
 
+import pandas as pd
+
+from MyData.Draw import Draw
+
 
 class Undirected:
     """
@@ -149,3 +153,42 @@ class Undirected:
             "assortativity_coefficient": assort_degree,
             "algebraic_connectivity": algebraic_connectivity
         }
+
+    @classmethod
+    def plot_structure_metrics(cls,
+                    target_metrics:str
+    ):
+        """
+        画拓扑指标随时间的变化
+        要画什么就传什么参数
+        零模型如果有需要就自己修改
+        :return:
+        """
+
+        df_origin = pd.read_csv('Output/Undirected/StructureMetrics/network_structure_metrics.csv',
+                                index_col=0
+                                )
+        df_origin_null_model = pd.read_csv(
+            'Output/Undirected/StructureMetrics/one_null_model_structure_metrics.csv',
+            index_col=0
+        )
+        data_network = {
+            "Time": [],
+            "Network": [],
+            "Null Model": []
+        }
+
+        # 4. 遍历所有时间列（df_origin.columns 是时间维度，如 2017 Spring）
+        for time in df_origin.columns:
+            # 添加时间到 Time 列表
+            data_network["Time"].append(time)
+            # 添加 assortativity_coefficient 行的数值
+            data_network["Network"].append(df_origin.loc[target_metrics, time])
+            data_network["Null Model"].append(df_origin_null_model.loc[target_metrics, time])
+        df = pd.DataFrame(data_network)
+        Draw.draw_plot(
+            df,
+            "Undirected/StructureMetrics/",
+            target_metrics,
+            target_metrics
+        )

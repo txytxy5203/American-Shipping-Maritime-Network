@@ -295,8 +295,8 @@ class Draw:
         plt.xlabel(x_label, fontsize=12)
         plt.ylabel(y_label, fontsize=12)
         plt.title(title, fontsize=14)
-        if show_legend:
-            plt.legend()
+
+        plt.legend()
         plt.tight_layout()
 
         for for_mat in ["png", "eps"]:      # png and eps

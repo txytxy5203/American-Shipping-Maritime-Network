@@ -48,3 +48,4 @@ class NullModel:
         return null_model
 
     # TODO 生成一个权重分布一样的 null model
+    # TODO 可以将节点的所有边的权重随机交换 这样就可以得到权重分布一样的null model

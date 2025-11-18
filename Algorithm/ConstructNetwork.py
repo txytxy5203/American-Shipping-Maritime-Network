@@ -2,6 +2,8 @@ import re
 import os
 import json
 import sys
+from typing import Set
+
 sys.path.append('../Algorithm')
 import pandas as pd
 import networkx as nx
@@ -56,6 +58,35 @@ class ConstructNetwork:
                         attr['Country'] = 'China'
                         print(f"change the {node}")
                 nx.write_graphml(G, file_path)
+
+    #regionImport Export 之后的处理
+    @classmethod
+    def Import_Export_To_Total(cls):
+        """
+        把Import Export 合并到一起
+        :return:
+        """
+        years = range(2017, 2022)
+        months = list(range(1,13))
+
+        for year in years:
+            for month in months:
+                # 核心修改：将month格式化为两位数字（01-12）
+                month_str = f"{month:02d}"
+
+                G_Im = nx.read_graphml(f'../Data/{year}/US/Month/{month_str}/USImport_{year}_{month_str}.graphml')
+                G_Ex = nx.read_graphml(f'../Data/{year}/US/Month/{month_str}/USExport_{year}_{month_str}.graphml')
+
+                # 合并两个图
+                G_combined = nx.compose(G_Im, G_Ex)
+
+                print("N:", G_combined.number_of_nodes())
+                print("M:", G_combined.number_of_edges())
+
+                # 使用 GraphML 保存图
+                nx.write_graphml(G_combined, f'../Data/{year}/US/Month/{month_str}/US_{year}_{month_str}.graphml')
+
+    #endregion
     @classmethod
     def Save_MultiDiGraph_To_Digraph(cls):
         years = range(2017, 2018)
@@ -81,6 +112,337 @@ class ConstructNetwork:
 
             # 使用 GraphML 保存图
             nx.write_graphml(D, f'../Data/{year}/US/US{year}_Digraph.graphml')
+
+    @classmethod
+    def Save_Network_USImport_Monthly(cls, year: int) -> None:
+        """
+        生成美国进口数据的月度网络（1-12月，每月一个图）
+        :param year: 年份（如2017）
+        """
+        # 无需季节映射，直接遍历1-12月
+        months = list(range(1, 13))  # [1,2,...,12]
+        US_data_path = f'D:/PortData/{year}/USImport{year}.csv'
+        port_data = cls.Read_Port_Data()
+        HSCode = Read.read_USImpHSCode()  # 确保 Read 类已定义
+
+        # 过滤美国港口（保留原逻辑）
+        us_data = {
+            port_code: info
+            for port_code, info in port_data.items()
+            if "United States" in info.get("country_english", "")
+        }
+        us_data_dict = {value["english_name"]: key for key, value in us_data.items()}
+
+        # 读取原始数据（保留原逻辑）
+        DataFrame = pd.read_csv(US_data_path, header=None)
+        DataFrame.columns = [
+            'panjivaRecordId', 'billOfLadingNumber', 'arrivalDate', 'conCountry', 'shpCountry',
+            'portOfUnlading', 'portOfLading', 'portOfLadingCountry', 'portOfLadingRegion',
+            'transportMethod', 'vessel', 'volumeTEU', 'weightKg', 'valueOfGoodsUSD'
+        ]
+
+        # 剔除重复数据
+        DataFrame = DataFrame.drop_duplicates()
+        # 将 相关列转换为字符串类型
+        DataFrame['portOfUnlading'] = DataFrame['portOfUnlading'].astype(str)
+        DataFrame['portOfLading'] = DataFrame['portOfLading'].astype(str)
+        DataFrame['panjivaRecordId'] = DataFrame['panjivaRecordId'].astype(str)
+        DataFrame['portOfLadingCountry'] = DataFrame['portOfLadingCountry'].astype(str)
+        DataFrame['arrivalDate'] = DataFrame['arrivalDate'].astype(str)
+
+        # 数据预处理（保留原逻辑：去重、类型转换、缺失值处理）
+        print("DataFrame加载完毕")
+        print(f"原始DataFrame大小: {len(DataFrame)}")
+        Origin_Len = len(DataFrame)
+
+        # 按提单号去重
+        DataFrame = DataFrame.drop_duplicates(subset=['billOfLadingNumber'], keep='first')
+        print(f"剔除重复数据后DataFrame大小: {len(DataFrame)}")
+
+        # 检查缺失值
+        null_counts = DataFrame.isnull().sum()
+        print("每个字段的null值占比：")
+        print(null_counts / len(DataFrame))
+
+        # 填充TEU缺失值，删除关键字段缺失的行
+        DataFrame.fillna({'volumeTEU': DataFrame['volumeTEU'].mean()}, inplace=True)
+        DataFrame = DataFrame.dropna(subset=['portOfUnlading', 'portOfLading'])
+        DataFrame = DataFrame.reset_index(drop=True)
+
+        print(f"剔除无效数据后DataFrame大小: {len(DataFrame)} ({len(DataFrame) / Origin_Len * 100:.2f}%)")
+        print("DataFrame处理完毕")
+
+        # 遍历每个月，生成月度网络
+        for target_month in months:
+            print(f"\n=== 开始生成 {year}年{target_month}月 网络 ===")
+
+            # 初始化月度网络和统计变量
+            G = nx.MultiDiGraph()
+            error_port: Set[str] = set()
+            timer = 0
+            USIndex = 0  # 美国卸货港匹配数
+            OriIndex = 0  # 起运港匹配数
+            monthly_edge_count = 0  # 月度有效边数
+
+            for index, row in DataFrame.iterrows():
+                timer += 1
+                # 进度打印（每处理1%数据打印一次）
+                if timer / len(DataFrame) > 0.01:
+                    print(f'构建{target_month}月网络进度：{index / len(DataFrame):.2%}')
+                    timer = 0
+
+                # ----------------------
+                # 核心修改1：按目标月份过滤（替代原季节过滤）
+                # ----------------------
+                try:
+                    # 提取月份（arrivalDate格式假设为 'YYYY-MM-DD'，字符串切片取第5-6位）
+                    month = int(row['arrivalDate'][5:7])
+                except (ValueError, IndexError):
+                    # 日期格式异常，跳过该条数据
+                    continue
+                if month != target_month:
+                    continue  # 只保留目标月份的数据
+
+                # ----------------------
+                # 港口匹配逻辑（保留原逻辑）
+                # ----------------------
+                # 1. 匹配美国卸货港（portOfUnlading）
+                UnLading_Code = ""
+                match = False
+                portOfUnlading = row['portOfUnlading'].lower()
+                for us_port in us_data_dict.keys():
+                    us_port_deal = us_port.lower().split(',', 1)[0]
+                    if us_port_deal in portOfUnlading:
+                        USIndex += 1
+                        match = True
+                        UnLading_Code = us_data_dict[us_port]
+                        break
+                if not match:
+                    error_port.add(portOfUnlading)
+                    continue
+
+                # 2. 匹配起运港（portOfLading）
+                Lading_Code = ""
+                match = False
+                portOfLading = row['portOfLading'].lower()
+                portOfLading = re.sub(r'[^a-zA-Z]', '', portOfLading)
+                portOfLading_country = row['portOfLadingCountry'].lower()
+
+                for port in port_data:
+                    port_name = port_data[port]["english_name"].lower()
+                    port_name = re.sub(r'[^a-zA-Z]', '', port_name)
+                    port_country = port_data[port]["country_english"].lower()
+                    if port_name in portOfLading and portOfLading_country == port_country:
+                        OriIndex += 1
+                        match = True
+                        Lading_Code = port
+                        break
+                if not match:
+                    error_port.add(portOfLading)
+                    continue
+
+                # 3. 过滤无HSCode的数据
+                if row['panjivaRecordId'] not in HSCode.keys() or HSCode[row['panjivaRecordId']] is None:
+                    continue
+
+                # ----------------------
+                # 添加边和节点属性（保留原逻辑）
+                # ----------------------
+                edge_attrs = {
+                    'volumeTEU': row['volumeTEU'],
+                    'HSCode': HSCode[row['panjivaRecordId']],
+                    'month': month
+                }
+                G.add_edge(Lading_Code, UnLading_Code, **edge_attrs)
+                G.nodes[Lading_Code]['Country'] = port_data[Lading_Code]["country_english"]
+                G.nodes[UnLading_Code]['Country'] = port_data[UnLading_Code]["country_english"]
+                monthly_edge_count += 1
+
+            # ----------------------
+            # 保存月度网络（核心修改2：调整保存路径和文件名）
+            # ----------------------
+            # 确保保存目录存在（不存在则创建）
+            save_dir = f'../Data/{year}/US/Month/{target_month:02d}/'  # 月份补零（如01、02）
+            os.makedirs(save_dir, exist_ok=True)  # 自动创建多级目录
+            save_path = f'{save_dir}USImport_{year}_{target_month:02d}.graphml'
+            nx.write_graphml(G, save_path)
+
+            # ----------------------
+            # 打印月度统计信息
+            # ----------------------
+            print(f"\n{year}年{target_month}月 网络生成完成！")
+            print(f" - 卸货港匹配率：{USIndex / len(DataFrame):.2%}")
+            print(f" - 起运港匹配率：{OriIndex / len(DataFrame):.2%}")
+            print(f" - 有效边数：{G.number_of_edges()}")
+            print(f" - 数据最终利用率：{G.number_of_edges() / Origin_Len:.2%}")
+            print(f" - 未匹配港口数：{len(error_port)}")
+            print(f" - 保存路径：{save_path}")
+
+    @classmethod
+    def Save_Network_USExport_Monthly(cls, year: int) -> None:
+        """
+        生成美国出口数据的月度网络（1-12月，每月一个图）
+        :param year: 年份（如2017）
+        """
+        # 直接遍历1-12月，无需季节映射
+        months = list(range(1, 13))  # [1,2,...,12]
+        US_data_path = f'D:/PortData/{year}/USExport{year}.csv'
+        port_data = cls.Read_Port_Data()
+        HSCode = Read.read_USExpHSCode()  # 出口HSCode读取函数（适配出口数据）
+
+        # 过滤美国港口（保留原逻辑：出口的起运港为美国港口）
+        us_data = {
+            port_code: info
+            for port_code, info in port_data.items()
+            if "United States" in info.get("country_english", "")
+        }
+        us_data_dict = {value["english_name"]: key for key, value in us_data.items()}
+
+        # 读取出口原始数据（适配出口字段）
+        DataFrame = pd.read_csv(US_data_path, header=None)
+        DataFrame.columns = [
+            'panjivaRecordId', 'billOfLadingNumber', 'shpmtDate', 'shpCountry', 'shpmtDestination',
+            'portOfUnlading', 'portOfLading', 'portOfLadingCountry', 'portOfUnladingCountry',
+            'vessel', 'volumeTEU', 'weightKg', 'valueOfGoodsUSD'
+        ]
+
+        # 剔除重复数据
+        DataFrame = DataFrame.drop_duplicates()
+        # 将 相关列转换为字符串类型
+        DataFrame['portOfUnlading'] = DataFrame['portOfUnlading'].astype(str)
+        DataFrame['portOfLading'] = DataFrame['portOfLading'].astype(str)
+        DataFrame['panjivaRecordId'] = DataFrame['panjivaRecordId'].astype(str)
+        DataFrame['portOfLadingCountry'] = DataFrame['portOfLadingCountry'].astype(str)
+        DataFrame['portOfUnladingCountry'] = DataFrame['portOfUnladingCountry'].astype(str)
+        DataFrame['shpmtDate'] = DataFrame['shpmtDate'].astype(str)
+
+        # 数据预处理（适配出口数据特性）
+        print("DataFrame加载完毕")
+        print(f"原始DataFrame大小: {len(DataFrame)}")
+        Origin_Len = len(DataFrame)
+
+        # 出口数据去重：按panjivaRecordId去重（保留原逻辑）
+        DataFrame = DataFrame.drop_duplicates(subset=['panjivaRecordId'], keep='first')
+        print(f"剔除重复数据后DataFrame大小: {len(DataFrame)}")
+
+        # 检查缺失值
+        null_counts = DataFrame.isnull().sum()
+        print("每个字段的null值占比：")
+        print(null_counts / len(DataFrame))
+
+        # 填充TEU缺失值，删除关键字段缺失的行（保留原逻辑）
+        DataFrame.fillna({'volumeTEU': DataFrame['volumeTEU'].mean()}, inplace=True)
+        DataFrame = DataFrame.dropna(subset=['portOfUnlading', 'portOfLading'])
+        DataFrame = DataFrame.reset_index(drop=True)
+
+        print(f"剔除无效数据后DataFrame大小: {len(DataFrame)} ({len(DataFrame) / Origin_Len * 100:.2f}%)")
+        print("DataFrame处理完毕")
+
+        # 遍历每个月，生成月度网络
+        for target_month in months:
+            print(f"\n=== 开始生成 {year}年{target_month}月 出口网络 ===")
+
+            # 初始化月度网络和统计变量
+            G = nx.MultiDiGraph()
+            error_port: Set[str] = set()
+            timer = 0
+            USIndex = 0  # 美国起运港（portOfLading）匹配数
+            OriIndex = 0  # 国外卸货港（portOfUnlading）匹配数
+            monthly_edge_count = 0  # 月度有效边数
+
+            for index, row in DataFrame.iterrows():
+                timer += 1
+                # 进度打印（每处理1%数据打印一次）
+                if timer / len(DataFrame) > 0.01:
+                    print(f'构建{target_month}月出口网络进度：{index / len(DataFrame):.2%}')
+                    timer = 0
+
+                # ----------------------
+                # 核心修改1：按出口日期（shpmtDate）过滤目标月份
+                # ----------------------
+                try:
+                    # 提取月份（shpmtDate格式假设为 'YYYY-MM-DD'，字符串切片取第5-6位）
+                    month = int(row['shpmtDate'][5:7])
+                except (ValueError, IndexError):
+                    # 日期格式异常，跳过该条数据
+                    continue
+                if month != target_month:
+                    continue  # 只保留目标月份的数据
+
+                # ----------------------
+                # 港口匹配逻辑（适配出口：起运港为美国港，卸货港为国外港）
+                # ----------------------
+                # 1. 匹配美国起运港（portOfLading，出口核心：从美国港口出发）
+                Lading_Code = ""
+                match = False
+                portOfLading = row['portOfLading'].lower()
+                for us_port in us_data_dict.keys():
+                    us_port_deal = us_port.lower().split(',', 1)[0]
+                    if us_port_deal in portOfLading:
+                        USIndex += 1
+                        match = True
+                        Lading_Code = us_data_dict[us_port]
+                        break
+                if not match:
+                    error_port.add(portOfLading)
+                    continue
+
+                # 2. 匹配国外卸货港（portOfUnlading，出口目的地港口）
+                UnLading_Code = ""
+                match = False
+                portOfUnlading = row['portOfUnlading'].lower()
+                portOfUnlading = re.sub(r'[^a-zA-Z]', '', portOfUnlading)
+                portOfUnlading_country = row['portOfUnladingCountry'].lower()
+
+                for port in port_data:
+                    port_name = port_data[port]["english_name"].lower()
+                    port_name = re.sub(r'[^a-zA-Z]', '', port_name)
+                    port_country = port_data[port]["country_english"].lower()
+                    if port_name in portOfUnlading and portOfUnlading_country == port_country:
+                        OriIndex += 1
+                        match = True
+                        UnLading_Code = port
+                        break
+                if not match:
+                    error_port.add(portOfUnlading)
+                    continue
+
+                # 3. 过滤无HSCode的数据（出口HSCode校验）
+                if row['panjivaRecordId'] not in HSCode.keys() or HSCode[row['panjivaRecordId']] is None:
+                    continue
+
+                # ----------------------
+                # 添加边和节点属性（保留原逻辑，适配出口字段）
+                # ----------------------
+                edge_attrs = {
+                    'volumeTEU': row['volumeTEU'],
+                    'HSCode': HSCode[row['panjivaRecordId']],
+                    'month': month
+                }
+                G.add_edge(Lading_Code, UnLading_Code, **edge_attrs)
+                G.nodes[Lading_Code]['Country'] = port_data[Lading_Code]["country_english"]
+                G.nodes[UnLading_Code]['Country'] = port_data[UnLading_Code]["country_english"]
+                monthly_edge_count += 1
+
+            # ----------------------
+            # 保存月度网络（核心修改2：出口路径+文件名适配）
+            # ----------------------
+            # 确保保存目录存在（自动创建多级目录）
+            save_dir = f'../Data/{year}/US/Month/{target_month:02d}/'  # 出口单独目录，月份补零
+            os.makedirs(save_dir, exist_ok=True)
+            save_path = f'{save_dir}USExport_{year}_{target_month:02d}.graphml'
+            nx.write_graphml(G, save_path)
+
+            # ----------------------
+            # 打印月度统计信息（适配出口指标）
+            # ----------------------
+            print(f"\n{year}年{target_month}月 出口网络生成完成！")
+            print(f" - 美国起运港匹配率：{USIndex / len(DataFrame):.2%}")
+            print(f" - 国外卸货港匹配率：{OriIndex / len(DataFrame):.2%}")
+            print(f" - 有效边数：{G.number_of_edges()}")
+            print(f" - 数据最终利用率：{G.number_of_edges() / Origin_Len:.2%}")
+            print(f" - 未匹配港口数：{len(error_port)}")
+            print(f" - 保存路径：{save_path}")
 
     @classmethod
     def Save_Network_USImport_Season_Winter(cls, year: int) -> None:
