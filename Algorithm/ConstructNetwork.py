@@ -86,32 +86,41 @@ class ConstructNetwork:
                 # 使用 GraphML 保存图
                 nx.write_graphml(G_combined, f'../Data/{year}/US/Month/{month_str}/US_{year}_{month_str}.graphml')
 
-    #endregion
     @classmethod
     def Save_MultiDiGraph_To_Digraph(cls):
-        years = range(2017, 2018)
+        """
+        将上一步合成的total 转换成 Digraph
+        :return:
+        """
+        years = range(2017, 2022)
+        months = list(range(1, 13))
 
         for year in years:
-            file_path = f'../Data/{year}/US/US{year}.graphml'
-            if not os.path.exists(file_path):
-                print(f'⚠️ 文件不存在: {file_path}')
-                continue
-            Multi_G = nx.read_graphml(file_path)
+            for month in months:
+                month_str = f"{month:02d}"
 
-            # 假设 G 是 MultiDiGraph，边有 total_TEU 属性
-            D = nx.DiGraph()  # 目标简单有向图
-            D.add_nodes_from(Multi_G.nodes(data=True))  # 1. 先拷节点属性
+                file_path = f'../Data/{year}/US/Month/{month_str}/US_{year}_{month_str}.graphml'
+                if not os.path.exists(file_path):
+                    print(f'⚠️ 文件不存在: {file_path}')
+                    continue
+                Multi_G = nx.read_graphml(file_path)
 
-            # 2. 把平行边的 TEU 累加
-            for u, v, data in Multi_G.edges(data=True):
-                teu = data.get('volumeTEU', 0)
-                if D.has_edge(u, v):
-                    D[u][v]['volumeTEU'] += teu
-                else:
-                    D.add_edge(u, v, volumeTEU=teu)
+                # 假设 G 是 MultiDiGraph，边有 total_TEU 属性
+                D = nx.DiGraph()  # 目标简单有向图
+                D.add_nodes_from(Multi_G.nodes(data=True))  # 1. 先拷节点属性
 
-            # 使用 GraphML 保存图
-            nx.write_graphml(D, f'../Data/{year}/US/US{year}_Digraph.graphml')
+                # 2. 把平行边的 TEU 累加
+                for u, v, data in Multi_G.edges(data=True):
+                    teu = data.get('volumeTEU', 0)
+                    if D.has_edge(u, v):
+                        D[u][v]['volumeTEU'] += teu
+                    else:
+                        D.add_edge(u, v, volumeTEU=teu)
+
+                # 使用 GraphML 保存图
+                nx.write_graphml(D, f'../Data/{year}/US/Month/{month_str}/US_{year}_{month_str}_Digraph.graphml')
+    #endregion
+
 
     @classmethod
     def Save_Network_USImport_Monthly(cls, year: int) -> None:
