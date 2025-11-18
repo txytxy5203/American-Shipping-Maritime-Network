@@ -4,7 +4,6 @@ import pathlib
 import random
 import re
 from typing import Set
-
 from matplotlib.lines import Line2D
 import os
 import networkx as nx
@@ -31,6 +30,7 @@ from MyData.NullModel import NullModel
 from MyData.DirectedWeighted import DirectedWeighted
 from MyData.Undirected import Undirected
 from MyData.Read import Read
+from MyData.Main import Main
 sys.path.append('../Algorithm')
 
 #regionTools
@@ -671,3 +671,8 @@ def generate_simple_weighted_digraph(num_nodes=10, weight_range=(1,10), edge_den
 #         'loglog'
 #     )
 #endregion
+
+
+_, G = Main.get_certain_networks_by_months("2017 01")
+print(G.number_of_nodes())
+print(G.number_of_edges())
