@@ -86,3 +86,29 @@ class Main:
                 DiG = nx.read_graphml(file_path)
                 G = nx.Graph(DiG)
                 yield DiG, G, time
+
+    @classmethod
+    def get_networks_by_months(cls):
+        """
+        网络生成器函数   months
+        :return: 每次生成对应的 DiG  G  time
+        """
+        years = range(2017, 2022)
+        months = list(range(1, 13))
+        for year in years:
+            for month in months:
+                month_str = f"{month:02d}"
+
+                # 跳过2021年7月的数据  感觉7月的数据可能不全
+                if year == 2021 and month == 7:
+                    continue
+                file_path = f'../Data/{year}/US/Month/{month_str}/US_{year}_{month_str}_Digraph.graphml'
+                if not os.path.exists(file_path):
+                    print(f'⚠️ 文件不存在: {file_path}')
+                    continue
+
+                time = f"{year} {month_str}"
+
+                DiG = nx.read_graphml(file_path)
+                G = nx.Graph(DiG)
+                yield DiG, G, time

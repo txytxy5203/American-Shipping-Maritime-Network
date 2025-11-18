@@ -673,6 +673,3 @@ def generate_simple_weighted_digraph(num_nodes=10, weight_range=(1,10), edge_den
 #endregion
 
 
-_, G = Main.get_certain_networks_by_months("2017 01")
-print(G.number_of_nodes())
-print(G.number_of_edges())
