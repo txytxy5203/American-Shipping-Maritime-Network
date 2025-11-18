@@ -121,7 +121,7 @@ def degree_and_weighted_std():
     df = pd.DataFrame(data)
 
     Draw.draw_dual_axis_plot(df,
-                      "DirectedWeighted/AverageDegreeAndWeightedDegree/",
+                      "DirectedWeighted/DegreeAndWeightedDegree/",
                       "Degree And Weighted Degree \'s Standard Deviation",
                       "lower left"
     )
@@ -149,7 +149,7 @@ def degree_and_weighted_average():
     df = pd.DataFrame(data)
 
     Draw.draw_dual_axis_plot(df,
-                      "DirectedWeighted/AverageDegreeAndWeightedDegree/",
+                      "DirectedWeighted/DegreeAndWeightedDegree/",
                       "Average Degree And Weighted Degree",
                       "upper left"
     )
@@ -646,4 +646,4 @@ def generate_simple_weighted_digraph(num_nodes=10, weight_range=(1,10), edge_den
 #     )
 #endregion
 
-Main.average_shortest_length()
+Main.degree_and_strength_average()

@@ -319,12 +319,13 @@ class Draw:
 
     @classmethod
     def draw_dual_axis_plot(cls,
-                  df:DataFrame,
-                  save_path:str,
-                  title:str,
-                  loc:str,
-                  linewidth:int = 2,
-                  markersize:int = 5
+                df:DataFrame,
+                save_path:str,
+                title:str,
+                loc:str,
+                linewidth:int=2,
+                markersize:int=5,
+                margin_rate:int=0.7
         ):
         """
         两个不同尺度的数据画在一起
@@ -334,6 +335,7 @@ class Draw:
         :param loc: 图例的位置
         :param markersize:
         :param linewidth:
+        :param margin_rate:  y轴数值的范围
         :return:
         """
         # 数据先保存
@@ -376,6 +378,32 @@ class Draw:
             linewidth=linewidth,  # 线条宽度（与左侧一致，保持美观）
             markersize=markersize  # 数据点大小（与左侧一致）
         )
+
+        # -----------------y轴的范围-------------------------
+        # 1. 左侧Y轴（ax1）：适配 left_col 数据，留5%边距
+        left_data = df[left_col].dropna()  # 剔除缺失值（避免影响极值计算）
+        left_min = left_data.min()
+        left_max = left_data.max()
+        left_margin = (left_max - left_min) * margin_rate  # 5%边距（可调整为0.1=10%）
+
+        # 特殊处理：若最小值接近0，强制Y轴从0开始（避免负范围）
+        if left_min - left_margin < 0:
+            ax1.set_ylim(bottom=0, top=left_max + left_margin)
+        else:
+            ax1.set_ylim(bottom=left_min - left_margin, top=left_max + left_margin)
+
+        # 2. 右侧Y轴（ax2）：适配 right_col 数据，留5%边距
+        right_data = df[right_col].dropna()  # 剔除缺失值
+        right_min = right_data.min()
+        right_max = right_data.max()
+        right_margin = (right_max - right_min) * margin_rate  # 边距比例与左侧一致，保持美观
+
+        # 特殊处理：若最小值接近0，强制Y轴从0开始
+        if right_min - right_margin < 0:
+            ax2.set_ylim(bottom=0, top=right_max + right_margin)
+        else:
+            ax2.set_ylim(bottom=right_min - right_margin, top=right_max + right_margin)
+
 
         # -------------------------- 5. 美化双轴标签与标题 --------------------------
         # -------------------------- 左侧Y轴（ax1）设置 --------------------------

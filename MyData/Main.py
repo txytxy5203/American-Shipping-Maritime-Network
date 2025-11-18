@@ -2,6 +2,7 @@ import os
 import networkx as nx
 import pandas as pd
 
+from MyData.DirectedWeighted import DirectedWeighted
 from MyData.Draw import Draw
 from MyData.NullModel import NullModel
 from MyData.Undirected import Undirected
@@ -168,8 +169,38 @@ class Main:
             "Months/Undirected/AverageShortestLength/",
             "<L>",
             "Average Shortest Path Length",
-            0.5
+            1
         )
+
+    @classmethod
+    def degree_and_strength_average(cls):
+        """
+        平均度和强度的变化趋势
+        :return:
+        """
+        data = {
+            "time": [],
+            "degree average": [],
+            "strength average": []
+        }
+        for DiG, G, time in cls.get_networks_by_months():
+            data["time"].append(time)
+
+            _, _, avg_degree = DirectedWeighted.calculate_average_degree(DiG)
+            data["degree average"].append(
+                avg_degree
+            )
+            _, _, avg_strength = DirectedWeighted.calculate_average_weighted_degree(DiG)
+            data["strength average"].append(
+                avg_strength
+            )
+        df = pd.DataFrame(data)
+        Draw.draw_dual_axis_plot(df,
+                                 "Months/DirectedWeighted/DegreeAndWeightedDegree/",
+                                 "Average Degree And Strength",
+                                 "lower left"
+        )
+
 
 
 
