@@ -236,48 +236,43 @@ class Main:
     @classmethod
     def degree_distribution(cls):
         """
-        画网络的度分布
+        画网络的度分布  多个时间段在一起的
         :return:
         """
-        for DiG, G, time in cls.get_networks_by_months():
-            # 1. 初始化数据结构
-            degree_counts = defaultdict(int)
-            degree_to_ports = defaultdict(list)  # 度值 → 港口列表
-            port_to_degree = {}  # 新增：港口 → 度值（快速查询每个港口的度）
+        times = ["2018 06", "2019 06", "2020 06", "2021 06"]
+        data = {}
 
-            # 2. 遍历节点，统计度值、港口对应关系
-            for port, degree in G.degree():
-                degree_counts[degree] += 1
-                degree_to_ports[degree].append(port)
-                port_to_degree[port] = degree  # 记录每个港口的度值
+        for time in times:
+            _, G = Main.get_certain_networks_by_months(time)
+            degree_frequency = Undirected.get_degree_distribution(G)  # 假设返回 {度值: 频率} 的字典
+            # 先获取所有可能的度值（确保后续索引统一）
+            all_degrees = sorted(degree_frequency.keys())  # 该时间段存在的度值（排序后）
+            time_frequency_dict = {deg: degree_frequency[deg] for deg in all_degrees}
+            # 存储该时间段的频率字典（而非 (degree, frequency) 元组列表）
+            data[time] = time_frequency_dict
 
-            # 3. 计算排序的度值、频率，并建立“度值→频率”映射
-            degrees_sorted = sorted(degree_counts.keys())
-            counts = [degree_counts[d] for d in degrees_sorted]
-            total_nodes = G.number_of_nodes()
-            frequencies = [count / total_nodes for count in counts]
+        # 1. 收集所有时间段的所有度值（作为最终 DataFrame 的索引）
+        all_unique_degrees = set()
+        for time_dict in data.values():
+            all_unique_degrees.update(time_dict.keys())
+        all_unique_degrees = sorted(list(all_unique_degrees))  # 排序后的所有度值（统一索引）
 
-            # 关键：建立“度值→频率”的字典（一个度值对应一个频率）
-            degree_to_frequency = dict(zip(degrees_sorted, frequencies))
+        # 2. 构建规整的 DataFrame：每行是一个度值，每列是一个时间段，值为频率（缺失填 0）
+        df_data = {}
+        for time in times:
+            # 对于每个时间段，按统一的度值索引填充频率（无该度值则填 0）
+            df_data[time] = [(deg, data[time].get(deg, 0)) for deg in all_unique_degrees]
 
-            # 4. 构建最终数据：港口 → [度值, 频率]（每个港口唯一对应一组数据）
-            data = {}
-            for port in G.nodes():  # 遍历所有港口，确保不遗漏
-                degree = port_to_degree[port]  # 获取该港口的度值
-                frequency = degree_to_frequency[degree]  # 通过度值获取对应频率
-                data[port] = [(degree, frequency)]  # 每个港口对应唯一的[(度值, 频率)]
-
-            # TODO 最后只能人工打上标签
-            df = pd.DataFrame(data)
-            Draw.draw_scatter_list(
-                df,
-                "Undirected/DegreeDistribution/",
-                "Degree",
-                "Frequency",
-                f"DegreeDistribution {time}",
-                "loglog",
-                "ports"
-            )
+        # 3. 创建 DataFrame，度值作为索引
+        df = pd.DataFrame(df_data)
+        Draw.draw_scatter_list(
+            df,
+            "Months/Undirected/DegreeDistribution/",
+            "Degree",
+            "Frequency",
+            f"DegreeDistribution",
+            "loglog"
+        )
 
 
 

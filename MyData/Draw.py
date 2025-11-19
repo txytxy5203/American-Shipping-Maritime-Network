@@ -11,12 +11,25 @@ from Read import Read
 class Draw:
     basic_path = 'Output'       # 保存的时候都在 Output中
 
-    # 通用配色/标记库（各模式可复用）
-    _normal_colors = [
-        '#2E86AB', '#A23B72', '#F18F01',
-        '#C73E1D', '#7209B7', '#024059'
-    ]
-    _normal_markers = ['o', 's', '^', 'D', 'p']
+    colors_config = {
+        1:[ # 天询师兄的配色 respect
+            '#4c91c3',
+            '#ff993d',
+            '#55b355',
+            '#dd5153'
+        ]
+    }
+    markers_config = {
+        1:[
+            'o',
+            's',
+            '^',
+            'D',
+            'p'
+        ]
+    }
+
+
 
     # 专门针对港口的  一种配色 一种标记
     _ports_colors = ['blue']
@@ -51,14 +64,7 @@ class Draw:
         'logy': _scale_logy,
         'loglog': _scale_loglog
     }
-    _mode_configs:dict[str, dict] = {
-        # 配置
-        'normal': {
-            'colors': _normal_colors,
-            'markers': _normal_markers,
-            'show_legend': True
-        }
-    }
+
 
     #regionWorldMap
     # 假设缩写规则：NA=北美洲, SA=南美洲, EU=欧洲, AS=亚洲, AF=非洲, OC=大洋洲, UN=未知
@@ -163,12 +169,13 @@ class Draw:
                           y_label:str,
                           title:str,
                           scale:str = 'linear',
-                          label:bool = False
+                          label:bool = False,
+                          colors:int = 1,
+                          markers:int = 1,
                           ):
         """
         画散点的函数
         TODO 加一个在散点图上显示标签的功能  比如说大于多少就 显示标签
-        TODO 这个mode之后要修改  颜色、标签等等自己管自己的
         :param df:
         Example：
         data1 = {
@@ -180,23 +187,20 @@ class Draw:
         :param y_label:
         :param title:
         :param scale:  横纵坐标的缩放模式
-        :param mode:   画图的模式  具体有哪些配置看上边的 _mode_configs
         :param label:
+        :param colors: 颜色配置
+        :param markers: 标记配置
         """
-
+        df.to_csv(f'{cls.basic_path}/{save_path}{title}.csv', index=False)
         # 模式的合法性
         if scale not in cls._scale_handlers.keys():
             raise ValueError("没有这种scale模式")
 
-
         # 获取配置信息
-        mode_config = cls._mode_configs["normal"]
-        colors = mode_config['colors']
-        markers = mode_config['markers']
-        show_legend = mode_config['show_legend']
+        colors = cls.colors_config[colors]
+        markers = cls.markers_config[markers]
 
         plt.figure(figsize=(10, 6))
-
 
         for i, col in enumerate(df.columns):
             coordinates = df[col]
@@ -220,8 +224,7 @@ class Draw:
         plt.xlabel(x_label, fontsize=12)
         plt.ylabel(y_label, fontsize=12)
         plt.title(title, fontsize=14)
-        if show_legend:
-            plt.legend()
+        plt.legend()
         plt.tight_layout()
 
         for for_mat in ["png", "eps"]:      # png and eps

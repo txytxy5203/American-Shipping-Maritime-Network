@@ -3702,3 +3702,26 @@ def draw_US_Top3_category_pie_chart():
 
 
 
+times = ["2017 06", "2018 06", "2019 06", "2020 06", "2021 06"]
+data = {}
+
+for time in times:
+    _, G = Main.get_certain_networks_by_months(time)
+    degree_frequency = Undirected.get_degree_distribution(G)
+    data[time] = []
+
+    # 构建最终数据：港口 → [度值, 频率]（每个港口唯一对应一组数据）
+    for port in G.nodes():  # 遍历所有港口，确保不遗漏
+        degree = G.degree(port)  # 获取该港口的度值
+        frequency = degree_frequency[degree]  # 通过度值获取对应频率
+        data[time].append((degree, frequency))
+
+df = pd.DataFrame(data)
+Draw.draw_scatter_list(
+    df,
+    "Months/Undirected/DegreeDistribution/",
+    "Degree",
+    "Frequency",
+    f"DegreeDistribution",
+    "loglog"
+)
