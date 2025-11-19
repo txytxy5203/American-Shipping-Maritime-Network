@@ -97,62 +97,7 @@ def nodes_or_edges_and_avg_path_length():
                       "Average shortest path length",
                       "Nodes And Avg Shortest Path Length"
                            )
-def degree_and_weighted_std():
-    """
-    度和加权度的平均值or标准差的变化
-    :return:
-    """
-    data = {
-        "time":[],
-        "degree standard deviation":[],
-        "weighted degree standard deviation": []
-    }
-    for DiG, G, time in get_network():
-        data["time"].append(time)
 
-        _,_,degree_std = DirectedWeighted.calculate_degree_standard_deviation(DiG)
-        data["degree standard deviation"].append(
-            degree_std
-        )
-        _,_,weighted_degree_std = DirectedWeighted.calculate_weighted_degree_standard_deviation(DiG)
-        data["weighted degree standard deviation"].append(
-            weighted_degree_std
-        )
-    df = pd.DataFrame(data)
-
-    Draw.draw_dual_axis_plot(df,
-                      "DirectedWeighted/DegreeAndWeightedDegree/",
-                      "Degree And Weighted Degree \'s Standard Deviation",
-                      "lower left"
-    )
-def degree_and_weighted_average():
-    """
-    度和加权度的平均值or标准差的变化
-    :return:
-    """
-    data = {
-        "time":[],
-        "average degree":[],
-        "average weighted degree": []
-    }
-    for DiG, G, time in get_network():
-        data["time"].append(time)
-
-        _,_,avg_degree = DirectedWeighted.calculate_average_degree(DiG)
-        data["average degree"].append(
-            avg_degree
-        )
-        _,_,avg_weighted_degree = DirectedWeighted.calculate_average_weighted_degree(DiG)
-        data["average weighted degree"].append(
-            avg_weighted_degree
-        )
-    df = pd.DataFrame(data)
-
-    Draw.draw_dual_axis_plot(df,
-                      "DirectedWeighted/DegreeAndWeightedDegree/",
-                      "Average Degree And Weighted Degree",
-                      "upper left"
-    )
 def degree_and_weighted_degree():
         """
         度和加权度的关系
@@ -170,7 +115,7 @@ def degree_and_weighted_degree():
                               "Weighted Degree",
                               f"Degree And Weighted Degree {time} loglog",
                               "loglog"
-                                   )
+            )
 def weighted_degree_and_directed_betweenness():
     """
     画每个港口 加权度和有向介数中心性之间的关系
@@ -646,4 +591,6 @@ def generate_simple_weighted_digraph(num_nodes=10, weight_range=(1,10), edge_den
 #     )
 #endregion
 
-Main.degree_and_strength_average()
+_, G = Main.get_certain_networks_by_months("2017 01")
+d = Undirected.get_degree_distribution(G)
+print(d)

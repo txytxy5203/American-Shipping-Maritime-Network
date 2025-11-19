@@ -192,3 +192,31 @@ class Undirected:
             target_metrics,
             target_metrics
         )
+
+    @classmethod
+    def get_degree_distribution(cls, g:nx.Graph) -> dict:
+        """
+        得到网络的度分布dict
+        :param g:
+        :return: {度值：频率}
+        """
+        degree_counts = defaultdict(int)
+        degree_to_ports = defaultdict(list)  # 度值 → 港口列表
+        port_to_degree = {}  # 新增：港口 → 度值（快速查询每个港口的度）
+
+        # 2. 遍历节点，统计度值、港口对应关系
+        for port, degree in g.degree():
+            degree_counts[degree] += 1
+            degree_to_ports[degree].append(port)
+            port_to_degree[port] = degree  # 记录每个港口的度值
+
+        # 3. 计算排序的度值、频率，并建立“度值→频率”映射
+        degrees_sorted = sorted(degree_counts.keys())
+        counts = [degree_counts[d] for d in degrees_sorted]
+        total_nodes = g.number_of_nodes()
+        frequencies = [count / total_nodes for count in counts]
+
+        # 关键：建立“度值→频率”的字典（一个度值对应一个频率）
+        degree_to_frequency = dict(zip(degrees_sorted, frequencies))
+        return degree_to_frequency
+
