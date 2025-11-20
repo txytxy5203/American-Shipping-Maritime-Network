@@ -303,5 +303,56 @@ class Main:
                 markers=2
             )
 
+    @classmethod
+    def degree_assortativity_coefficient(cls):
+        """
+        度同配系数的演化趋势
+        :return:
+        """
+        data = {
+            "time": [],
+            "Network": [],
+            "Null Model": []
+        }
+        for DiG, G, time in cls.get_networks_by_months():
+            null_model = NullModel.create_degree_distribution_null_model(G)
+
+            assortativity_coefficient = nx.degree_assortativity_coefficient(G)
+            assortativity_coefficient_null_model = nx.degree_assortativity_coefficient(null_model)
+
+            data["time"].append(time)
+            data["Network"].append(assortativity_coefficient)
+            data["Null Model"].append(assortativity_coefficient_null_model)
+        df = pd.DataFrame(data)
+        Draw.draw_plot(
+            df,
+            "Months/Undirected/AssortativityCoefficient/",
+            "r",
+            "assortativity coefficient",
+            0.5
+        )
+
+    @classmethod
+    def strength_and_directed_betweenness(cls):
+        """
+        画每个港口 加权度和有向介数中心性之间的关系
+        :return:
+        """
+        for DiG, G, time in cls.get_networks_by_months():
+            data = {}
+            bc_dict = nx.betweenness_centrality(DiG, normalized=True)  # 有向网络的介数中心性  不适用加权
+            for node, attr in DiG.nodes(data=True):
+                dc = attr['total_TEU']
+                bc = bc_dict[node]
+                data[node] = [(dc, bc)]
+            df = pd.DataFrame(data)
+            Draw.draw_scatter_ports(df,
+                                   "Months/DirectedWeighted/WeightedDegreeAndDirectedBetweenness/",
+                                   "Weighted Degree",
+                                   "Directed Betweenness",
+                                   f"Weighted Degree And Directed Betweenness {time}",
+                                   label=True,
+                                    legend=False
+            )
 
 

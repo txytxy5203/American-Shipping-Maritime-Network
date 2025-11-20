@@ -90,27 +90,6 @@ def degree_and_weighted_degree():
                               f"Degree And Weighted Degree {time} loglog",
                               "loglog"
             )
-def weighted_degree_and_directed_betweenness():
-    """
-    画每个港口 加权度和有向介数中心性之间的关系
-    :return:
-    """
-    for DiG, G, time in get_network():
-        data = {}
-        bc_dict = nx.betweenness_centrality(DiG, normalized=True)  # 有向网络的介数中心性  不适用加权
-        for node,attr in DiG.nodes(data=True):
-            dc = attr['total_TEU']
-            bc = bc_dict[node]
-            data[node] = [(dc, bc)]
-        df = pd.DataFrame(data)
-        Draw.draw_scatter_list(df,
-                          "DirectedWeighted/WeightedDegreeAndDirectedBetweenness/",
-                          "Weighted Degree",
-                          "Directed Betweenness",
-                                        f"Weighted Degree And Directed Betweenness {time}",
-                               mode='ports',
-                               label=True
-                               )
 def write_network_structure_metric():
     """
     将网络和null model的结构指标写入csv文件
@@ -522,3 +501,4 @@ def generate_simple_weighted_digraph(num_nodes=10, weight_range=(1,10), edge_den
 #endregion
 
 
+Main.strength_and_directed_betweenness()

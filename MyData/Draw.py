@@ -96,6 +96,7 @@ class Draw:
                   ):
         """
         适用于大家的横坐标一样  比如说时间
+        # TODO 横坐标可以不用全部展示 6个月展示一次即可
         :param df:
         示例
         data = {
@@ -249,11 +250,12 @@ class Draw:
                      y_label:str,
                      title:str,
                      scale:str = 'linear',
-                     label:bool = False
+                     label:bool = False,
+                     legend:bool = False
                      ):
         """
         画散点的函数
-        key就是港口  value中的list每一列就是不同的值
+        key就是港口  value中的list每一列就是不同轴的数值
         :param df:
         Example：
         data2 = {
@@ -265,9 +267,10 @@ class Draw:
         :param y_label:
         :param title:
         :param scale:  横纵坐标的缩放模式
-        :param label:
+        :param label:  是否给部分散点加上标签
+        :param legend: 是否显示图例
         """
-
+        df.to_csv(f'{cls.basic_path}/{save_path}{title}.csv', index=False)
         # 模式的合法性
         if scale not in cls._scale_handlers.keys():
             raise ValueError("没有这种scale模式")
@@ -293,11 +296,11 @@ class Draw:
             )
 
             # -------------------------- 关键：plt.text() 添加标签 --------------------------
-            if label and (x > 7e5 or y > 0.04):
+            if label and (x > 2e5 or y > 0.038):
                 plt.text(
                     # 注意这里是坐标系中的数值偏移
-                    x + 0.5,  # 文本的 x 坐标（在散点 x 基础上右移1，避免重叠）
-                    y - 0.003,  # 文本的 y 坐标（在散点 y 基础上上移1）
+                    x - 1.2e4,  # 文本的 x 坐标（在散点 x 基础上右移1，避免重叠）
+                    y - 0.005,  # 文本的 y 坐标（在散点 y 基础上上移1）
                     s=port,  # 标签内容（港口名）
                     fontsize=9,  # 字体大小
                     color='black',  # 字体颜色
@@ -317,8 +320,8 @@ class Draw:
         plt.xlabel(x_label, fontsize=12)
         plt.ylabel(y_label, fontsize=12)
         plt.title(title, fontsize=14)
-
-        plt.legend()
+        if legend:
+            plt.legend()
         plt.tight_layout()
 
         for for_mat in ["png", "eps"]:      # png and eps
