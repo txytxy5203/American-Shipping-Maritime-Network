@@ -52,31 +52,6 @@ def get_common_and_unique(last:list, next:list):
 #endregion
 
 #regionMain
-def k_and_knn():
-    """
-    画 k 与 knn(k) 的散点图
-    :return:
-    """
-    for _, G, time in get_network():
-        null_model = NullModel.create_degree_distribution_null_model(G)
-
-        # 3. 执行计算
-        knn_dict = Undirected.calculate_knn(G)
-        null_model_knn_dict = Undirected.calculate_knn(null_model)
-
-        data = {
-            "Origin Network": [(k, v) for k,v in knn_dict.items()],
-            "Null Model": [(k, v) for k,v in null_model_knn_dict.items()]
-        }
-        df = pd.DataFrame(data)
-        Draw.draw_scatter_list(
-            df,
-            "Undirected/KAndKnn/",
-            "k",
-            "knn(k)",
-            f"k and knn(k) {time}",
-            'loglog'
-        )
 def nodes_or_edges_and_avg_path_length():
     """
     nodes or edges and avg path length 的 关系
@@ -97,7 +72,6 @@ def nodes_or_edges_and_avg_path_length():
                       "Average shortest path length",
                       "Nodes And Avg Shortest Path Length"
                            )
-
 def degree_and_weighted_degree():
         """
         度和加权度的关系
@@ -137,50 +111,6 @@ def weighted_degree_and_directed_betweenness():
                                mode='ports',
                                label=True
                                )
-def degree_distribution():
-    """
-    画网络的度分布
-    :return:
-    """
-    for DiG, G, time in get_network():
-        # 1. 初始化数据结构
-        degree_counts = defaultdict(int)
-        degree_to_ports = defaultdict(list)  # 度值 → 港口列表
-        port_to_degree = {}  # 新增：港口 → 度值（快速查询每个港口的度）
-
-        # 2. 遍历节点，统计度值、港口对应关系
-        for port, degree in G.degree():
-            degree_counts[degree] += 1
-            degree_to_ports[degree].append(port)
-            port_to_degree[port] = degree  # 记录每个港口的度值
-
-        # 3. 计算排序的度值、频率，并建立“度值→频率”映射
-        degrees_sorted = sorted(degree_counts.keys())
-        counts = [degree_counts[d] for d in degrees_sorted]
-        total_nodes = G.number_of_nodes()
-        frequencies = [count / total_nodes for count in counts]
-
-        # 关键：建立“度值→频率”的字典（一个度值对应一个频率）
-        degree_to_frequency = dict(zip(degrees_sorted, frequencies))
-
-        # 4. 构建最终数据：港口 → [度值, 频率]（每个港口唯一对应一组数据）
-        data = {}
-        for port in G.nodes():  # 遍历所有港口，确保不遗漏
-            degree = port_to_degree[port]  # 获取该港口的度值
-            frequency = degree_to_frequency[degree]  # 通过度值获取对应频率
-            data[port] = [(degree, frequency)]  # 每个港口对应唯一的[(度值, 频率)]
-
-        # TODO 最后只能人工打上标签
-        df = pd.DataFrame(data)
-        Draw.draw_scatter_list(
-            df,
-            "Undirected/DegreeDistribution/",
-            "Degree",
-            "Frequency",
-            f"DegreeDistribution {time}",
-            "loglog",
-            "ports"
-        )
 def write_network_structure_metric():
     """
     将网络和null model的结构指标写入csv文件

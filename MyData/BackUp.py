@@ -514,6 +514,50 @@ def draw_degree_distribution():
             print(f"斜率（-γ）：{slope:.4f} → 幂指数 γ = { -slope:.4f}")
             print(f"截距：{intercept:.4f}")
             print(f"决定系数 R²：{r_value**2:.4f}（越接近1，拟合越好）")
+def degree_distribution():
+    """
+    画网络的度分布
+    :return:
+    """
+    for DiG, G, time in get_network():
+        # 1. 初始化数据结构
+        degree_counts = defaultdict(int)
+        degree_to_ports = defaultdict(list)  # 度值 → 港口列表
+        port_to_degree = {}  # 新增：港口 → 度值（快速查询每个港口的度）
+
+        # 2. 遍历节点，统计度值、港口对应关系
+        for port, degree in G.degree():
+            degree_counts[degree] += 1
+            degree_to_ports[degree].append(port)
+            port_to_degree[port] = degree  # 记录每个港口的度值
+
+        # 3. 计算排序的度值、频率，并建立“度值→频率”映射
+        degrees_sorted = sorted(degree_counts.keys())
+        counts = [degree_counts[d] for d in degrees_sorted]
+        total_nodes = G.number_of_nodes()
+        frequencies = [count / total_nodes for count in counts]
+
+        # 关键：建立“度值→频率”的字典（一个度值对应一个频率）
+        degree_to_frequency = dict(zip(degrees_sorted, frequencies))
+
+        # 4. 构建最终数据：港口 → [度值, 频率]（每个港口唯一对应一组数据）
+        data = {}
+        for port in G.nodes():  # 遍历所有港口，确保不遗漏
+            degree = port_to_degree[port]  # 获取该港口的度值
+            frequency = degree_to_frequency[degree]  # 通过度值获取对应频率
+            data[port] = [(degree, frequency)]  # 每个港口对应唯一的[(度值, 频率)]
+
+        # TODO 最后只能人工打上标签
+        df = pd.DataFrame(data)
+        Draw.draw_scatter_list(
+            df,
+            "Undirected/DegreeDistribution/",
+            "Degree",
+            "Frequency",
+            f"DegreeDistribution {time}",
+            "loglog",
+            "ports"
+        )
 def draw_in_degree_distribution():
     """
     入度分布  出度分布

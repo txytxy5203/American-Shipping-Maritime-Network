@@ -239,12 +239,12 @@ class Main:
         画网络的度分布  多个时间段在一起的
         :return:
         """
-        times = ["2018 06", "2019 06", "2020 06", "2021 06"]
+        times = ["2018 06", "2019 06", "2020 06", "2021 06"]    # 可以在这里修改要画的时间段
         data = {}
 
         for time in times:
             _, G = Main.get_certain_networks_by_months(time)
-            degree_frequency = Undirected.get_degree_distribution(G)  # 假设返回 {度值: 频率} 的字典
+            degree_frequency = Undirected.get_degree_distribution(G)  # 返回 {度值: 频率} 的字典
             # 先获取所有可能的度值（确保后续索引统一）
             all_degrees = sorted(degree_frequency.keys())  # 该时间段存在的度值（排序后）
             time_frequency_dict = {deg: degree_frequency[deg] for deg in all_degrees}
@@ -273,6 +273,35 @@ class Main:
             f"DegreeDistribution",
             "loglog"
         )
+
+    @classmethod
+    def k_and_knn(cls):
+        """
+        画 k 与 knn(k) 的散点图
+        :return:
+        """
+        for _, G, time in cls.get_networks_by_months():
+
+            null_model = NullModel.create_degree_distribution_null_model(G)
+            # 执行计算
+            knn_dict = Undirected.calculate_knn(G)
+            null_model_knn_dict = Undirected.calculate_knn(null_model)
+
+            data = {
+                "Origin Network": [(k, v) for k, v in knn_dict.items()],
+                "Null Model": [(k, v) for k, v in null_model_knn_dict.items()]
+            }
+            df = pd.DataFrame(data)
+            Draw.draw_scatter_list(
+                df,
+                "Months/Undirected/KAndKnn/",
+                "k",
+                "knn(k)",
+                f"k and knn(k) {time}",
+                'loglog',
+                colors=2,
+                markers=2
+            )
 
 
 
