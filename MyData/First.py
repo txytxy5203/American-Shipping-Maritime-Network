@@ -501,4 +501,4 @@ def generate_simple_weighted_digraph(num_nodes=10, weight_range=(1,10), edge_den
 #endregion
 
 
-Main.strength_and_directed_betweenness()
+Main.write_ports_centrality()
