@@ -161,44 +161,7 @@ class DirectedWeighted:
     #region讲道理这些东西要放在class里面吗
 
 
-    @classmethod
-    def write_ports_weighted_degree_centrality_rank(cls):
-        """
-        把度中心性的排名写入csv文件
-        :return:
-        """
-        centrality_type = [
-            ('dc', 'PortsWeightedDegree', 'ports_weighted_degree_centrality.json'),
-            ('in_dc', 'PortsWeightedDegree', 'ports_weighted_degree_centrality.json'),
-            ('out_dc', 'PortsWeightedDegree', 'ports_weighted_degree_centrality.json')
-        ]
-        for type in centrality_type:
-            file_path = f'Output/DirectedWeighted/{type[1]}/{type[2]}'
-            degree_centrality = json.loads(pathlib.Path(file_path).read_text())
-            # 1. 对每个时间段的港口按dc降序排序，提取港口名称列表
-            sorted_ports_by_time = {}
-            for time, data in degree_centrality.items():
-                # 按dc降序排序，取港口名称（如['USLSA', 'USLGB', 'CNSHA']）
-                sorted_ports = [port for port, metrics in sorted(data.items(), key=lambda x: x[1][type[0]], reverse=True)]
 
-                # 如果要筛选国家就使用下面这个 而且后面的保存文件名要修改
-                # sorted_ports = [port for port, metrics in
-                #                 sorted(data.items(), key=lambda x: x[1][type[0]], reverse=True)
-                #                 if port_info[port]["country_english"] == 'China']
-
-                sorted_ports_by_time[time] = sorted_ports
-            # 2. 确定最大排名数（即所有时间段中港口数量最多的那个，保证行数足够）
-            max_rank = max(len(ports) for ports in sorted_ports_by_time.values())
-            # 3. 构建数据：行=排名（1,2,3...），列=时间段，值=港口名称
-            rank_data = {}
-            for time, ports in sorted_ports_by_time.items():
-                # 为每个时间段填充港口名称，不足max_rank的用空值补充
-                rank_data[time] = ports + [None] * (max_rank - len(ports))
-            # 4. 转为DataFrame，行索引设为排名（1开始）
-            df = pd.DataFrame(rank_data, index=range(1, max_rank + 1))
-            # 5. 保存为CSV（index_label='排名'，明确行含义）
-            df.to_csv(f'Output/DirectedWeighted/{type[1]}/weighted_{type[0]}_sorted_ports_by_time.csv',
-                      index_label='排名')
 
     @classmethod
     def write_ports_weighted_betweenness_centrality_rank(cls):
