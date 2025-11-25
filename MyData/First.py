@@ -504,28 +504,7 @@ def generate_simple_weighted_digraph(num_nodes=10, weight_range=(1,10), edge_den
 # )
 
 #region出出、出入、入出、入入
-for degree_type in ["Out", "In"]:
-    for neighbors_type in ["Out", "In"]:
-        for DiG, G, time in Main.get_networks_by_months():
-            # null_model = NullModel.create_degree_distribution_null_model(DiG)
-            # 3. 执行计算
-            knn_dict = DirectedWeighted.calculate_knn_degree(DiG,
-                                                             degree_type, neighbors_type)
-            # null_model_knn_dict = DirectedWeighted.calculate_knn_strength(null_model)
 
-            data = {
-                "Origin Network": [(k, v) for k,v in knn_dict.items()]
-                # "Null Model": [(k, v) for k,v in null_model_knn_dict.items()]
-            }
-            df = pd.DataFrame(data)
-            Draw.draw_scatter_list(
-                df,
-                f"Months/DirectedWeighted/KAndKnn/{degree_type}{neighbors_type}/",
-                "k",
-                "knn(k)",
-                f"k and knn(k) {degree_type} {neighbors_type} {time}",
-                'loglog'
-            )
 #endregion
 
 
