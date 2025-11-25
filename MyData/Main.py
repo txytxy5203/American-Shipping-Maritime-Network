@@ -132,20 +132,20 @@ class Main:
         :return:
         """
         data = {
-            "time":[],
-            "nodes":[],
-            "edges":[]
+            "Time":[],
+            "Nodes":[],
+            "Edges":[]
         }
         for DiG, G, time in cls.get_networks_by_months():
-            data["time"].append(time)
-            data["nodes"].append(G.number_of_nodes())
-            data["edges"].append(G.number_of_edges())
+            data["Time"].append(time)
+            data["Nodes"].append(G.number_of_nodes())
+            data["Edges"].append(G.number_of_edges())
         df = pd.DataFrame(data)
         Draw.draw_dual_axis_plot(
             df,
             "Months/Undirected/NodesAndEdges/",
             "Nodes And Edges",
-            "lower left"
+            "upper right"
         )
 
     @classmethod
@@ -155,7 +155,7 @@ class Main:
         :return:
         """
         data = {
-            "time":[],
+            "Time":[],
             "Network":[],
             "Null Model":[]
         }
@@ -165,7 +165,7 @@ class Main:
             avg_shortest_length = Undirected.calculate_average_shortest_path_length(G)
             avg_shortest_length_null_model = Undirected.calculate_average_shortest_path_length(null_model)
 
-            data["time"].append(time)
+            data["Time"].append(time)
             data["Network"].append(avg_shortest_length)
             data["Null Model"].append(avg_shortest_length_null_model)
         df = pd.DataFrame(data)
@@ -184,26 +184,26 @@ class Main:
         :return:
         """
         data = {
-            "time": [],
-            "degree average": [],
-            "strength average": []
+            "Time": [],
+            "Average Degree": [],
+            "Average Strength": []
         }
         for DiG, G, time in cls.get_networks_by_months():
-            data["time"].append(time)
+            data["Time"].append(time)
 
             _, _, avg_degree = DirectedWeighted.calculate_average_degree(DiG)
-            data["degree average"].append(
+            data["Average Degree"].append(
                 avg_degree
             )
             _, _, avg_strength = DirectedWeighted.calculate_average_weighted_degree(DiG)
-            data["strength average"].append(
+            data["Average Strength"].append(
                 avg_strength
             )
         df = pd.DataFrame(data)
         Draw.draw_dual_axis_plot(df,
                                  "Months/DirectedWeighted/DegreeAndWeightedDegree/",
                                  "Average Degree And Strength",
-                                 "lower left"
+                                 "upper right"
         )
 
     @classmethod
@@ -213,20 +213,20 @@ class Main:
         :return:
         """
         data = {
-            "time": [],
-            "degree standard deviation": [],
-            "strength standard deviation": []
+            "Time": [],
+            "Degree Standard Deviation": [],
+            "Strength Standard Deviation": []
         }
         for DiG, G, time in cls.get_networks_by_months():
 
-            data["time"].append(time)
+            data["Time"].append(time)
             _, _, degree_std = DirectedWeighted.calculate_degree_standard_deviation(DiG)
-            data["degree standard deviation"].append(
+            data["Degree Standard Deviation"].append(
                 degree_std
             )
 
             _, _, weighted_degree_std = DirectedWeighted.calculate_weighted_degree_standard_deviation(DiG)
-            data["strength standard deviation"].append(
+            data["Strength Standard Deviation"].append(
                 weighted_degree_std
             )
         df = pd.DataFrame(data)
@@ -234,7 +234,7 @@ class Main:
         Draw.draw_dual_axis_plot(df,
                                  "Months/DirectedWeighted/DegreeAndWeightedDegree/",
                                  "Degree And Strength \'s Standard Deviation",
-                                 "lower left"
+                                 "upper right"
         )
 
     @classmethod
@@ -449,3 +449,35 @@ class Main:
             # 5. 保存为CSV（index_label='排名'，明确行含义）
             df.to_csv(f'Output/Months/DirectedWeighted/{type[1]}/weighted_{type[0]}_sorted_ports_by_time.csv',
                       index_label='排名')
+
+    @classmethod
+    def draw_ports_degree_centrality_change(cls,
+                                            target_ports: str
+        ):
+        """
+        画单个港口的 度 入度 出度 变化趋势图
+        使用的时候记得自己改名字
+        :param target_ports: 例如 ： target_ports = 'VNVUT'
+        :return:
+        """
+        file_path = f'Output/Months/DirectedWeighted/PortsWeightedDegree/ports_weighted_degree_centrality.json'
+        degree_centrality = json.loads(pathlib.Path(file_path).read_text())
+        degree_centrality_metric = ['dc', 'in_dc', 'out_dc']
+
+        data = {
+            "Time": []
+        }
+        for metrics in degree_centrality_metric:
+            data[metrics] = []  # 为每个港口初始化空列表，避免KeyError
+        for time, port_info in degree_centrality.items():
+            data["Time"].append(time)
+            for metrics in degree_centrality_metric:
+                data[metrics].append(port_info[target_ports][metrics])
+
+        df = pd.DataFrame(data)
+        Draw.draw_plot(
+            df,
+            'Months/DirectedWeighted/PortsCentralityChangeByTime/',
+            f'degree centrality',
+            f'{target_ports} dc in_dc out_dc change by time'
+        )

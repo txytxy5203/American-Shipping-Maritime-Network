@@ -3769,3 +3769,183 @@ Draw.draw_scatter_list(
     f"DegreeDistribution",
     "loglog"
 )
+
+
+def draw_dual_axis_plot(cls,
+                        df: DataFrame,
+                        save_path: str,
+                        title: str,
+                        loc: str,
+                        linewidth: int = 2,
+                        markersize: int = 5,
+                        margin_rate: int = 0.7,
+                        label_step: int = 4,
+                        rotation: int = 15
+                        ):
+    """
+    两个不同尺度的数据画在一起
+    :param df:
+    :param save_path:
+    :param title:
+    :param loc: 图例的位置
+    :param markersize:
+    :param linewidth:
+    :param margin_rate:  y轴扩大的范围 这样可以使数据线更集中
+    :param label_step: x轴标签间隔
+    :param rotation: x轴标签旋转角度
+    :return:
+    """
+    # 数据先保存
+    df.to_csv(f'{cls.basic_path}/{save_path}{title}.csv',
+              index=False)
+
+    # --- 全局字体设置 ---
+    plt.rcParams['font.sans-serif'] = ['Times New Roman']  # 设置默认字体
+    plt.rcParams['font.size'] = 16  # 设置默认字体大小
+    plt.rcParams['axes.labelsize'] = 30  # 设置轴标签字体大小
+    plt.rcParams['xtick.labelsize'] = 16  # 设置X轴刻度标签字体大小
+    plt.rcParams['ytick.labelsize'] = 16  # 设置Y轴刻度标签字体大小
+
+    time_col = df.columns[0]
+    left_col = df.columns[1]
+    right_col = df.columns[2]
+    time = df[time_col]
+
+    colors = ['#2878b4', '#373535']
+    markers = ['o', 's']
+
+    # 创建画布和坐标轴
+    fig, ax1 = plt.subplots(figsize=(12, 6))  # 宽12英寸，高6英寸
+    # 创建右侧Y轴（与左侧Y轴共享X轴，实现双轴对齐）
+    ax2 = ax1.twinx()  # 关键：生成与ax1共享X轴的第二个Y轴
+    # -------------------------- 4. 绘制双折线（分别绑定左右Y轴） --------------------------
+    # -------------------------- 左侧Y轴：Nodes（假设N列是Nodes数量） --------------------------
+    ax1.plot(
+        time,  # X轴：时间
+        df[left_col],  # Y轴：绑定左侧ax1
+        label=left_col,  # 图例名称
+        color=colors[0],  # 颜色（可选：用十六进制色更精准，这里是深蓝色）
+        marker=markers[0],  # 数据点标记（圆形）
+        linestyle='-',
+        linewidth=linewidth,  # 线条宽度（加粗更清晰）
+        markersize=markersize  # 数据点大小
+    )
+
+    # -------------------------- 右侧Y轴：Edges（假设M列是Edges数量） --------------------------
+    ax2.plot(
+        time,  # X轴：时间（与左侧共享，无需重复设置）
+        df[right_col],  # Y轴：Edges数量（绑定右侧ax2）
+        label=right_col,  # 图例名称
+        color=colors[1],  # 颜色（深红色，与左侧区分明显）
+        marker=markers[1],  # 数据点标记（方形，与圆形区分）
+        linestyle='--',  # 线条样式（虚线，与实线区分）
+        linewidth=linewidth,  # 线条宽度（与左侧一致，保持美观）
+        markersize=markersize  # 数据点大小（与左侧一致）
+    )
+
+    # -----------------y轴的范围-------------------------
+    # 1. 左侧Y轴（ax1）：适配 left_col 数据，留5%边距
+    left_data = df[left_col].dropna()  # 剔除缺失值（避免影响极值计算）
+    left_min = left_data.min()
+    left_max = left_data.max()
+    left_margin = (left_max - left_min) * margin_rate  # 5%边距（可调整为0.1=10%）
+
+    # 特殊处理：若最小值接近0，强制Y轴从0开始（避免负范围）
+    if left_min - left_margin < 0:
+        ax1.set_ylim(bottom=0, top=left_max + left_margin)
+    else:
+        ax1.set_ylim(bottom=left_min - left_margin, top=left_max + left_margin)
+
+    # 2. 右侧Y轴（ax2）：适配 right_col 数据，留5%边距
+    right_data = df[right_col].dropna()  # 剔除缺失值
+    right_min = right_data.min()
+    right_max = right_data.max()
+    right_margin = (right_max - right_min) * margin_rate  # 边距比例与左侧一致，保持美观
+
+    # 特殊处理：若最小值接近0，强制Y轴从0开始
+    if right_min - right_margin < 0:
+        ax2.set_ylim(bottom=0, top=right_max + right_margin)
+    else:
+        ax2.set_ylim(bottom=right_min - right_margin, top=right_max + right_margin)
+
+    # -------------------------- 5. 美化双轴标签与标题 --------------------------
+    # -------------------------- 左侧Y轴（ax1）设置 --------------------------
+    ax1.set_xlabel(time_col, fontsize=30, fontfamily='Times New Roman')  # X轴标签（加粗）
+    ax1.tick_params(axis='x',
+                    rotation=rotation,
+                    labelsize=16,
+                    labelfontfamily='Times New Roman')  # X轴时间标签旋转45度，避免文字重叠
+
+    # regionx轴标签间隔
+    # --- 核心修改：手动设置X轴刻度和标签 ---
+    # 1. 获取所有原始的X轴标签文本
+    all_labels = [item.get_text() for item in ax1.get_xticklabels()]
+
+    # 2. 定义一个步长，比如每隔2个显示一个
+    step = label_step
+
+    # 3. 创建新的刻度位置和对应的标签列表
+    new_tick_positions = list(range(0, len(all_labels), step))
+    new_tick_labels = [all_labels[i] for i in new_tick_positions]
+
+    # 4. 应用新的刻度和标签
+    ax1.set_xticks(new_tick_positions)
+    ax1.set_xticklabels(new_tick_labels)
+    # endregion
+
+    ax1.set_ylabel(left_col,  # 左侧Y轴标签（明确对应Nodes）
+                   color='black',  # 标签颜色与线条颜色一致
+                   fontsize=30,
+                   fontfamily='Times New Roman')
+    ax1.tick_params(axis='y',  # 左侧Y轴刻度设置
+                    colors='black',  # 刻度颜色与线条一致
+                    labelsize=16,
+                    labelfontfamily='Times New Roman')  # 刻度文字大小
+
+    # -------------------------- 右侧Y轴（ax2）设置 --------------------------
+    ax2.set_ylabel(right_col,  # 右侧Y轴标签（明确对应Edges）
+                   color='black',  # 标签颜色与线条颜色一致
+                   fontsize=30,
+                   fontfamily='Times New Roman')
+    ax2.tick_params(axis='y',  # 右侧Y轴刻度设置
+                    colors='black',  # 刻度颜色与线条一致
+                    labelsize=16,
+                    labelfontfamily='Times New Roman')  # 刻度文字大小
+
+    # region图片标题
+    # -------------------------- 图片标题 --------------------------
+    # ax1.set_title(
+    #     title,
+    #     fontsize=16,
+    #     fontweight='bold',
+    #     pad=20  # 标题与图表的间距（避免拥挤）
+    # )
+    # endregion
+
+    # --- 核心修改：设置图例的字体 ---
+    font = {'family': 'Times New Roman',
+            'size': 16}  # 'weight' 可选，用于设置粗体
+    # -------------------------- 6. 合并双轴图例（关键：避免图例重复） --------------------------
+    # 提取左右轴的图例，合并为一个（放在图表右侧，不遮挡数据）
+    lines1, labels1 = ax1.get_legend_handles_labels()  # 左侧轴图例
+    lines2, labels2 = ax2.get_legend_handles_labels()  # 右侧轴图例
+    ax1.legend(
+        lines1 + lines2,  # 合并图例线条
+        labels1 + labels2,  # 合并图例文字
+        prop=font,
+        loc=loc,
+        frameon=True,  # 显示图例边框
+        fancybox=True,  # 边框圆角
+        shadow=True  # 边框阴影（更立体）
+    )
+
+    # -------------------------- 7. 调整布局与保存 --------------------------
+    # 自动调整布局（避免标签、图例被截断）
+    plt.tight_layout()
+
+    for for_mat in ["png", "eps"]:  # png and eps
+        plt.savefig(f'{cls.basic_path}/{save_path}{title}.{for_mat}',
+                    format=for_mat,  # 显式指定格式（可选，但更稳妥）
+                    dpi=300,
+                    bbox_inches='tight'  # 去除图片周围多余空白
+                    )

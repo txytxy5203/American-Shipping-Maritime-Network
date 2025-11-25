@@ -93,10 +93,13 @@ class Draw:
                   y_label:str,
                   title:str,
                   margin_rate:float=0.2,
+                  colors: int = 2,
+                  markers: int = 2,
+                  label_step: int = 4,
+                  rotation:int=15
                   ):
         """
         适用于大家的横坐标一样  比如说时间
-        # TODO 横坐标可以不用全部展示 6个月展示一次即可
         :param df:
         示例
         data = {
@@ -108,35 +111,36 @@ class Draw:
         :param y_label: y轴的label
         :param title:   图片的名字
         :param margin_rate:
+        :param colors:
+        :param markers:
+        :param label_step:
+        :param rotation:
         """
         # 数据先保存
         df.to_csv(f'{cls.basic_path}/{save_path}{title}.csv',
                   index=False)
 
+        # --- 全局字体设置 ---
+        plt.rcParams['font.sans-serif'] = ['Times New Roman']  # 设置默认字体
+        plt.rcParams['font.size'] = 16  # 设置默认字体大小
+        plt.rcParams['axes.labelsize'] = 30  # 设置轴标签字体大小
+        plt.rcParams['xtick.labelsize'] = 16  # 设置X轴刻度标签字体大小
+        plt.rcParams['ytick.labelsize'] = 16  # 设置Y轴刻度标签字体大小
+
         x_col = df.columns[0]  # 第一列列名
         y_cols = df.columns[1:]  # 后面的列名
         x = df[x_col]  # 第一列的数据
 
-        plt.figure(figsize=(10, 6))
+        # --- 使用面向对象的方式创建图形和轴 ---
+        fig, ax = plt.subplots(figsize=(10, 6))
 
-        markers = [
-            'o',
-            's',
-            '^',
-            'D',
-            'p'
-        ]
-        colors = [
-                  '#2878b4',
-                  '#373535',
-                  '#F18F01',  # 暖橙（辅助色1，中和冷色）
-                  '#C73E1D',  # 暗红（辅助色2，小范围强调）
-                  '#7209B7',  # 深紫（补充色1，低饱和不突兀）
-                  '#024059'  # 墨蓝（补充色2，适合背景或次要曲线）
-        ]
+        # 获取配置信息
+        colors = cls.colors_config[colors]
+        markers = cls.markers_config[markers]
+
         # 绘制折线图
         for i, col in enumerate(y_cols):  # 遍历后面所有的列的数据
-            plt.plot(
+            ax.plot(
                 x,
                 df[col],
                 label=col,
@@ -152,17 +156,31 @@ class Draw:
         y_max = all_y_data.max()
         # 预留的边距（可调整比例）
         margin = (y_max - y_min) * margin_rate
-        plt.ylim(bottom=y_min - margin, top=y_max + margin)
+        ax.set_ylim(bottom=y_min - margin, top=y_max + margin)
 
+        # ---------------------- 核心修改：采用 ax.set_xticks 方式设置X轴刻度 ----------------------
+        # 获取原始的刻度位置列表
+        # 注意：这里我们根据x_data的索引来创建位置，而不是获取ax的现有刻度
+        all_tick_positions = list(range(len(x)))
+
+        # 1. 定义步长
+        step = label_step
+
+        # 2. 创建新的刻度位置和对应的标签列表
+        new_tick_positions = all_tick_positions[::step]
+        new_tick_labels = [x[i] for i in new_tick_positions]
+
+        # 3. 应用新的刻度和标签
+        ax.set_xticks(new_tick_positions)
+        ax.set_xticklabels(new_tick_labels, rotation=rotation)
 
         # 添加标签和标题
-        plt.xlabel(x_col, fontsize=12)
-        plt.ylabel(y_label, fontsize=12)
-        plt.title(title, fontsize=14)
-        plt.xticks(rotation=45)  # 时间标签旋转45度，避免重叠
-        plt.legend()  # 显示图例
+        ax.set_xlabel(x_col)
+        ax.set_ylabel(y_label)
+        ax.legend()  # 显示图例
         # 调整布局并显示
         plt.tight_layout()
+
 
         for for_mat in ["png", "eps"]:  # png and eps
             plt.savefig(f'{cls.basic_path}/{save_path}{title}.{for_mat}',
@@ -201,6 +219,14 @@ class Draw:
         :param markers: 标记配置
         """
         df.to_csv(f'{cls.basic_path}/{save_path}{title}.csv', index=False)
+
+        # --- 全局字体设置 ---
+        plt.rcParams['font.sans-serif'] = ['Times New Roman']  # 设置默认字体
+        plt.rcParams['font.size'] = 16  # 设置默认字体大小
+        plt.rcParams['axes.labelsize'] = 30  # 设置轴标签字体大小
+        plt.rcParams['xtick.labelsize'] = 16  # 设置X轴刻度标签字体大小
+        plt.rcParams['ytick.labelsize'] = 16  # 设置Y轴刻度标签字体大小
+
         # 模式的合法性
         if scale not in cls._scale_handlers.keys():
             raise ValueError("没有这种scale模式")
@@ -230,9 +256,8 @@ class Draw:
 
         cls._scale_handlers[scale]()   # 执行对应的缩放模式
         # 添加标签和标题
-        plt.xlabel(x_label, fontsize=12)
-        plt.ylabel(y_label, fontsize=12)
-        plt.title(title, fontsize=14)
+        plt.xlabel(x_label)
+        plt.ylabel(y_label)
         plt.legend()
         plt.tight_layout()
 
@@ -339,7 +364,9 @@ class Draw:
                 loc:str,
                 linewidth:int=2,
                 markersize:int=5,
-                margin_rate:int=0.7
+                margin_rate:int=0.7,
+                label_step:int=4,
+                rotation:int=15
         ):
         """
         两个不同尺度的数据画在一起
@@ -349,12 +376,21 @@ class Draw:
         :param loc: 图例的位置
         :param markersize:
         :param linewidth:
-        :param margin_rate:  y轴数值的范围
+        :param margin_rate:  y轴扩大的范围 这样可以使数据线更集中
+        :param label_step: x轴标签间隔
+        :param rotation: x轴标签旋转角度
         :return:
         """
         # 数据先保存
         df.to_csv(f'{cls.basic_path}/{save_path}{title}.csv',
                   index=False)
+
+        # --- 全局字体设置 ---
+        plt.rcParams['font.sans-serif'] = ['Times New Roman']  # 设置默认字体
+        plt.rcParams['font.size'] = 16  # 设置默认字体大小
+        plt.rcParams['axes.labelsize'] = 30  # 设置轴标签字体大小
+        plt.rcParams['xtick.labelsize'] = 16  # 设置X轴刻度标签字体大小
+        plt.rcParams['ytick.labelsize'] = 16  # 设置Y轴刻度标签字体大小
 
         time_col = df.columns[0]
         left_col = df.columns[1]
@@ -421,34 +457,48 @@ class Draw:
 
         # -------------------------- 5. 美化双轴标签与标题 --------------------------
         # -------------------------- 左侧Y轴（ax1）设置 --------------------------
-        ax1.set_xlabel(time_col, fontsize=12, fontweight='bold')  # X轴标签（加粗）
-        ax1.tick_params(axis='x', rotation=45)  # X轴时间标签旋转45度，避免文字重叠
+        ax1.set_xlabel(time_col)  # X轴标签（加粗）
+        ax1.tick_params(axis='x',
+                        rotation=rotation)
+
+        #regionx轴标签间隔
+        # --- 核心修改：手动设置X轴刻度和标签 ---
+        # 1. 获取所有原始的X轴标签文本
+        all_labels = [item.get_text() for item in ax1.get_xticklabels()]
+
+        # 2. 定义一个步长，比如每隔2个显示一个
+        step = label_step
+
+        # 3. 创建新的刻度位置和对应的标签列表
+        new_tick_positions = list(range(0, len(all_labels), step))
+        new_tick_labels = [all_labels[i] for i in new_tick_positions]
+
+        # 4. 应用新的刻度和标签
+        ax1.set_xticks(new_tick_positions)
+        ax1.set_xticklabels(new_tick_labels)
+        #endregion
 
 
         ax1.set_ylabel(left_col,  # 左侧Y轴标签（明确对应Nodes）
-                       color='black',  # 标签颜色与线条颜色一致
-                       fontsize=12,
-                       fontweight='bold')
+                       color='black')
         ax1.tick_params(axis='y',  # 左侧Y轴刻度设置
-                        colors='black',  # 刻度颜色与线条一致
-                        labelsize=10)  # 刻度文字大小
+                        colors='black')  # 刻度文字大小
 
         # -------------------------- 右侧Y轴（ax2）设置 --------------------------
         ax2.set_ylabel(right_col,  # 右侧Y轴标签（明确对应Edges）
-                       color='black',  # 标签颜色与线条颜色一致
-                       fontsize=12,
-                       fontweight='bold')
+                       color='black')
         ax2.tick_params(axis='y',  # 右侧Y轴刻度设置
-                        colors='black',  # 刻度颜色与线条一致
-                        labelsize=10)  # 刻度文字大小
+                        colors='black')
 
-        # -------------------------- 标题与X轴刻度 --------------------------
-        ax1.set_title(
-            title,
-            fontsize=14,
-            fontweight='bold',
-            pad=20  # 标题与图表的间距（避免拥挤）
-        )
+        #region图片标题
+        # -------------------------- 图片标题 --------------------------
+        # ax1.set_title(
+        #     title,
+        #     fontsize=16,
+        #     fontweight='bold',
+        #     pad=20  # 标题与图表的间距（避免拥挤）
+        # )
+        #endregion
 
         # -------------------------- 6. 合并双轴图例（关键：避免图例重复） --------------------------
         # 提取左右轴的图例，合并为一个（放在图表右侧，不遮挡数据）
@@ -457,11 +507,9 @@ class Draw:
         ax1.legend(
             lines1 + lines2,  # 合并图例线条
             labels1 + labels2,  # 合并图例文字
-            fontsize=11,
             loc=loc,
             frameon=True,  # 显示图例边框
-            fancybox=True,  # 边框圆角
-            shadow=True  # 边框阴影（更立体）
+            fancybox=True  # 边框圆角
         )
 
         # -------------------------- 7. 调整布局与保存 --------------------------

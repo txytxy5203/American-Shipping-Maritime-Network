@@ -86,6 +86,72 @@ class DirectedWeighted:
         return knn_strength_dict
 
     @classmethod
+    def calculate_knn_degree(cls,
+                               g: nx.DiGraph,
+                               degree_type: str,
+                               neighbors_degree_type: str
+                               ) -> dict:
+        """
+        计算有向网络的「度的平均邻居度」（KNN）
+        支持四种组合：入入、入出、出入、出出
+
+        :param g: 有向图（nx.DiGraph）
+        :param degree_type: 节点自身的度类型：
+            - "out"：按出度分组
+            - "in"：按入度分组
+        :param neighbors_degree_type: 邻居的度类型：
+            - "out"：计算邻居的出度
+            - "in"：计算邻居的入度
+        :return: {k: knn(k)} 的字典（k=节点度，knn(k)=该度组的平均邻居度）
+        """
+        # ----------------------
+        # 1. 计算所有节点的出度和入度
+        # ----------------------
+        # 出度：节点指向的边的数量
+        node_out_degree = dict(g.out_degree())
+        # 入度：指向节点的边的数量
+        node_in_degree = dict(g.in_degree())
+
+        # ----------------------
+        # 2. 按目标度分组，收集对应邻居的度
+        # ----------------------
+        degree_groups = defaultdict(list)  # {目标度k: [邻居度列表]}
+
+        for node in g.nodes:
+            # 2.1 确定当前节点的「目标度」（按 degree_type 选择出/入度）
+            if degree_type == "Out":
+                target_degree = node_out_degree[node]  # 按出度分组
+                # 出邻居：当前节点指向的节点（v→u）
+                neighbors = g.successors(node)
+            elif degree_type == "In":
+                target_degree = node_in_degree[node]  # 按入度分组
+                # 入邻居：指向当前节点的节点（u→v）
+                neighbors = g.predecessors(node)
+            else:
+                raise ValueError("degree_type 只能是 'Out' 或 'In'")
+
+            # 2.2 计算邻居的度（按 neighbor_degree_type 选择出/入度）
+            if neighbors_degree_type == "Out":
+                neighbor_degrees = [node_out_degree[neigh] for neigh in neighbors]
+            elif neighbors_degree_type == "In":
+                neighbor_degrees = [node_in_degree[neigh] for neigh in neighbors]
+            else:
+                raise ValueError("neighbor_degree_type 只能是 'Out' 或 'In'")
+
+            # 2.3 将邻居度加入对应度组
+            degree_groups[target_degree].extend(neighbor_degrees)
+
+        # ----------------------
+        # 3. 计算每个度组的平均邻居度（knn(k)）
+        # ----------------------
+        knn_degree_dict = {}
+        for k, neighbor_degrees in degree_groups.items():
+            if neighbor_degrees:  # 跳过无邻居的节点（孤立节点）
+                knn_degree_dict[k] = round(np.mean(neighbor_degrees), 3)  # 结果保留3位小数
+
+        return knn_degree_dict
+
+    @classmethod
     def calculate_average_degree(cls, g: nx.DiGraph):
         """
         计算有向加权网络的平均度  这里的 度 = 出度 + 入度
