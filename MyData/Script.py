@@ -1,10 +1,16 @@
 """
-生成一个csv文件   ppt要使用   nm零模型和网络的指标对比
+脚本文件
 """
 
 import pandas as pd
 import numpy as np
 import os
+
+from matplotlib import pyplot as plt
+
+from MyData.Main import Main
+from MyData.NullModel import NullModel
+from MyData.Undirected import Undirected
 
 
 def process_csv_files(file1_path, file2_path, output_path=None):
@@ -97,12 +103,93 @@ def process_csv_files(file1_path, file2_path, output_path=None):
     except Exception as e:
         print(f"处理出错: {str(e)}")
         return None
+def four_to_one_eps():
+    time_list = ['2018 06', '2019 06', '2020 06', '2021 06']
+    # --- 全局字体设置 ---
+    plt.rcParams['font.sans-serif'] = ['Times New Roman']
+    plt.rcParams['font.size'] = 30
+    plt.rcParams['axes.labelsize'] = 20  # 可以适当调小，因为子图空间有限
+    plt.rcParams['xtick.labelsize'] = 12
+    plt.rcParams['ytick.labelsize'] = 12
+    plt.rcParams['legend.fontsize'] = 14
+
+
+    # 获取配置信息
+    colors = ['#2878b4',
+              '#373535']
+    markers = ['o',
+               's']
+
+    # 1. 创建一个大画布和4个子图
+    fig, axes = plt.subplots(2, 2, figsize=(16, 12))  # 2行2列的子图布局
+    axes = axes.flatten()  # 将axes数组展平，方便循环索引 (ax1, ax2, ax3, ax4)
+
+    # 2. 循环遍历每个时间段并绘图
+    for i, time in enumerate(time_list):
+        if i < len(axes):  # 防止time_list过长
+            ax = axes[i]  # 获取当前子图
+
+            _,G = Main.get_certain_networks_by_months(time)
+            null_model = NullModel.create_degree_distribution_null_model(G)
+
+            knn_dict = Undirected.calculate_knn(G)
+            null_model_knn_dict = Undirected.calculate_knn(null_model)
+
+            # 为当前子图绘制数据
+            # 原始网络
+            x_origin = list(knn_dict.keys())
+            y_origin = list(knn_dict.values())
+            ax.scatter(
+                x_origin, y_origin,
+                label=f'Network ({time})',
+                color=colors[0 % len(colors)],
+                marker=markers[0 % len(markers)],
+                s=60, alpha=0.8, linewidth=0.8, edgecolors='k'
+            )
+
+            # 空模型
+            x_null = list(null_model_knn_dict.keys())
+            y_null = list(null_model_knn_dict.values())
+            ax.scatter(
+                x_null, y_null,
+                label=f'Null Model ({time})',
+                color=colors[1 % len(colors)],
+                marker=markers[1 % len(markers)],
+                s=60, alpha=0.8, linewidth=0.8, edgecolors='k'
+            )
+
+            ax.set_xscale('log')
+            ax.set_yscale('log')
+            ax.legend(loc='upper right')
+
+    # 3. 添加整体标题和图例
+    # fig.suptitle('KNN Comparison Across Different Time Periods', fontsize=24, y=0.98)
+
+    fig.supxlabel('Degree')
+    fig.supylabel('Average Neighbors Node Degree')
+
+    # 4. 调整子图间距，防止标题和标签重叠
+    plt.tight_layout()  # rect参数为图例和总标题留出空间
+
+    # 5. 保存图片
+    for for_mat in ["png", "eps", "pdf"]:  # png eps pdf
+        plt.savefig(f'Output/Months/Undirected/KAndKnn/2018 06-2021 06.{for_mat}',
+                    format=for_mat,  # 显式指定格式（可选，但更稳妥）
+                    dpi=300,
+                    bbox_inches='tight'  # 去除图片周围多余空白
+                    )
+
+
+
 
 # 使用示例
 if __name__ == "__main__":
-    # 替换为你的文件路径
-    file1 = "Figure/Season/all_in_one_Digraph.csv"  # 第一个CSV文件路径
-    file2 = "Figure/Season/all_in_one_nm_zero_model.csv"  # 第二个CSV文件路径
-    output = "Figure/Season/nm_zero_model_comparison.csv"  # 输出文件路径
+    four_to_one_eps()
 
-    process_csv_files(file1, file2, output)
+    #regionProcess_csv_files
+    # # 替换为你的文件路径
+    # file1 = "Figure/Season/all_in_one_Digraph.csv"  # 第一个CSV文件路径
+    # file2 = "Figure/Season/all_in_one_nm_zero_model.csv"  # 第二个CSV文件路径
+    # output = "Figure/Season/nm_zero_model_comparison.csv"  # 输出文件路径
+    # process_csv_files(file1, file2, output)
+    #endregion

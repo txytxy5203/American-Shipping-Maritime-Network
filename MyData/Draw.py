@@ -95,6 +95,7 @@ class Draw:
                   margin_rate:float=0.2,
                   colors: int = 2,
                   markers: int = 2,
+                  is_label_step: bool = True,
                   label_step: int = 4,
                   rotation:int=15
                   ):
@@ -113,7 +114,8 @@ class Draw:
         :param margin_rate:
         :param colors:
         :param markers:
-        :param label_step:
+        :param is_label_step:   是否要启用隔间显示
+        :param label_step:  横坐标间隔几个显示一个标签
         :param rotation:
         """
         # 数据先保存
@@ -158,21 +160,24 @@ class Draw:
         margin = (y_max - y_min) * margin_rate
         ax.set_ylim(bottom=y_min - margin, top=y_max + margin)
 
-        # ---------------------- 核心修改：采用 ax.set_xticks 方式设置X轴刻度 ----------------------
-        # 获取原始的刻度位置列表
-        # 注意：这里我们根据x_data的索引来创建位置，而不是获取ax的现有刻度
-        all_tick_positions = list(range(len(x)))
 
-        # 1. 定义步长
-        step = label_step
+        # 是否启用间隔显示
+        if is_label_step:
+            # ---------------------- 核心修改：采用 ax.set_xticks 方式设置X轴刻度 ----------------------
+            # 获取原始的刻度位置列表
+            # 注意：这里我们根据x_data的索引来创建位置，而不是获取ax的现有刻度
+            all_tick_positions = list(range(len(x)))
 
-        # 2. 创建新的刻度位置和对应的标签列表
-        new_tick_positions = all_tick_positions[::step]
-        new_tick_labels = [x[i] for i in new_tick_positions]
+            # 1. 定义步长
+            step = label_step
 
-        # 3. 应用新的刻度和标签
-        ax.set_xticks(new_tick_positions)
-        ax.set_xticklabels(new_tick_labels, rotation=rotation)
+            # 2. 创建新的刻度位置和对应的标签列表
+            new_tick_positions = all_tick_positions[::step]
+            new_tick_labels = [x[i] for i in new_tick_positions]
+
+            # 3. 应用新的刻度和标签
+            ax.set_xticks(new_tick_positions)
+            ax.set_xticklabels(new_tick_labels, rotation=rotation)
 
         # 添加标签和标题
         ax.set_xlabel(x_col)
@@ -516,7 +521,7 @@ class Draw:
         # 自动调整布局（避免标签、图例被截断）
         plt.tight_layout()
 
-        for for_mat in ["png", "eps"]:      # png and eps
+        for for_mat in ["png", "eps", "pdf"]:      # png and eps
             plt.savefig(f'{cls.basic_path}/{save_path}{title}.{for_mat}',
                         format=for_mat,  # 显式指定格式（可选，但更稳妥）
                         dpi=300,

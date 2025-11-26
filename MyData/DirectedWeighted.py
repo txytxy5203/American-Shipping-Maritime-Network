@@ -226,9 +226,6 @@ class DirectedWeighted:
 
     #region讲道理这些东西要放在class里面吗
 
-
-
-
     @classmethod
     def write_ports_weighted_betweenness_centrality_rank(cls):
         """
