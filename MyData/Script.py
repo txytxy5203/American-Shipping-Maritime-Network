@@ -104,14 +104,18 @@ def process_csv_files(file1_path, file2_path, output_path=None):
         print(f"处理出错: {str(e)}")
         return None
 def four_to_one_eps():
+    """
+    将四个小图排列成2×2的大图
+    :return:
+    """
     time_list = ['2018 06', '2019 06', '2020 06', '2021 06']
     # --- 全局字体设置 ---
     plt.rcParams['font.sans-serif'] = ['Times New Roman']
     plt.rcParams['font.size'] = 30
     plt.rcParams['axes.labelsize'] = 20  # 可以适当调小，因为子图空间有限
-    plt.rcParams['xtick.labelsize'] = 12
-    plt.rcParams['ytick.labelsize'] = 12
-    plt.rcParams['legend.fontsize'] = 14
+    plt.rcParams['xtick.labelsize'] = 20
+    plt.rcParams['ytick.labelsize'] = 20
+    plt.rcParams['legend.fontsize'] = 16
 
 
     # 获取配置信息

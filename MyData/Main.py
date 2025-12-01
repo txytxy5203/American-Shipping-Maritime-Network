@@ -18,6 +18,28 @@ class Main:
     """
     #region网络生成器
     @classmethod
+    def get_certain_networks_by_years(cls, year_str: str):
+        """
+        得到某个具体的network  通过年份
+        例如： 2017
+        :return:
+        """
+        years = range(2017, 2021)
+        # 读取数据并构建网络
+        for year in years:
+
+            file_path = f'../Data/{year}/US/US{year}_Digraph.graphml'
+            if not os.path.exists(file_path):
+                print(f'⚠️ 文件不存在: {file_path}')
+                continue
+            time = str(year)
+
+            DiG = nx.read_graphml(file_path)
+            G = nx.Graph(DiG)
+            if time == year_str:
+                return DiG, G
+        return None, None
+    @classmethod
     def get_certain_networks_by_seasons(cls, year_season: str):
         """
         得到某个具体的network  通过季节
@@ -344,7 +366,7 @@ class Main:
         :return:
         """
         data = {
-            "time": [],
+            "Time": [],
             "Network": [],
             "Null Model": []
         }
@@ -354,7 +376,7 @@ class Main:
             assortativity_coefficient = nx.degree_assortativity_coefficient(G)
             assortativity_coefficient_null_model = nx.degree_assortativity_coefficient(null_model)
 
-            data["time"].append(time)
+            data["Time"].append(time)
             data["Network"].append(assortativity_coefficient)
             data["Null Model"].append(assortativity_coefficient_null_model)
         df = pd.DataFrame(data)

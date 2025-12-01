@@ -507,274 +507,184 @@ def generate_simple_weighted_digraph(num_nodes=10, weight_range=(1,10), edge_den
 
 
 #region鲁棒脆弱性
-# time_str = "2017 Summer"
-# DiG, G = Main.get_certain_networks_by_seasons(time_str)
-# print(f"节点数: {DiG.number_of_nodes()}, 边数: {DiG.number_of_edges()}")
+def robustness_weakness():
+    time_str = "2017 Summer"
+    DiG, G = Main.get_certain_networks_by_seasons(time_str)
 
-# #region原本的模拟攻击函数
-# # def simulate_attack(G, attack_strategy, fraction_removed_list):
-# #     """
-# #     模拟网络攻击并计算鲁棒性指标。
-# #
-# #     :param G: 原始网络 (NetworkX Graph)。
-# #     :param attack_strategy: 攻击策略，'random' 或 'targeted'。
-# #     :param fraction_removed_list: 一个列表，包含要移除的节点比例（例如 [0.1, 0.2, ..., 0.9]）。
-# #     :return: 一个字典，包含不同攻击强度下的网络指标。
-# #     """
-# #     results = {
-# #         "fraction_removed": [],
-# #         "largest_component_size": [],
-# #         "avg_shortest_path": [],
-# #         "diameter":[]
-# #     }
-# #
-# #     # 为了不修改原始网络，每次模拟都从一个副本开始
-# #     G_original = G.copy()
-# #
-# #     for fraction in tqdm(fraction_removed_list, desc=f"模拟 {attack_strategy} 攻击"):
-# #         # 复制原始网络进行本次攻击
-# #         G_current = G_original.copy()
-# #
-# #         # 计算要移除的节点数量
-# #         num_to_remove = int(fraction * G_current.number_of_nodes())
-# #
-# #         if num_to_remove == 0:
-# #             # 移除 0 个节点时，记录初始状态
-# #             lcc_size = len(max(nx.connected_components(G_current), key=len)) / G_original.number_of_nodes()
-# #             # avg_path = nx.average_shortest_path_length(G_current) if len(G_current.nodes()) > 1 else 0
-# #             avg_path = Undirected.calculate_average_shortest_path_length(G_current)
-# #             # diameter = nx.diameter(G_current) if len(G_current.nodes()) > 1 else 0
-# #             diameter = Undirected.calculate_diameter(G_current)
-# #
-# #             results["fraction_removed"].append(0.0)
-# #             results["largest_component_size"].append(lcc_size)
-# #             results["avg_shortest_path"].append(avg_path)
-# #             results["diameter"].append(diameter)
-# #             continue
-# #
-# #         # 根据攻击策略选择要移除的节点
-# #         if attack_strategy == 'random':
-# #             nodes_to_remove = np.random.choice(G_current.nodes(), size=num_to_remove, replace=False)
-# #
-# #         elif attack_strategy == 'targeted':
-# #             # 按度从大到小排序，选择度最高的节点
-# #             nodes_by_degree = sorted(G_current.degree(), key=lambda x: x[1], reverse=True)
-# #             nodes_to_remove = [node for node, _ in nodes_by_degree[:num_to_remove]]
-# #
-# #         else:
-# #             raise ValueError("无效的攻击策略。请使用 'random' 或 'targeted'。")
-# #
-# #         # 移除节点
-# #         G_current.remove_nodes_from(nodes_to_remove)
-# #
-# #         # 如果网络被完全摧毁，填充默认值
-# #         if G_current.number_of_nodes() == 0:
-# #             results["fraction_removed"].append(fraction)
-# #             results["largest_component_size"].append(0)
-# #             results["avg_shortest_path"].append(0)
-# #             results["diameter"].append(0)
-# #             continue
-# #
-# #         # 计算最大连通分量 (Largest Connected Component, LCC) 的相对大小
-# #         connected_components = list(nx.connected_components(G_current))
-# #         if not connected_components:
-# #             lcc_size = 0
-# #         else:
-# #             lcc_size = len(max(connected_components, key=len)) / G_original.number_of_nodes()
-# #
-# #         # 计算平均最短路径长度 (只在最大连通分量上计算，因为整个网络可能已断开)
-# #         if len(connected_components) > 0 and len(max(connected_components, key=len)) > 1:
-# #             lcc = G_current.subgraph(max(connected_components, key=len))
-# #             avg_path = nx.average_shortest_path_length(lcc)
-# #         else:
-# #             avg_path = 0  # 如果最大连通分量只有一个节点或没有节点，平均路径长度为 0
-# #
-# #         # 计算直径
-# #         if len(connected_components) > 0 and len(max(connected_components, key=len)) > 1:
-# #             lcc = G_current.subgraph(max(connected_components, key=len))
-# #             diameter = nx.diameter(lcc)
-# #         else:
-# #             diameter = 0
-# #
-# #         # 记录结果
-# #         results["fraction_removed"].append(fraction)
-# #         results["largest_component_size"].append(lcc_size)
-# #         results["avg_shortest_path"].append(avg_path)
-# #         results["diameter"].append(diameter)
-# #     return results
-# #endregion
-#
-# --- 2. 定义攻击模拟函数 ---
-def simulate_attack(G, attack_strategy, fraction_removed_list):
-    """
-    模拟网络攻击并计算鲁棒性指标。
+    # --- 2. 定义攻击模拟函数 ---
+    def simulate_attack(G, attack_strategy, fraction_removed_list):
+        """
+        模拟网络攻击并计算鲁棒性指标。
 
-    :param G: 原始网络 (NetworkX Graph)。
-    :param attack_strategy: 攻击策略，'random' 或 'targeted'。
-    :param fraction_removed_list: 一个列表，包含要移除的节点比例（例如 [0.1, 0.2, ..., 0.9]）。
-    :return: 一个字典，包含不同攻击强度下的网络指标。
-    """
-    results = {
-        "fraction_removed": [],
-        "largest_strongly_connected_component_size": [],
-        "avg_shortest_path_length": [],
-        "diameter":[]
+        :param G: 原始网络 (NetworkX Graph)。
+        :param attack_strategy: 攻击策略，'random' 或 'targeted'。
+        :param fraction_removed_list: 一个列表，包含要移除的节点比例（例如 [0.1, 0.2, ..., 0.9]）。
+        :return: 一个字典，包含不同攻击强度下的网络指标。
+        """
+        results = {
+            "fraction_removed": [],
+            "largest_strongly_connected_component_size": [],
+            "avg_shortest_path_length": [],
+            "diameter":[]
+        }
+
+        # 为了不修改原始网络，每次模拟都从一个副本开始
+        G_original = G.copy()
+        original_num_nodes = G_original.number_of_nodes()
+
+        for fraction in tqdm(fraction_removed_list, desc=f"模拟 {attack_strategy} 攻击 (有向图)"):
+            G_current = G_original.copy()
+            num_to_remove = int(fraction * original_num_nodes)
+
+            # --- 选择并移除节点 ---
+            if num_to_remove > 0:
+                if attack_strategy == 'random':
+                    nodes_to_remove = np.random.choice(G_current.nodes(), size=num_to_remove, replace=False)
+                elif attack_strategy == 'degree':
+                    # 在有向图中，"度"可以指入度(in-degree)、出度(out-degree)或总度(total-degree)
+                    # 这里我们选择基于总度进行攻击
+                    nodes_by_degree = sorted(G_current.degree(weight=None), key=lambda x: x[1], reverse=True)
+                    nodes_to_remove = [node for node, _ in nodes_by_degree[:num_to_remove]]
+
+                elif attack_strategy == 'strength':
+                    # 依据节点的 'total_TEU' 属性值进行攻击（默认攻击值最大的节点）
+                    # 1. 筛选出具有 'total_TEU' 属性的节点
+                    nodes_with_teu = [
+                        (node, G_current.nodes[node]['total_TEU'])
+                        for node in G_current.nodes()
+                        # if 'total_TEU' in G_current.nodes[node]       # 不想加这个if 因为我的节点应该都有total_TEU属性
+                    ]
+
+                    # 2. 按 'total_TEU' 属性值降序排序（攻击值最大的节点）
+                    # 如果想攻击值最小的节点，将 reverse=True 改为 reverse=False
+                    nodes_with_teu_sorted = sorted(nodes_with_teu, key=lambda x: x[1], reverse=True)
+
+                    # 3. 选择前 num_to_remove 个节点
+                    nodes_to_remove = [node for node, _ in nodes_with_teu_sorted[:num_to_remove]]
+                elif attack_strategy == 'betweenness':
+                    # 依据有向中介中心性进行攻击
+                    # nx.betweenness_centrality 计算的是无向中介中心性
+                    # 对于有向图，应使用 nx.directed_betweenness_centrality
+                    betweenness_centralities = nx.betweenness_centrality(G_current, normalized=True)
+
+                    # 按中介中心性值降序排序
+                    nodes_by_betweenness = sorted(betweenness_centralities.items(), key=lambda x: x[1], reverse=True)
+
+                    # 选择前 num_to_remove 个节点
+                    nodes_to_remove = [node for node, _ in nodes_by_betweenness[:num_to_remove]]
+                elif attack_strategy == 'pagerank':
+                    # 新增：PageRank 中心性攻击
+                    # 计算有向图的 PageRank（可调整alpha参数，默认0.85为随机游走概率）
+                    pagerank_scores = nx.pagerank(
+                        G_current,
+                        alpha=0.85,  # 阻尼系数（随机跳转到其他节点的概率为1-alpha）
+                        weight='weight'  # 若边有weight属性，可基于权重计算（无则忽略）
+                    )
+                    # 按 PageRank 分数降序排序，选取分数最高的节点
+                    nodes_by_pagerank = sorted(pagerank_scores.items(), key=lambda x: x[1], reverse=True)
+                    nodes_to_remove = [node for node, _ in nodes_by_pagerank[:num_to_remove]]
+                else:
+                    raise ValueError("无效的攻击策略，请查看函数说明！")
+
+                G_current.remove_nodes_from(nodes_to_remove)
+
+            # --- 如果网络被完全摧毁，填充默认值 ---
+            if G_current.number_of_nodes() == 0:
+                results["fraction_removed"].append(fraction)
+                results["largest_strongly_connected_component_size"].append(0)
+                results["avg_shortest_path_length"].append(0)
+                results["diameter"].append(0)
+                continue
+
+
+
+            # 1. 最大强连通分量大小
+            # --- 计算最大强连通分量 (Largest Strongly Connected Component, LSCC) ---
+            # 对于有向图，强连通分量(SCC)是指其中每个节点都可以到达其他所有节点
+            strongly_connected_components = list(nx.strongly_connected_components(G_current))
+            if not strongly_connected_components:
+                lscc_size = 0
+                lscc = G_current.subgraph([])  # 空图
+            else:
+                lscc_nodes = max(strongly_connected_components, key=len)
+                lscc = G_current.subgraph(lscc_nodes)
+                lscc_size = len(lscc) / original_num_nodes
+
+            # --- 计算指标 (主要基于最大强连通分量 LSCC) ---
+
+
+
+            # 2. 平均最短路径长度
+            # 在有向图中，路径是有方向的。我们计算所有节点对之间的有向最短路径的平均值。
+            if len(lscc) > 1:
+                try:
+                    # nx.average_shortest_path_length 对有向图同样适用
+                    avg_path = nx.average_shortest_path_length(lscc)
+                except nx.NetworkXError:
+                    # 如果LSCC不是强连通的（理论上不会发生），会报错
+                    avg_path = float('inf')
+            else:
+                avg_path = 0  # 单个节点或空图没有路径
+
+
+
+            # 3. 网络直径
+            # 有向图的直径定义为其强连通分量中最长的最短路径。
+            # 如果图不是强连通的，直径通常被认为是无穷大
+            if len(lscc) > 1:
+                try:
+                    diameter = nx.diameter(lscc)
+                except nx.NetworkXError:
+                    # 如果LSCC不是强连通的，diameter会报错，我们将其视为无穷大
+                    diameter = float('inf')
+            else:
+                diameter = 0  # 单个节点或空图的直径为0
+
+            # --- 记录结果 ---
+            results["fraction_removed"].append(fraction)
+            results["largest_strongly_connected_component_size"].append(lscc_size)
+            results["avg_shortest_path_length"].append(avg_path)
+            results["diameter"].append(diameter)
+        return results
+
+
+    metrics = "avg_shortest_path_length"
+    fraction_removed_list = np.linspace(0, 0.03, 30)
+
+    attack_strategy = ['random', 'degree', 'strength', 'betweenness', 'pagerank']
+    attack_results = {}
+
+    # 开始模拟攻击
+    for strategy in attack_strategy:
+        attack_results[strategy] = simulate_attack(DiG, strategy, fraction_removed_list)
+
+    data = {
+        "fraction_removed": [],  # 移除节点的比例（如0.1, 0.2, 0.3...）
+        **{strategy: [] for strategy in attack_strategy}  # 解包推导式，合并到主字典
     }
 
-    # 为了不修改原始网络，每次模拟都从一个副本开始
-    G_original = G.copy()
-    original_num_nodes = G_original.number_of_nodes()
+    for fraction in fraction_removed_list:
+        data["fraction_removed"].append(fraction)
 
-    for fraction in tqdm(fraction_removed_list, desc=f"模拟 {attack_strategy} 攻击 (有向图)"):
-        G_current = G_original.copy()
-        num_to_remove = int(fraction * original_num_nodes)
+        index = {}
+        for strategy in attack_strategy:
+            index[strategy] = attack_results[strategy]["fraction_removed"].index(fraction)
 
-        # --- 选择并移除节点 ---
-        if num_to_remove > 0:
-            if attack_strategy == 'random':
-                nodes_to_remove = np.random.choice(G_current.nodes(), size=num_to_remove, replace=False)
-            elif attack_strategy == 'degree':
-                # 在有向图中，"度"可以指入度(in-degree)、出度(out-degree)或总度(total-degree)
-                # 这里我们选择基于总度进行攻击
-                nodes_by_degree = sorted(G_current.degree(weight=None), key=lambda x: x[1], reverse=True)
-                nodes_to_remove = [node for node, _ in nodes_by_degree[:num_to_remove]]
+        for strategy in attack_strategy:
+            data[strategy].append(attack_results[strategy][metrics][index[strategy]])
 
-            elif attack_strategy == 'strength':
-                # 依据节点的 'total_TEU' 属性值进行攻击（默认攻击值最大的节点）
-                # 1. 筛选出具有 'total_TEU' 属性的节点
-                nodes_with_teu = [
-                    (node, G_current.nodes[node]['total_TEU'])
-                    for node in G_current.nodes()
-                    # if 'total_TEU' in G_current.nodes[node]       # 不想加这个if 因为我的节点应该都有total_TEU属性
-                ]
-
-                # 2. 按 'total_TEU' 属性值降序排序（攻击值最大的节点）
-                # 如果想攻击值最小的节点，将 reverse=True 改为 reverse=False
-                nodes_with_teu_sorted = sorted(nodes_with_teu, key=lambda x: x[1], reverse=True)
-
-                # 3. 选择前 num_to_remove 个节点
-                nodes_to_remove = [node for node, _ in nodes_with_teu_sorted[:num_to_remove]]
-            elif attack_strategy == 'betweenness':
-                # 依据有向中介中心性进行攻击
-                # nx.betweenness_centrality 计算的是无向中介中心性
-                # 对于有向图，应使用 nx.directed_betweenness_centrality
-                betweenness_centralities = nx.betweenness_centrality(G_current, normalized=True)
-
-                # 按中介中心性值降序排序
-                nodes_by_betweenness = sorted(betweenness_centralities.items(), key=lambda x: x[1], reverse=True)
-
-                # 选择前 num_to_remove 个节点
-                nodes_to_remove = [node for node, _ in nodes_by_betweenness[:num_to_remove]]
-
-            else:
-                raise ValueError("无效的攻击策略，请查看函数说明！")
-
-            G_current.remove_nodes_from(nodes_to_remove)
-
-        # --- 如果网络被完全摧毁，填充默认值 ---
-        if G_current.number_of_nodes() == 0:
-            results["fraction_removed"].append(fraction)
-            results["largest_strongly_connected_component_size"].append(0)
-            results["avg_shortest_path_length"].append(0)
-            results["diameter"].append(0)
-            continue
-
-
-
-        # 1. 最大强连通分量大小
-        # --- 计算最大强连通分量 (Largest Strongly Connected Component, LSCC) ---
-        # 对于有向图，强连通分量(SCC)是指其中每个节点都可以到达其他所有节点
-        strongly_connected_components = list(nx.strongly_connected_components(G_current))
-        if not strongly_connected_components:
-            lscc_size = 0
-            lscc = G_current.subgraph([])  # 空图
-        else:
-            lscc_nodes = max(strongly_connected_components, key=len)
-            lscc = G_current.subgraph(lscc_nodes)
-            lscc_size = len(lscc) / original_num_nodes
-
-        # --- 计算指标 (主要基于最大强连通分量 LSCC) ---
-
-
-
-        # 2. 平均最短路径长度
-        # 在有向图中，路径是有方向的。我们计算所有节点对之间的有向最短路径的平均值。
-        if len(lscc) > 1:
-            try:
-                # nx.average_shortest_path_length 对有向图同样适用
-                avg_path = nx.average_shortest_path_length(lscc)
-            except nx.NetworkXError:
-                # 如果LSCC不是强连通的（理论上不会发生），会报错
-                avg_path = float('inf')
-        else:
-            avg_path = 0  # 单个节点或空图没有路径
-
-
-
-        # 3. 网络直径
-        # 有向图的直径定义为其强连通分量中最长的最短路径。
-        # 如果图不是强连通的，直径通常被认为是无穷大
-        if len(lscc) > 1:
-            try:
-                diameter = nx.diameter(lscc)
-            except nx.NetworkXError:
-                # 如果LSCC不是强连通的，diameter会报错，我们将其视为无穷大
-                diameter = float('inf')
-        else:
-            diameter = 0  # 单个节点或空图的直径为0
-
-        # --- 记录结果 ---
-        results["fraction_removed"].append(fraction)
-        results["largest_strongly_connected_component_size"].append(lscc_size)
-        results["avg_shortest_path_length"].append(avg_path)
-        results["diameter"].append(diameter)
-    return results
-
-
-# # --- 3. 配置并执行模拟 ---
-#
-# # 定义要测试的攻击强度（移除节点的比例）
-# fraction_removed_list = np.linspace(0, 0.03, 30)
-#
-# # 执行两种攻击的模拟
-# random_attack_results = simulate_attack(DiG, 'random', fraction_removed_list)
-# degree_attack_results = simulate_attack(DiG, 'degree', fraction_removed_list)
-# strength_attack_results = simulate_attack(DiG, 'strength', fraction_removed_list)
-# betweenness_attack_results = simulate_attack(DiG, 'betweenness', fraction_removed_list)
-#
-# data = {
-#     "fraction_removed": [],
-#     "random attack": [],
-#     "degree attack": [],
-#     "strength attack": [],
-#     "betweenness attack":[]
-# }
-#
-# for fraction in fraction_removed_list:
-#     data["fraction_removed"].append(fraction)
-#
-#     random_index = random_attack_results["fraction_removed"].index(fraction)
-#     degree_index = degree_attack_results["fraction_removed"].index(fraction)
-#     strength_index = strength_attack_results["fraction_removed"].index(fraction)
-#     betweenness_index = betweenness_attack_results["fraction_removed"].index(fraction)
-#
-#     data["random attack"].append(random_attack_results["avg_shortest_path_length"][random_index])
-#     data["degree attack"].append(degree_attack_results["avg_shortest_path_length"][degree_index])
-#     data["strength attack"].append(strength_attack_results["avg_shortest_path_length"][strength_index])
-#     data["betweenness attack"].append(betweenness_attack_results["avg_shortest_path_length"][betweenness_index])
-#
-# df = pd.DataFrame(data)
-# Draw.draw_plot(
-#     df,
-#     'Test/',
-#     'avg length',
-#     f'{time_str} attack 0.03',
-#     margin_rate=0.1,
-#     is_label_step=False,
-#     colors=1,
-#     markers=1
-# )
+    df = pd.DataFrame(data)
+    Draw.draw_plot(
+        df,
+        'Test/',
+        metrics,
+        f'{time_str} {metrics} attack 0.03',
+        margin_rate=0.1,
+        is_label_step=False,
+        colors=3,
+        markers=3
+    )
 #endregion
 
 
-Main.nodes_and_edges()
+Main.strength_and_directed_betweenness()

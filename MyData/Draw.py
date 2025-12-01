@@ -21,6 +21,14 @@ class Draw:
         2:[ # 天询师兄的两个颜色的配色
             '#2878b4',
            '#373535'
+        ],
+        3:[
+            '#2E86AB',  # 深海蓝（主色）
+            '#A23B72',  # 酒红紫
+            '#F18F01',  # 暖橙黄
+            '#C73E1D',  # 砖红
+            '#6A994E',  # 森林绿
+            '#577590'  # 浅灰蓝
         ]
     }
     markers_config = {
@@ -34,6 +42,14 @@ class Draw:
         2:[
             'o',
             's'
+        ],
+        3:[
+            'o',  # 圆形（经典易识别）
+            's',  # 正方形
+            '^',  # 正三角形
+            'D',  # 菱形
+            'v',  # 倒三角形
+            'p'  # 五边形
         ]
     }
 
@@ -301,6 +317,14 @@ class Draw:
         :param legend: 是否显示图例
         """
         df.to_csv(f'{cls.basic_path}/{save_path}{title}.csv', index=False)
+
+        # --- 全局字体设置 ---
+        plt.rcParams['font.sans-serif'] = ['Times New Roman']  # 设置默认字体
+        plt.rcParams['font.size'] = 16  # 设置默认字体大小
+        plt.rcParams['axes.labelsize'] = 30  # 设置轴标签字体大小
+        plt.rcParams['xtick.labelsize'] = 16  # 设置X轴刻度标签字体大小
+        plt.rcParams['ytick.labelsize'] = 16  # 设置Y轴刻度标签字体大小
+
         # 模式的合法性
         if scale not in cls._scale_handlers.keys():
             raise ValueError("没有这种scale模式")
@@ -347,9 +371,8 @@ class Draw:
 
         cls._scale_handlers[scale]()   # 执行对应的缩放模式
         # 添加标签和标题
-        plt.xlabel(x_label, fontsize=12)
-        plt.ylabel(y_label, fontsize=12)
-        plt.title(title, fontsize=14)
+        plt.xlabel(x_label)
+        plt.ylabel(y_label)
         if legend:
             plt.legend()
         plt.tight_layout()
