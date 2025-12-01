@@ -27,7 +27,6 @@ class Main:
         years = range(2017, 2021)
         # 读取数据并构建网络
         for year in years:
-
             file_path = f'../Data/{year}/US/US{year}_Digraph.graphml'
             if not os.path.exists(file_path):
                 print(f'⚠️ 文件不存在: {file_path}')
@@ -96,6 +95,21 @@ class Main:
                     return DiG, G
         return None, None
 
+    @classmethod
+    def get_networks_by_years(cls):
+        """
+        网络生成器函数   months
+        :return: 每次生成对应的 DiG  G  time
+        """
+        years = range(2017, 2021)       # 21年的数据不全 不使用
+        for year in years:
+            file_path = f'../Data/{year}/US/US{year}_Digraph.graphml'
+
+            time = f"{year}"
+
+            DiG = nx.read_graphml(file_path)
+            G = nx.Graph(DiG)
+            yield DiG, G, time
     @classmethod
     def get_networks_by_seasons(cls):
         """
