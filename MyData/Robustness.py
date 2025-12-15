@@ -77,6 +77,15 @@ class Robustness:
         return np.random.choice(list(G.nodes()), size=k, replace=False)
 
     @classmethod
+    def node_attack_degree(cls, G, k):
+        nodes_by_degree = sorted(
+            G.degree(weight=None),
+            key=lambda x:x[1],
+            reverse=True
+        )
+        return [node for node, _ in nodes_by_degree[:k]]
+
+    @classmethod
     def node_attack_strength(cls, G, k):
         nodes = sorted(
             G.nodes(data=True),
