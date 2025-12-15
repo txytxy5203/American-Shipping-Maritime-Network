@@ -1,6 +1,9 @@
 import networkx as nx
+import numpy as np
+
 
 class Robustness:
+    #regionMetrics
     @classmethod
     def LSCC(cls, g:nx.DiGraph):
         """
@@ -60,3 +63,70 @@ class Robustness:
 
         # 2. 使用 NetworkX 内置实现
         return nx.global_efficiency(undirected_g)
+    #endregion
+
+    #regionAttackStrategy
+    @classmethod
+    def node_attack_random(cls, G, k):
+        """
+        随机攻击  k个节点
+        :param G:
+        :param k:
+        :return:
+        """
+        return np.random.choice(list(G.nodes()), size=k, replace=False)
+
+    @classmethod
+    def node_attack_strength(cls, G, k):
+        nodes = sorted(
+            G.nodes(data=True),
+            key=lambda x: x[1].get("total_TEU", 0),
+            reverse=True
+        )
+        return [n for n, _ in nodes[:k]]
+
+    @classmethod
+    def node_attack_betweenness(cls, G, k):
+        bc = nx.betweenness_centrality(G)
+        nodes = sorted(bc.items(), key=lambda x: x[1], reverse=True)
+        return [n for n, _ in nodes[:k]]
+    #endregion
+
+    @classmethod
+    def simulate_attack(cls, g:nx.DiGraph, attack_func:callable,
+                        metric_funcs:dict, fraction_removed_list:list):
+
+
+
+        G0 = g.copy()
+        N0 = G0.number_of_nodes()
+
+        """
+        returns = {
+         "Fraction": [0.1, 0.2, 0.3],
+         "Degree":   [0.9, 0.8, 0.7],
+         "Strength":  [0.9, 0.8, 0.7]
+        }
+        """
+        results = {
+            "Fraction": [],
+            **{metric: [] for metric in metric_funcs}
+        }
+
+        for frac in fraction_removed_list:
+            G_current = G0.copy()
+            k = int(frac * N0)
+
+            if k > 0:
+                # 目前只有节点攻击
+                nodes_to_remove = attack_func(G_current, k)
+                G_current.remove_nodes_from(nodes_to_remove)
+
+            results["Fraction"].append(frac)
+
+            for name, func in metric_funcs.items():
+                # 允许指标函数自己决定是否需要 N0
+                value = func(G_current)
+                results[name].append(value)
+
+        return results
