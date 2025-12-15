@@ -208,7 +208,7 @@ class Main:
         Draw.draw_plot(
             df,
             "Months/Undirected/AverageShortestLength/",
-            "<L>",
+            "Average Shortest Path Length",
             "Average Shortest Path Length",
             1
         )
@@ -408,6 +408,7 @@ class Main:
         画每个港口 加权度和有向介数中心性之间的关系
         :return:
         """
+        # TODO 可以使用那个库函数
         for DiG, G, time in cls.get_networks_by_months():
             data = {}
             bc_dict = nx.betweenness_centrality(DiG, normalized=True)  # 有向网络的介数中心性  不适用加权

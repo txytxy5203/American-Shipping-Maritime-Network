@@ -1,6 +1,8 @@
 import numpy as np
 import pandas as pd
 from typing import Callable
+
+from fuzzywuzzy.utils import full_process
 from matplotlib import pyplot as plt
 from matplotlib.lines import Line2D
 from mpl_toolkits.basemap import Basemap
@@ -150,7 +152,7 @@ class Draw:
         x = df[x_col]  # 第一列的数据
 
         # --- 使用面向对象的方式创建图形和轴 ---
-        fig, ax = plt.subplots(figsize=(10, 6))
+        fig, ax = plt.subplots(figsize=(10, 6.2))
 
         # 获取配置信息
         colors = cls.colors_config[colors]
@@ -195,10 +197,21 @@ class Draw:
             ax.set_xticks(new_tick_positions)
             ax.set_xticklabels(new_tick_labels, rotation=rotation)
 
+        #region刻度加粗
+        for label in ax.get_xticklabels():
+            label.set_fontweight('bold')
+        for label in ax.get_yticklabels():
+            label.set_fontweight('bold')
+        #endregion
+
         # 添加标签和标题
         ax.set_xlabel(x_col)
         ax.set_ylabel(y_label)
-        ax.legend()  # 显示图例
+        legend = ax.legend()  # 显示图例
+
+        # 图例文字加粗
+        for text in legend.get_texts():
+            text.set_fontweight('bold')
         # 调整布局并显示
         plt.tight_layout()
 
@@ -256,7 +269,7 @@ class Draw:
         colors = cls.colors_config[colors]
         markers = cls.markers_config[markers]
 
-        plt.figure(figsize=(10, 6))
+        fig = plt.figure(figsize=(10, 6))
 
         for i, col in enumerate(df.columns):
             coordinates = df[col]
@@ -276,10 +289,19 @@ class Draw:
             )
 
         cls._scale_handlers[scale]()   # 执行对应的缩放模式
+
+        ax = plt.gca()
+        for label in ax.get_xticklabels():
+            label.set_fontweight('bold')
+        for label in ax.get_yticklabels():
+            label.set_fontweight('bold')
+
         # 添加标签和标题
         plt.xlabel(x_label)
         plt.ylabel(y_label)
-        plt.legend()
+        legend = plt.legend()
+        for text in legend.get_texts():
+            text.set_fontweight('bold')
         plt.tight_layout()
 
         for for_mat in ["png", "eps"]:      # png and eps
@@ -354,22 +376,27 @@ class Draw:
                 plt.text(
                     # 注意这里是坐标系中的数值偏移
                     x - 1.2e4,  # 文本的 x 坐标（在散点 x 基础上右移1，避免重叠）
-                    y - 0.005,  # 文本的 y 坐标（在散点 y 基础上上移1）
+                    y - 0.005 if port != "KRBUS" else 0.01,  # 文本的 y 坐标（在散点 y 基础上上移1）
                     s=port,  # 标签内容（港口名）
-                    fontsize=9,  # 字体大小
+                    fontsize=12,  # 字体大小
                     color='black',  # 字体颜色
                     weight='bold',  # 加粗（可选）
                     ha='left',  # 文本水平对齐方式（left/center/right）
                     va='bottom',  # 文本垂直对齐方式（bottom/center/top）
-                    bbox=dict(  # 半透明背景框（可选，增强可读性）
-                        boxstyle='round,pad=0.2',
-                        facecolor='white',
-                        alpha=0.7,
-                        edgecolor='black'
-                )
+                    # bbox=dict(  # 半透明背景框（可选，增强可读性）
+                    #     boxstyle='round,pad=0.2',
+                    #     facecolor='white',
+                    #     alpha=0.7,
+                    #     edgecolor='black'
+                #)
             )
 
         cls._scale_handlers[scale]()   # 执行对应的缩放模式
+        ax = plt.gca()
+        for label in ax.get_xticklabels():
+            label.set_fontweight('bold')
+        for label in ax.get_yticklabels():
+            label.set_fontweight('bold')
         # 添加标签和标题
         plt.xlabel(x_label)
         plt.ylabel(y_label)
@@ -517,29 +544,30 @@ class Draw:
                        color='black')
         ax2.tick_params(axis='y',  # 右侧Y轴刻度设置
                         colors='black')
+        #region 加粗刻度文字
+        for label in ax1.get_xticklabels():
+            label.set_fontweight('bold')
 
-        #region图片标题
-        # -------------------------- 图片标题 --------------------------
-        # ax1.set_title(
-        #     title,
-        #     fontsize=16,
-        #     fontweight='bold',
-        #     pad=20  # 标题与图表的间距（避免拥挤）
-        # )
+        for label in ax1.get_yticklabels():
+            label.set_fontweight('bold')
+        for label in ax2.get_yticklabels():
+            label.set_fontweight('bold')
         #endregion
 
         # -------------------------- 6. 合并双轴图例（关键：避免图例重复） --------------------------
         # 提取左右轴的图例，合并为一个（放在图表右侧，不遮挡数据）
         lines1, labels1 = ax1.get_legend_handles_labels()  # 左侧轴图例
         lines2, labels2 = ax2.get_legend_handles_labels()  # 右侧轴图例
-        ax1.legend(
+        legend = ax1.legend(
             lines1 + lines2,  # 合并图例线条
             labels1 + labels2,  # 合并图例文字
             loc=loc,
             frameon=True,  # 显示图例边框
             fancybox=True  # 边框圆角
         )
-
+        # 图例加粗
+        for text in legend.get_texts():
+            text.set_fontweight('bold')
         # -------------------------- 7. 调整布局与保存 --------------------------
         # 自动调整布局（避免标签、图例被截断）
         plt.tight_layout()

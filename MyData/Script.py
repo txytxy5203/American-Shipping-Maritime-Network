@@ -164,7 +164,13 @@ def four_to_one_eps():
 
             ax.set_xscale('log')
             ax.set_yscale('log')
-            ax.legend(loc='upper right')
+            legend = ax.legend(loc='upper right')
+            for label in ax.get_xticklabels():
+                label.set_fontweight('bold')
+            for label in ax.get_yticklabels():
+                label.set_fontweight('bold')
+            for text in legend.get_texts():
+                text.set_fontweight('bold')
 
     # 3. 添加整体标题和图例
     # fig.suptitle('KNN Comparison Across Different Time Periods', fontsize=24, y=0.98)
