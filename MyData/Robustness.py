@@ -87,12 +87,18 @@ class Robustness:
 
     @classmethod
     def node_attack_strength(cls, G, k):
-        nodes = sorted(
-            G.nodes(data=True),
-            key=lambda x: x[1].get("total_TEU", 0),
-            reverse=True
-        )
-        return [n for n, _ in nodes[:k]]
+        # 依据节点的 'total_TEU' 属性值进行攻击（默认攻击值最大的节点）
+        # 1. 筛选出具有 'total_TEU' 属性的节点
+        nodes_with_teu = [
+            (node, G.nodes[node]['total_TEU'])
+            for node in G.nodes()
+            # if 'total_TEU' in G_current.nodes[node]     # 不想加这个if 因为我的节点应该都有total_TEU属性
+        ]
+        # 2. 按 'total_TEU' 属性值降序排序（攻击值最大的节点）
+        nodes_with_teu_sorted = sorted(nodes_with_teu, key=lambda x: x[1], reverse=True)
+
+        # 3. 选择前 num_to_remove 个节点
+        return [node for node, _ in nodes_with_teu_sorted[:k]]
 
     @classmethod
     def node_attack_betweenness(cls, G, k):

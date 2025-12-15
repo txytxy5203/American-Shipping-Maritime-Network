@@ -40,25 +40,32 @@ sys.path.append('../Algorithm')
 
 
 
-fraction_removed_list = np.linspace(0, 0.05, 50)
-attack_strategies = {
-    "random": node_attack_random,
-    "strength": node_attack_strength,
-    "betweenness": node_attack_betweenness
-}
-
-metric_funcs = {
-    "LSCC": Robustness.LSCC,
-    "LWCC": Robustness.LWCC,
-    "Efficiency": Robustness.Global_Efficiency
-}
-
-attack_results = {}
-
-for name, attack_func in attack_strategies.items():
-    attack_results[name] = Robustness.simulate_attack(
-        DiG,
-        attack_func,
-        metric_funcs,
-        fraction_removed_list
-    )
+# fraction_removed_list = np.linspace(0, 0.05, 50)
+# attack_strategies = {
+#     "random": node_attack_random,
+#     "strength": node_attack_strength,
+#     "betweenness": node_attack_betweenness
+# }
+#
+# metric_funcs = {
+#     "LSCC": Robustness.LSCC,
+#     "LWCC": Robustness.LWCC,
+#     "Efficiency": Robustness.Global_Efficiency
+# }
+#
+# attack_results = {}
+#
+# for name, attack_func in attack_strategies.items():
+#     attack_results[name] = Robustness.simulate_attack(
+#         DiG,
+#         attack_func,
+#         metric_funcs,
+#         fraction_removed_list
+#     )
+G = Main.get_certain_networks_by_years("2017")
+nodes = sorted(
+            G.nodes(data=True),
+            key=lambda x: x[1].get("total_TEU", 0),
+            reverse=True
+        )
+print(nodes)
