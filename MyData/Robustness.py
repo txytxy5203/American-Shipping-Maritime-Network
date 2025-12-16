@@ -179,6 +179,21 @@ class Robustness:
             # 一个由 tuple 组成的 list
             "targets": [edge for edge, _ in edges_strength_sorted[:m]]
         }
+
+    @classmethod
+    def edge_attack_betweenness(cls, g:nx.DiGraph, frac):
+        M0 = g.number_of_edges()
+        m = int(M0 * frac)
+
+        edge_bc = nx.edge_betweenness_centrality(g, normalized=True)
+        edge_bc_sorted = sorted(
+            edge_bc.items(),
+            key=lambda x: x[1], reverse=True
+        )
+        return {
+            "type": "edge",
+            "targets": [edge for edge,_ in edge_bc_sorted[:m]]
+        }
     #endregion
 
     @classmethod
