@@ -1,11 +1,12 @@
 import networkx as nx
 import numpy as np
+from tqdm import tqdm
 
 
 class Robustness:
     #regionMetrics
     @classmethod
-    def LSCC(cls, g:nx.DiGraph):
+    def LSCC(cls, g:nx.DiGraph, n0:int):
         """
         最大强连通分量（LSCC）大小
         :return:
@@ -19,13 +20,13 @@ class Robustness:
         try:
             # 返回最大的连通分量的大小
             lscc = max(sccs, key=len)
-            return len(lscc)
+            return len(lscc) / n0
         except ValueError:
             print("没有强连通分量")
             return 0.0
 
     @classmethod
-    def LWCC(cls, g:nx.DiGraph):
+    def LWCC(cls, g:nx.DiGraph, n0:int):
         """
         最大弱连通分量（LWCC）大小
         :return:
@@ -39,7 +40,7 @@ class Robustness:
         try:
             # 返回最大的连通分量的大小
             lwcc = max(wccs, key=len)
-            return len(lwcc)
+            return len(lwcc) / n0
         except ValueError:
             print("没有连通分量")
             return 0.0
@@ -102,7 +103,7 @@ class Robustness:
 
     @classmethod
     def node_attack_betweenness(cls, G, k):
-        bc = nx.betweenness_centrality(G)
+        bc = nx.betweenness_centrality(G, normalized=True)
         nodes = sorted(bc.items(), key=lambda x: x[1], reverse=True)
         return [n for n, _ in nodes[:k]]
     #endregion
@@ -110,7 +111,6 @@ class Robustness:
     @classmethod
     def simulate_attack(cls, g:nx.DiGraph, attack_func:callable,
                         metric_funcs:dict, fraction_removed_list:list):
-
 
 
         G0 = g.copy()
@@ -128,20 +128,24 @@ class Robustness:
             **{metric: [] for metric in metric_funcs}
         }
 
-        for frac in fraction_removed_list:
+        for frac in tqdm(fraction_removed_list):
             G_current = G0.copy()
             k = int(frac * N0)
 
+            # 1.对网络执行攻击
             if k > 0:
                 # 目前只有节点攻击
                 nodes_to_remove = attack_func(G_current, k)
                 G_current.remove_nodes_from(nodes_to_remove)
 
             results["Fraction"].append(frac)
-
+            # 2.计算攻击之后网络的指标
             for name, func in metric_funcs.items():
-                # 允许指标函数自己决定是否需要 N0
-                value = func(G_current)
+                # 这里用 “异常” 来做 “控制流” 了
+                try:
+                    value = func(G_current)
+                except TypeError:
+                    value = func(G_current, N0)
                 results[name].append(value)
 
         return results
