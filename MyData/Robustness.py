@@ -1,3 +1,5 @@
+import random
+
 import networkx as nx
 import numpy as np
 from tqdm import tqdm
@@ -134,19 +136,49 @@ class Robustness:
         M0 = g.number_of_edges()
         m = int(M0 * frac)
         return {
-            "type": "node",
-            "targets": np.random.choice(list(g.edges()), size=m, replace=False)
+            "type": "edge",
+            "targets": random.sample(list(g.edges()), k=m)
         }
 
     @classmethod
-    def edge_attack_random(cls, g: nx.DiGraph, frac):
+    def edge_attack_degree(cls, g: nx.DiGraph, frac):
+        """edge的度为连接的两个节点的度值之和"""
         M0 = g.number_of_edges()
         m = int(M0 * frac)
+
+        edges_degree = {
+            (u,v): g.degree[u] + g.degree[v] for u, v in g.edges()
+        }
+        edges_degree_sorted = sorted(
+            edges_degree.items(),
+            key=lambda x: x[1], reverse=True
+        )
+
         return {
-            "type": "node",
-            "targets": np.random.choice(list(g.edges()), size=m, replace=False)
+            "type": "edge",
+            # 一个由 tuple 组成的 list
+            "targets": [edge for edge, _ in edges_degree_sorted[:m]]
         }
 
+    @classmethod
+    def edge_attack_strength(cls, g: nx.DiGraph, frac):
+        """edge的强度就是这条边的流量 哈哈哈"""
+        M0 = g.number_of_edges()
+        m = int(M0 * frac)
+
+        edges_strength = {
+            (u, v): data.get("total_TEU", 0.0) for u, v, data in g.edges(data=True)
+        }
+        edges_strength_sorted = sorted(
+            edges_strength.items(),
+            key=lambda x: x[1], reverse=True
+        )
+
+        return {
+            "type": "edge",
+            # 一个由 tuple 组成的 list
+            "targets": [edge for edge, _ in edges_strength_sorted[:m]]
+        }
     #endregion
 
     @classmethod
