@@ -68,44 +68,85 @@ class Robustness:
 
     #regionAttackStrategy
     @classmethod
-    def node_attack_random(cls, G, k):
+    def node_attack_random(cls, g:nx.DiGraph, frac):
         """
         随机攻击  k个节点
-        :param G:
-        :param k:
+        :param g:
+        :param frac:
         :return:
         """
-        return np.random.choice(list(G.nodes()), size=k, replace=False)
+        # 这里使用G来计算N0是没有问题的，因为每个frac的攻击都是从最初始的网络开始攻击的
+        N0 = g.number_of_nodes()
+        k = int(N0 * frac)
+        return {
+            "type": "node",
+            "targets": np.random.choice(list(g.nodes()), size=k, replace=False)
+        }
 
     @classmethod
-    def node_attack_degree(cls, G, k):
+    def node_attack_degree(cls, g:nx.DiGraph, frac):
+        N0 = g.number_of_nodes()
+        k = int(N0 * frac)
+
         nodes_by_degree = sorted(
-            G.degree(weight=None),
+            g.degree(weight=None),
             key=lambda x:x[1],
             reverse=True
         )
-        return [node for node, _ in nodes_by_degree[:k]]
+        return {
+            "type": "node",
+            "targets": [node for node, _ in nodes_by_degree[:k]]
+        }
 
     @classmethod
-    def node_attack_strength(cls, G, k):
+    def node_attack_strength(cls, g:nx.DiGraph, frac):
+
+        N0 = g.number_of_nodes()
+        k = int(N0 * frac)
         # 依据节点的 'total_TEU' 属性值进行攻击（默认攻击值最大的节点）
-        # 1. 筛选出具有 'total_TEU' 属性的节点
+        # 1. 得到 'total_TEU' 属性
         nodes_with_teu = [
-            (node, G.nodes[node]['total_TEU'])
-            for node in G.nodes()
-            # if 'total_TEU' in G_current.nodes[node]     # 不想加这个if 因为我的节点应该都有total_TEU属性
+            (node, g.nodes[node]['total_TEU'])
+            for node in g.nodes()
         ]
         # 2. 按 'total_TEU' 属性值降序排序（攻击值最大的节点）
         nodes_with_teu_sorted = sorted(nodes_with_teu, key=lambda x: x[1], reverse=True)
 
         # 3. 选择前 num_to_remove 个节点
-        return [node for node, _ in nodes_with_teu_sorted[:k]]
+        return {
+            "type": "node",
+            "targets": [node for node, _ in nodes_with_teu_sorted[:k]]
+        }
 
     @classmethod
-    def node_attack_betweenness(cls, G, k):
-        bc = nx.betweenness_centrality(G, normalized=True)
+    def node_attack_betweenness(cls, g:nx.DiGraph, frac):
+        N0 = g.number_of_nodes()
+        k = int(N0 * frac)
+        bc = nx.betweenness_centrality(g, normalized=True)
         nodes = sorted(bc.items(), key=lambda x: x[1], reverse=True)
-        return [n for n, _ in nodes[:k]]
+        return {
+            "type": "node",
+            "targets": [n for n, _ in nodes[:k]]
+        }
+
+    @classmethod
+    def edge_attack_random(cls, g:nx.DiGraph, frac):
+        M0 = g.number_of_edges()
+        m = int(M0 * frac)
+        return {
+            "type": "node",
+            "targets": np.random.choice(list(g.edges()), size=m, replace=False)
+        }
+
+    @classmethod
+    def edge_attack_random(cls, g: nx.DiGraph, frac):
+        M0 = g.number_of_edges()
+        m = int(M0 * frac)
+        return {
+            "type": "node",
+            "targets": np.random.choice(list(g.edges()), size=m, replace=False)
+        }
+
     #endregion
 
     @classmethod
@@ -114,7 +155,7 @@ class Robustness:
 
 
         G0 = g.copy()
-        N0 = G0.number_of_nodes()
+        # N0 = G0.number_of_nodes()
 
         """
         returns = {
@@ -130,13 +171,17 @@ class Robustness:
 
         for frac in tqdm(fraction_removed_list):
             G_current = G0.copy()
-            k = int(frac * N0)
+            # k = int(frac * N0)
 
             # 1.对网络执行攻击
-            if k > 0:
-                # 目前只有节点攻击
-                nodes_to_remove = attack_func(G_current, k)
-                G_current.remove_nodes_from(nodes_to_remove)
+            if frac > 0:
+                # 得到攻击的返回信息
+                plan = attack_func(G_current, frac)
+                # node or edge
+                if plan["type"] == "node":
+                    G_current.remove_nodes_from(plan["targets"])
+                elif plan["type"] == "edge":
+                    G_current.remove_edges_from(plan["targets"])
 
             results["Fraction"].append(frac)
             # 2.计算攻击之后网络的指标
