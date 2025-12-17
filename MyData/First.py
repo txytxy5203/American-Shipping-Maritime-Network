@@ -36,8 +36,12 @@ from MyData.Main import Main
 from MyData.Robustness import Robustness
 sys.path.append('../Algorithm')
 
+alpha_list = np.linspace(0, 0.3, 31)
+time = "2017"
+DiG,_ = Main.get_certain_networks_by_years(time)
 
+result = Robustness.simulate_cascade(DiG, alpha_list,
+                                     Robustness.node_attack_betweenness, Robustness.LWCC)
 
-
-
-
+(pathlib.Path(f'Output/Robustness/Cascade/{time}.json')
+         .write_text(json.dumps(result, indent=2)))

@@ -4595,3 +4595,47 @@ def robustness_weakness_edge(time:str):
 
     # return attack_results #return什么意思
 #endregion
+
+
+#region级联
+# TODO 有相变是不是因为整个网络被分成了两个块了？
+# 使用介数中心性近似计算
+time = "2017"
+DiG, _ = Main.get_certain_networks_by_years(time)
+N0 = DiG.number_of_nodes()
+alpha_list = np.linspace(0, 0.3, 31)
+
+# 初始选择一个节点
+first_remove_node = Robustness.node_attack_degree(DiG, 0.1)["targets"][0]
+
+
+results = {}
+for alpha in tqdm(alpha_list):
+
+    G_copy = DiG.copy()
+    # 先计算容量
+    bc_raw = nx.betweenness_centrality(G_copy, normalized=False, weight=None)
+    Load = {node: val for node, val in bc_raw.items()}  # 负载
+    Capacity = {node: val * (1 + alpha) for node, val in Load.items()}  # 容量
+
+    remove_nodes = [first_remove_node]  # 待移除的节点
+    while len(remove_nodes) > 0:
+        # 移除节点
+        G_copy.remove_nodes_from(remove_nodes)
+        remove_nodes = []
+
+        if G_copy.number_of_nodes() == 0:
+            break
+
+        # 重新计算负载
+        current_bc = nx.betweenness_centrality(G_copy, normalized=False, weight=None)
+        current_load = {node : val for node, val in current_bc.items()}
+        # 检测哪些节点要删除
+        for node, val in current_load.items():
+            if val > Capacity[node]:
+                remove_nodes.append(node)
+    LWCC = Robustness.LWCC(G_copy, N0)
+    results[alpha] = LWCC
+(pathlib.Path(f'Output/Robustness/Cascade/{time}.json')
+         .write_text(json.dumps(results, indent=2)))
+#endregion

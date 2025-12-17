@@ -4,13 +4,12 @@ import networkx as nx
 import numpy as np
 from tqdm import tqdm
 
-
 class Robustness:
     #regionMetrics
     @classmethod
     def LSCC(cls, g:nx.DiGraph, n0:int):
         """
-        最大强连通分量（LSCC）大小
+        最大强连通分量（LSCC）大小  直接返回的比例 和最初的网路相比
         :return:
         """
         if g.number_of_nodes() == 0:
@@ -70,11 +69,11 @@ class Robustness:
 
     #regionAttackStrategy
     @classmethod
-    def node_attack_random(cls, g:nx.DiGraph, frac):
+    def node_attack_random(cls, g, frac):
         """
         随机攻击  k个节点
         :param g:
-        :param frac:
+        :param frac: 移除的比例
         :return:
         """
         # 这里使用G来计算N0是没有问题的，因为每个frac的攻击都是从最初始的网络开始攻击的
@@ -199,7 +198,11 @@ class Robustness:
     @classmethod
     def simulate_attack(cls, g:nx.DiGraph, attack_func:callable,
                         metric_funcs:dict, fraction_removed_list:list):
-        """模拟攻击的函数 适用 nodes 和 edges"""
+        """
+        模拟随机、蓄意攻击的函数
+        适用 nodes 和 edges
+        鲁棒性 和 脆弱性
+        """
 
         G0 = g.copy()
         N0 = G0.number_of_nodes()
@@ -243,3 +246,64 @@ class Robustness:
                 results[name].append(value)
 
         return results
+
+    @classmethod
+    def simulate_cascade(cls, g_original:nx.DiGraph, alpha_list,
+                         attack_func:callable, metric_func:callable):
+        """
+        级联故障模拟函数
+        :param g_original:
+        :param alpha_list: eg: np.linspace(0, 1, 11)
+        :param attack_func: 攻击策略 这个class中的函数
+        :param metric_func: 指标函数
+        :return:
+        """
+        # TODO 有相变是不是因为整个网络被分成了两个块了？
+
+
+        N0 = g_original.number_of_nodes()
+
+        # 初始选择一个节点  用的还是这个class中的攻击策略函数  注意参数
+        first_remove_node = attack_func(g_original, 0.1)["targets"][0]
+
+        results = {}
+        for alpha in tqdm(alpha_list, desc=f"模拟攻击 alpha值进度："):
+
+            g_copy = g_original.copy()
+            # 初始化容量
+            _, Capacity = cls.calculate_load_func(alpha, g_copy)
+
+            remove_nodes = [first_remove_node]  # 待移除的节点
+            while len(remove_nodes) > 0:
+                # 移除节点
+                g_copy.remove_nodes_from(remove_nodes)
+                remove_nodes = []
+
+                if g_copy.number_of_nodes() == 0:
+                    break
+
+                # 重新计算负载
+                current_load,_ = cls.calculate_load_func(alpha, g_copy)
+
+                # 检测哪些节点要删除
+                for node, val in current_load.items():
+                    if val > Capacity[node]:
+                        remove_nodes.append(node)
+            metric = metric_func(g_copy, N0)
+            results[alpha] = metric
+        return results
+
+    @classmethod
+    def calculate_load_func(cls, alpha, g_copy):
+        """
+        容量计算函数   后续可以自己修改
+        目前使用介数中心性近似计算 ！！！
+        :param alpha:
+        :param g_copy:
+        :return:  容量 和 负载
+        """
+        # 先计算容量
+        bc_raw = nx.betweenness_centrality(g_copy, normalized=False, weight=None)
+        Load = {node: val for node, val in bc_raw.items()}  # 负载
+        Capacity = {node: val * (1 + alpha) for node, val in Load.items()}  # 容量
+        return Load, Capacity
