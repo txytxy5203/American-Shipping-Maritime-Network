@@ -199,10 +199,10 @@ class Robustness:
     @classmethod
     def simulate_attack(cls, g:nx.DiGraph, attack_func:callable,
                         metric_funcs:dict, fraction_removed_list:list):
-
+        """模拟攻击的函数 适用 nodes 和 edges"""
 
         G0 = g.copy()
-        # N0 = G0.number_of_nodes()
+        N0 = G0.number_of_nodes()
 
         """
         returns = {
@@ -229,6 +229,8 @@ class Robustness:
                     G_current.remove_nodes_from(plan["targets"])
                 elif plan["type"] == "edge":
                     G_current.remove_edges_from(plan["targets"])
+                else:
+                    raise ValueError("攻击函数的返回type有问题")
 
             results["Fraction"].append(frac)
             # 2.计算攻击之后网络的指标

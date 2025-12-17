@@ -3,12 +3,14 @@ import os
 import pathlib
 
 import networkx as nx
+import numpy as np
 import pandas as pd
 
 from MyData.DirectedWeighted import DirectedWeighted
 from MyData.Draw import Draw
 from MyData.NullModel import NullModel
 from MyData.Read import Read
+from MyData.Robustness import Robustness
 from MyData.Undirected import Undirected
 
 class Main:
@@ -161,6 +163,7 @@ class Main:
                 yield DiG, G, time
     #endregion
 
+    #regionCCC论文
     @classmethod
     def nodes_and_edges(cls):
         """
@@ -547,4 +550,59 @@ class Main:
             'Months/DirectedWeighted/PortsCentralityChangeByTime/',
             f'degree centrality',
             f'{target_ports} dc in_dc out_dc change by time'
+        )
+    #endregion
+
+    @classmethod
+    def nodes_or_edges_attack(cls, time:str, target_metric:str):
+        """
+        有些参数使用的时候就自己调一下了
+        :param time:  "2017"
+        :param target_metric: "LWCC"
+        :return:
+        """
+        fraction_removed_list = list(np.linspace(0, 0.05, 50))
+        DiG, _ = cls.get_certain_networks_by_years(time)
+
+        attack_strategies = {
+            "random": Robustness.edge_attack_random,
+            "degree": Robustness.edge_attack_degree,
+            "strength": Robustness.edge_attack_strength,
+            "betweenness": Robustness.edge_attack_betweenness
+        }
+        metric_funcs = {
+            "LSCC": Robustness.LSCC,
+            "LWCC": Robustness.LWCC,
+            "Efficiency": Robustness.Global_Efficiency
+        }
+
+        attack_results = {}
+        for name, attack_func in attack_strategies.items():
+            print(f"{name}攻击开始：")
+            attack_results[name] = Robustness.simulate_attack(
+                DiG,
+                attack_func,
+                metric_funcs,
+                fraction_removed_list
+            )
+        (pathlib.Path(f'Output/Robustness/Edges/{time} edge attack.json')
+         .write_text(json.dumps(attack_results, indent=2)))
+
+        data = {
+            "Fraction": attack_results["random"]["Fraction"],
+            "random": attack_results["random"][target_metric],
+            "degree": attack_results["degree"][target_metric],
+            "strength": attack_results["strength"][target_metric],
+            "betweenness": attack_results["betweenness"][target_metric]
+        }
+        df = pd.DataFrame(data)
+        Draw.draw_plot(
+            df,
+            'Robustness/Edges/',
+            target_metric,
+            f'{time} {target_metric} edges attack',
+            margin_rate=0.1,
+            is_label_step=False,
+            colors=3,
+            markers=3
         )
