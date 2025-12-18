@@ -65,6 +65,13 @@ class Robustness:
 
         # 2. 使用 NetworkX 内置实现
         return nx.global_efficiency(undirected_g)
+
+    @classmethod
+    def Number_Of_Connected_Components(cls, g:nx.DiGraph):
+        """连通块的个数 使用的是弱连通块"""
+        size = nx.number_weakly_connected_components(g)
+        return size
+
     #endregion
 
     #regionAttackStrategy
@@ -254,11 +261,12 @@ class Robustness:
         级联故障模拟函数
         :param g_original:
         :param alpha_list: eg: np.linspace(0, 1, 11)
-        :param attack_func: 攻击策略 这个class中的函数
+        :param attack_func: 攻击策略 就是这个class中的函数
         :param metric_func: 指标函数
         :return:
         """
         # TODO 有相变是不是因为整个网络被分成了两个块了？
+        # TODO 边移除的Cascade还没有做
 
 
         N0 = g_original.number_of_nodes()
