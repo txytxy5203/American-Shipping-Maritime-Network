@@ -4598,44 +4598,366 @@ def robustness_weakness_edge(time:str):
 
 
 #region级联
-# TODO 有相变是不是因为整个网络被分成了两个块了？
-# 使用介数中心性近似计算
-time = "2017"
-DiG, _ = Main.get_certain_networks_by_years(time)
-N0 = DiG.number_of_nodes()
-alpha_list = np.linspace(0, 0.3, 31)
+def simulate_cascade(cls, g_original: nx.DiGraph, alpha_list,
+                     attack_func: callable, metric_func: callable, mode: str):
+    """
+    级联故障模拟函数
+    :param g_original:
+    :param alpha_list: eg: np.linspace(0, 1, 11)
+    :param attack_func: 攻击策略 就是这个class中的函数
+    :param metric_func: 指标函数
+    :param mode:  "node" or "edge
+    :return:
+    """
+    # TODO 有相变是不是因为整个网络被分成了两个块了？
+    # TODO 边移除的Cascade还没有做
 
-# 初始选择一个节点
-first_remove_node = Robustness.node_attack_degree(DiG, 0.1)["targets"][0]
+    N0 = g_original.number_of_nodes()
 
+    # 初始选择一个节点  用的还是这个class中的攻击策略函数  注意参数
+    first_remove_node = attack_func(g_original, 0.1)["targets"][0]
 
-results = {}
-for alpha in tqdm(alpha_list):
+    results = {}
+    for alpha in tqdm(alpha_list, desc=f"模拟攻击 alpha值进度："):
 
-    G_copy = DiG.copy()
-    # 先计算容量
-    bc_raw = nx.betweenness_centrality(G_copy, normalized=False, weight=None)
-    Load = {node: val for node, val in bc_raw.items()}  # 负载
-    Capacity = {node: val * (1 + alpha) for node, val in Load.items()}  # 容量
+        g_copy = g_original.copy()
+        # 初始化容量
+        _, Capacity = cls.calculate_load_betweenness_func(alpha, g_copy, "node")
 
-    remove_nodes = [first_remove_node]  # 待移除的节点
-    while len(remove_nodes) > 0:
-        # 移除节点
-        G_copy.remove_nodes_from(remove_nodes)
-        remove_nodes = []
+        remove_nodes = [first_remove_node]  # 待移除的节点
+        while len(remove_nodes) > 0:
+            # 移除节点
+            g_copy.remove_nodes_from(remove_nodes)
+            remove_nodes = []
 
-        if G_copy.number_of_nodes() == 0:
-            break
+            if g_copy.number_of_nodes() == 0:
+                break
 
-        # 重新计算负载
-        current_bc = nx.betweenness_centrality(G_copy, normalized=False, weight=None)
-        current_load = {node : val for node, val in current_bc.items()}
-        # 检测哪些节点要删除
-        for node, val in current_load.items():
-            if val > Capacity[node]:
-                remove_nodes.append(node)
-    LWCC = Robustness.LWCC(G_copy, N0)
-    results[alpha] = LWCC
-(pathlib.Path(f'Output/Robustness/Cascade/{time}.json')
-         .write_text(json.dumps(results, indent=2)))
+            # 重新计算负载
+            current_load, _ = cls.calculate_load_betweenness_func(alpha, g_copy, "node")
+
+            # 检测哪些节点要删除
+            for node, val in current_load.items():
+                if val > Capacity[node]:
+                    remove_nodes.append(node)
+        metric = metric_func(g_copy, N0)
+        results[alpha] = metric
+    return results
 #endregion
+
+#region欠载级联
+@classmethod
+def simulate_underload_cascade(cls, g_original, alpha_list, beta_list,
+                                  attack_func: callable, metric_func: callable, mode: str = "node"):
+    """
+    考虑欠载的模型
+    海运网络级联失效模拟（贴合模型逻辑：负载=离港吞吐量+失效传播+实时恢复）
+    :param g_original: 有向网络（节点=港口，边=航线，边权重=航线流量）
+    :param alpha_list: 容量上界参数列表 eg: np.linspace(1.0, 2.0, 11)
+    :param beta_list: 容量下界参数列表 eg: np.linspace(0.0, 0.9, 10)
+    :param attack_func: 攻击策略（class中的函数，返回初始失效节点/边）
+    :param metric_func: 指标函数（输入：当前网络、初始网络、性能曲线，返回抗毁性R）
+    :param mode: "node"（港口失效）或 "edge"（航线失效）
+    :return: 嵌套字典 results[alpha][beta] = 抗毁性R
+    """
+    # 初始化基础参数
+    N0 = g_original.number_of_nodes()
+
+    # 初始触发失效（攻击单个节点/边   调用的是cls中的函数 其实还是耦合了）
+    first_remove_item = attack_func(g_original, 0.5)["targets"][0]
+    # 存储边的初始流量（无权重时默认1）
+    initial_edge_flows = {(u, v): attr.get("total_TEU", 1.0)
+                          for u, v, attr in g_original.edges(data=True)}
+
+    results = {}
+    # 双重循环遍历α（上界）和β（下界）
+    for alpha in tqdm(alpha_list, desc="遍历容量上界α"):
+        results[alpha] = {}
+        for beta in tqdm(beta_list, desc=f"α={alpha} 遍历容量下界β", leave=False):
+            # 复制原始网络，避免修改原数据
+            g_copy = g_original.copy()
+
+            # 1. 计算初始负载（负载=节点离港吞吐量=所有出边流量之和）
+            initial_load = cls.calculate_initial_load(g_copy, initial_edge_flows)
+            # 2. 计算容量上下界（C_upper=α*初始负载，C_lower=β*初始负载）
+            capacity = {
+                node: (alpha * initial_load[node], beta * initial_load[node])
+                for node in g_copy.nodes()
+            }  # (C_upper, C_lower)
+
+            # 初始化：待移除的节点/边、性能曲线（存储各时间步P(t)）
+            current_load = initial_load.copy()
+            remove_items = [first_remove_item]
+            performance_curve = []
+            time_step = 0
+
+            while remove_items:
+                # 移除当前失效的节点/边
+                if mode == "node":
+                    g_copy.remove_nodes_from(remove_items)
+                elif mode == "edge":
+                    g_copy.remove_edges_from(remove_items)
+                else:
+                    raise ValueError("mode仅支持'node'或'edge'")
+
+                # 网络空则终止
+                if g_copy.number_of_nodes() == 0:
+                    performance_curve.append(0.0)
+                    break
+
+
+                # 4. 失效传播：计算上下游节点的负载损失（按航线流量占比） TODO 还差一个边模式
+                load_loss = cls.propagate_load_loss(g_copy, remove_items, current_load, initial_edge_flows)
+                # 5. 恢复机制：利用其他上下游节点的剩余产能补充负载
+                recovered_load = cls.recover_load(g_copy, load_loss, current_load, capacity)
+
+                # ---- 4.4 同步更新负载 & 判定新失效 ----
+                next_load = {}
+                new_remove = []
+
+                for node in g_copy.nodes():
+                    next_load[node] = (
+                            current_load.get(node, 0.0)
+                            - load_loss.get(node, 0.0)
+                            + recovered_load.get(node, 0.0)
+                    )
+
+                    C_upper, C_lower = capacity[node]
+                    if next_load[node] > C_upper or next_load[node] < C_lower:
+                        new_remove.append(node)
+
+                current_load = next_load
+                remove_items = new_remove
+
+                # ---- 4.5 网络性能 ----
+                total_initial = sum(initial_load.values())
+                total_current = sum(current_load.values())
+
+                P_t = total_current / total_initial if total_initial > 0 else 0.0
+                performance_curve.append(P_t)
+
+                # ===== 5. 抗毁性指标 =====
+            resilience_R = metric_func(
+                g_copy,
+                N0,
+                performance_curve
+            )
+
+            results[alpha][beta] = resilience_R
+
+    return results
+
+@classmethod
+def calculate_initial_load(cls, g,initial_edge_flows):
+    """计算初始负载：节点离港吞吐量=所有出边流量之和"""
+    load = {}
+    for node in g.nodes():
+        load[node] = sum(
+            initial_edge_flows.get((u, v), 0.0)
+            for u, v in g.out_edges(node)
+        )
+    return load
+
+@classmethod
+def calculate_current_load(cls, g,initial_edge_flows):
+    """计算当前负载：网络变化后更新离港吞吐量"""
+    current_load = {}
+    for node in g.nodes():
+        out_edges = g.out_edges(node)
+        load = sum(initial_edge_flows.get((u, v), 0.0) for u, v in out_edges)
+        current_load[node] = load
+    return current_load
+
+@classmethod
+def propagate_load_loss(cls, g, failed_nodes, current_load, initial_edge_flows):
+    """
+    节点失效传播：
+    - 下游节点损失 = 该节点原本通过失效节点获得的流量
+    - 上游节点损失 = 该节点原本向失效节点输出的流量
+    """
+    load_loss = {node: 0.0 for node in g.nodes()}
+
+    for fn in failed_nodes:
+        # if not g.has_node(fn):
+        #     continue
+
+        # 下游节点损失
+        for _, v in g.out_edges(fn):
+            loss = initial_edge_flows.get((fn, v), 0.0)
+            load_loss[v] += loss
+
+        # 上游节点损失
+        for u, _ in g.in_edges(fn):
+            loss = initial_edge_flows.get((u, fn), 0.0)
+            load_loss[u] += loss
+
+    return load_loss
+
+
+@classmethod
+def recover_load(cls, g,load_loss, current_load, capacity):
+    """
+    同步恢复机制：
+    - 邻居节点用剩余产能补充
+    - 不直接修改 current_load
+    """
+    recovered = {node: 0.0 for node in g.nodes()}
+    supplier_delta = {node: 0.0 for node in g.nodes()}
+
+    for node, loss in load_loss.items():
+        if loss <= 0:
+            continue
+
+        neighbors = list(g.predecessors(node)) + list(g.successors(node))
+        remaining = loss
+
+        for s in neighbors:
+            if remaining <= 0:
+                break
+
+            C_upper, _ = capacity[s]
+            surplus = C_upper - current_load[s] - supplier_delta[s]
+            if surplus <= 0:
+                continue
+
+            supply = min(remaining, surplus)
+            recovered[node] += supply
+            supplier_delta[s] += supply
+            remaining -= supply
+
+    return recovered
+#endregion
+
+def simulate_cascade(cls, g_original, alpha_list,
+                     attack_func:callable, metric_func:callable, mode:str):
+    """
+    经典级联故障模拟函数
+    :param g_original:  有向网络
+    :param alpha_list: eg: np.linspace(0, 1, 11)
+    :param attack_func: 攻击策略 就是这个class中的函数
+    :param metric_func: 指标函数
+    :param mode:  "node" or "edge
+    :return:
+    """
+    # TODO 有相变是不是因为整个网络被分成了两个块了？
+
+    N0 = g_original.number_of_nodes()
+
+    # 初始选择一个节点 or 边  用的还是这个class中的攻击策略函数  注意参数
+    first_remove_item = attack_func(g_original, 0.1)["targets"][0]
+
+    results = {}
+    for alpha in tqdm(alpha_list, desc=f"模拟攻击："):
+
+        g_copy = g_original.copy()
+        # 初始化容量
+        _, Capacity = cls.calculate_load_betweenness_func(alpha, g_copy, mode)
+
+        remove_items = [first_remove_item]  # 先将第一个要移除的节点或者边加入list 触发Cascade
+        while len(remove_items) > 0:
+            # 移除 节点 or 边
+            if mode == "node":
+                g_copy.remove_nodes_from(remove_items)
+            elif mode == 'edge':
+                g_copy.remove_edges_from(remove_items)
+            else:
+                raise ValueError("mode 有问题")
+            remove_items = []
+
+            if g_copy.number_of_nodes() == 0:
+                break
+
+            # 重新计算负载
+            current_load,_ = cls.calculate_load_betweenness_func(alpha, g_copy, mode)
+
+            # 检测哪些 节点 or 边 要删除
+            for item, val in current_load.items():
+                if val > Capacity[item]:
+                    remove_items.append(item)
+        metric = metric_func(g_copy, N0)
+        results[alpha] = metric
+    return results
+@classmethod
+def redistribute_flow_from(cls, node, g_copy):
+    """
+    TODO 只需要改边  节点的total_TEU信息不要动 在外边更新
+    当 node 即将失效时：
+    - 其上游节点把原本发往 node 的流量
+      按权重比例重新分配到其他下游节点
+    - 下游节点不索取流量
+      -> k
+    i -> node ->j
+      -> k
+    :param node:
+    :param g_copy:
+    :return:
+    """
+    if node not in g_copy:
+        return
+
+    # 所有上游节点 i -> node
+    predecessors = list(g_copy.predecessors(node))
+
+    for i in predecessors:
+        if i not in g_copy:
+            continue
+
+        # 1. 原本 i -> node 的流量
+        if not g_copy.has_edge(i, node):
+            continue
+
+        lost_flow = g_copy[i][node].get("volumeTEU", 0.0)
+
+        if lost_flow <= 0:
+            continue
+
+        # 2. 从 i 的 total_TEU 中扣除这部分
+        # 虽然 i 是转移流量  但是可能i没有后继节点了所以还是需要先减少
+        # g_copy.nodes[i]["total_TEU"] -= lost_flow
+
+
+        # 3. 找 i 的其他下游节点
+        successors = [
+            k for k in g_copy.successors(i)
+            if k != node and k in g_copy
+        ]
+
+        if len(successors) == 0:
+            # 没有其他下游，流量直接损失
+            continue
+
+        # 4. 按权重比例分配
+        total_weight = 0.0
+        for k in successors:
+            total_weight += g_copy[i][k].get("volumeTEU", 0.0)
+
+        if total_weight <= 0:
+            continue
+
+        for k in successors:
+            w_ik = g_copy[i][k].get("volumeTEU", 0.0)
+            delta = lost_flow * (w_ik / total_weight)
+
+            # 增加边流量
+            g_copy[i][k]["volumeTEU"] += delta
+
+            # # 增加下游节点的 total_TEU
+            # g_copy.nodes[k]["total_TEU"] += delta
+            #
+            # # 增加i本身的流量 不要忘记
+            # g_copy.nodes[i]["total_TEU"] += delta
+
+    node_successors = [
+        j for j in g_copy.successors(node)
+        if j != node and j in g_copy
+    ]
+
+    # 5. node的下游节点
+    for j in node_successors:
+        delta = g_copy[node][j].get("volumeTEU", 0.0)
+
+        # 减少边流量
+        g_copy[node][j]["volumeTEU"] -= delta
+
+        # 减少下游节点的 total_TEU
+        # g_copy.nodes[j]["total_TEU"] -= delta

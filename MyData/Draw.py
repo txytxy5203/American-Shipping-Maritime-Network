@@ -113,7 +113,7 @@ class Draw:
                   margin_rate:float=0.2,
                   colors: int = 2,
                   markers: int = 2,
-                  is_label_step: bool = True,
+                  is_label_step: bool = False,
                   label_step: int = 4,
                   rotation:int=15
                   ):
