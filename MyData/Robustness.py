@@ -202,6 +202,7 @@ class Robustness:
         }
     #endregion
 
+    #regionSimulate AttackOrCascade
     @classmethod
     def simulate_attack(cls, g, attack_func:callable,
                         metric_funcs:dict, fraction_removed_list:list):
@@ -305,58 +306,57 @@ class Robustness:
             results[alpha] = metric
         return results
 
-    #regionload的不同计算方式
+
     @classmethod
-    def calculate_load_betweenness_func(cls, alpha, g_copy, mode:str):
+    def simulate_underload_cascade(cls, g_original, alpha, beta,
+                                   attack_func:callable, metric_func:callable):
         """
-        容量计算函数   后续可以自己修改
-        目前使用介数中心性近似计算 ！！！
-        :param alpha:
-        :param g_copy:
-        :param mode:  "node" or "edge"
-        :return:  容量 和 负载
+        考虑欠载的模型  beta为下界  alpha为上界
+        海运网络级联失效模拟
         """
-        calc_func = nx.betweenness_centrality if mode == "node" else nx.edge_betweenness_centrality
-        # 先计算容量
+        N0 = g_original.number_of_nodes()
 
-        raw_data = calc_func(g_copy, normalized=False, weight=None)
+        # 初始选择一个节点
+        first_remove_item = attack_func(g_original, 0.5)["targets"][0]
+        results = {}
 
-        # 因为我都是有向图所以不需要再去 乘以2
-        load = {key: val for key, val in raw_data.items()}                  # 负载
-        capacity = {edge: val * (1 + alpha) for edge, val in load.items()}  # 容量
-        return load, capacity
-    @classmethod
-    def calculate_load_strength_func(cls, alpha, beta, g_copy, mode:str=""):
-        """
-        一个node 的 load 就是它的总的 teu 流量
-        注意要重新根据边的 volumeTEU 计算节点的 total_TEU
-        注意 返回的 capacity 的 value 中：第一个是下界 第二个是上界
-        :param alpha: alpha 上界
-        :param beta:  beta  下界
-        :param g_copy:
-        :param mode:
-        :return:
-        """
+        # alpha 和 beta 的list 还是放到函数外边处理吧
+        # for alpha in alpha_list:
+        #     for beta in tqdm(beta_list, desc=f"beta 扫描"):
+        g_copy = g_original.copy()
+        # 初始化容量
+        _, Capacity = cls.calculate_load_strength_func(alpha, beta, g_copy)
 
-        # 先重新计算所有节点的流量信息
-        for node in g_copy.nodes:
-            g_copy.nodes[node]['in_TEU'] = 0
-            g_copy.nodes[node]['out_TEU'] = 0
-            g_copy.nodes[node]['total_TEU'] = 0
-            TEU_in = 0
-            TEU_out = 0
-            for _, _, attr in g_copy.in_edges(node, data=True):
-                TEU_in += attr.get("volumeTEU", 0)
-            for _, _, attr in g_copy.out_edges(node, data=True):
-                TEU_out += attr.get("volumeTEU", 0)
-            g_copy.nodes[node]['in_TEU'] = TEU_in
-            g_copy.nodes[node]['out_TEU'] = TEU_out
-            g_copy.nodes[node]['total_TEU'] = TEU_in + TEU_out
+        remove_items = [first_remove_item]
 
-        load = {node: attr["total_TEU"] for node,attr in g_copy.nodes(data=True)}
-        capacity = {node: (teu * beta, teu * alpha) for node, teu in load.items()}
-        return load, capacity
-    #endregion
+        while len(remove_items) > 0:
+            # 1. 流量重新分配（针对即将失效的节点）
+            for node in remove_items:
+                cls.redistribute_flow_from(node, g_copy)
+                # 2. 删除节点
+                g_copy.remove_node(node)
+
+            # ai给的代码是在重新分配后统一删除 但是我觉得应该在重新分配一个节点后就删除该节点
+            # 这涉及到同步还是异步的问题
+            # 2. 删除节点
+            # g_copy.remove_nodes_from(remove_items)
+
+            if g_copy.number_of_nodes() == 0:
+                break
+
+            # 3. 重新计算动态负载
+            current_load, _ = cls.calculate_load_strength_func(alpha, beta, g_copy)
+
+            # 4. 判断新一轮失效
+            remove_items = []
+            for node in current_load:
+                if current_load[node] < Capacity[node][0] \
+                        or current_load[node] > Capacity[node][1]:
+                    remove_items.append(node)
+        metric = metric_func(g_copy, N0)
+        results[(alpha, beta)] = metric
+
+        return results
 
     @classmethod
     def redistribute_flow_from(cls, node, g_copy):
@@ -432,56 +432,64 @@ class Robustness:
 
             # 减少边流量
             g_copy[node][j]["volumeTEU"] -= delta
+    #endregion
 
-
+    #regionload的不同计算方式
     @classmethod
-    def simulate_underload_cascade(cls, g_original, alpha_list, beta_list,
-                                   attack_func:callable, metric_func:callable):
+    def calculate_load_betweenness_func(cls, alpha, g_copy, mode:str):
         """
-        考虑欠载的模型  beta为下界  alpha为上界
-        海运网络级联失效模拟
+        容量计算函数   后续可以自己修改
+        目前使用介数中心性近似计算 ！！！
+        :param alpha:
+        :param g_copy:
+        :param mode:  "node" or "edge"
+        :return:  容量 和 负载
         """
-        N0 = g_original.number_of_nodes()
+        calc_func = nx.betweenness_centrality if mode == "node" else nx.edge_betweenness_centrality
+        # 先计算容量
 
-        # 初始选择一个节点
-        first_remove_item = attack_func(g_original, 0.5)["targets"][0]
-        results = {}
+        raw_data = calc_func(g_copy, normalized=False, weight=None)
 
-        for alpha in alpha_list:
-            print(f"{alpha} 级联开始：")
-            for beta in tqdm(beta_list, desc=f"beta 扫描"):
-                g_copy = g_original.copy()
-                # 初始化容量
-                _, Capacity = cls.calculate_load_strength_func(alpha, beta, g_copy)
+        # 因为我都是有向图所以不需要再去 乘以2
+        load = {key: val for key, val in raw_data.items()}                  # 负载
+        capacity = {edge: val * (1 + alpha) for edge, val in load.items()}  # 容量
+        return load, capacity
+    @classmethod
+    def calculate_load_strength_func(cls, alpha, beta, g_copy, mode:str=""):
+        """
+        一个node 的 load 就是它的总的 teu 流量
+        注意要重新根据边的 volumeTEU 计算节点的 total_TEU
+        注意 返回的 capacity 的 value 中：第一个是下界 第二个是上界
+        :param alpha: alpha 上界
+        :param beta:  beta  下界
+        :param g_copy:
+        :param mode:
+        :return:
+        """
 
-                remove_items = [first_remove_item]
+        # 先重新计算所有节点的流量信息
+        for node in g_copy.nodes:
+            g_copy.nodes[node]['in_TEU'] = 0
+            g_copy.nodes[node]['out_TEU'] = 0
+            g_copy.nodes[node]['total_TEU'] = 0
+            TEU_in = 0
+            TEU_out = 0
+            for _, _, attr in g_copy.in_edges(node, data=True):
+                TEU_in += attr.get("volumeTEU", 0)
+            for _, _, attr in g_copy.out_edges(node, data=True):
+                TEU_out += attr.get("volumeTEU", 0)
+            g_copy.nodes[node]['in_TEU'] = TEU_in
+            g_copy.nodes[node]['out_TEU'] = TEU_out
+            g_copy.nodes[node]['total_TEU'] = TEU_in + TEU_out
 
-                while len(remove_items) > 0:
-                    # 1. 流量重新分配（针对即将失效的节点）
-                    for node in remove_items:
-                        cls.redistribute_flow_from(node, g_copy)
-                        # 2. 删除节点
-                        g_copy.remove_node(node)
+        load = {node: attr["total_TEU"] for node,attr in g_copy.nodes(data=True)}
+        capacity = {node: (teu * beta, teu * alpha) for node, teu in load.items()}
+        return load, capacity
+    #endregion
 
-                    # ai给的代码是在重新分配后统一删除 但是我觉得应该在重新分配一个节点后就删除该节点
-                    # 这涉及到同步还是异步的问题
-                    # 2. 删除节点
-                    # g_copy.remove_nodes_from(remove_items)
 
-                    if g_copy.number_of_nodes() == 0:
-                        break
 
-                    # 3. 重新计算动态负载
-                    current_load, _ = cls.calculate_load_strength_func(alpha, beta, g_copy)
 
-                    # 4. 判断新一轮失效
-                    remove_items = []
-                    for node in current_load:
-                        if current_load[node] < Capacity[node][0] \
-                                or current_load[node] > Capacity[node][1]:
-                            remove_items.append(node)
-                metric = metric_func(g_copy, N0)
-                results[(alpha, beta)] = metric
-        return results
+
 
 

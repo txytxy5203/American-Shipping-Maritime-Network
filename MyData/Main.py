@@ -5,6 +5,7 @@ import pathlib
 import networkx as nx
 import numpy as np
 import pandas as pd
+from tqdm import tqdm
 
 from MyData.DirectedWeighted import DirectedWeighted
 from MyData.Draw import Draw
@@ -609,13 +610,53 @@ class Main:
         )
 
     @classmethod
-    def cascade_attack(cls, time:str):
+    def cascade_attack(cls):
         """
         级联故障的模拟函数
         :param time:
         :return:
         """
-        alpha_list = np.linspace(0, 0.5, 20)
+        for DiG, G, time in cls.get_networks_by_years():
+
+            alpha_list = np.linspace(0, 1, 10)
+            DiG, _ = Main.get_certain_networks_by_years(time)
+
+            configure = {
+                "random": Robustness.node_attack_random,
+                "degree": Robustness.node_attack_degree,
+                "strength": Robustness.node_attack_strength,
+                "betweenness": Robustness.node_attack_betweenness
+            }
+
+            data = {
+                "Fraction": [frac for frac in alpha_list]
+            }
+            for attack, func in configure.items():
+                print(f"{attack}级联开始：")
+                result = Robustness.simulate_cascade(DiG, alpha_list, func, Robustness.LWCC, mode="node")
+                data[attack] = list(result.values())
+
+            df = pd.DataFrame(data)
+            Draw.draw_plot(
+                df,
+                f'Robustness/Cascade/Classic/',
+                "LWCC Node",
+                f"{time} LWCC Node",
+                colors=1,
+                markers=1
+            )
+
+    @classmethod
+    def cascade_attack_unload(cls, time:str):
+        """
+        具有欠载的攻击流程函数
+        :param time:
+        :return:
+        """
+        # [beta, alpha]  节点容量的上下限
+        alpha_list = np.linspace(1, 2, 11)
+        beta_list = np.linspace(0, 1, 11)
+
         DiG, _ = Main.get_certain_networks_by_years(time)
 
         configure = {
@@ -625,20 +666,27 @@ class Main:
             "betweenness": Robustness.node_attack_betweenness
         }
 
-        data = {
-            "Fraction": [frac for frac in alpha_list]
-        }
-        for attack, func in configure.items():
-            print(f"{attack}级联开始：")
-            result = Robustness.simulate_cascade(DiG, alpha_list, func, Robustness.Number_Of_Connected_Components)
-            data[attack] = list(result.values())
+        for beta in beta_list:
+            print(f"beat = {beta} 开始：")
+            data = {
+                "Alpha": [alpha for alpha in alpha_list],
+                "random": [],
+                "degree": [],
+                "strength": [],
+                "betweenness": []
+            }
+            for alpha in tqdm(alpha_list):
+                for attack, func in configure.items():
+                    result = Robustness.simulate_underload_cascade(DiG, alpha, beta, func, Robustness.LWCC)
+                    value = float(result[(alpha, beta)])
+                    data[attack].append(value)
 
-        df = pd.DataFrame(data)
-        Draw.draw_plot(
-            df,
-            f'Robustness/Cascade/',
-            "Number Of Connected Components",
-            f"{time} Number Of Connected Components",
-            colors=1,
-            markers=1
-        )
+            df = pd.DataFrame(data)
+            Draw.draw_plot(
+                df,
+                f'Robustness/Cascade/',
+                f"{beta} LWCC",
+                f"{time} {beta} LWCC",
+                colors=1,
+                markers=1
+            )

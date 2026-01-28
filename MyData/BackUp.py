@@ -4961,3 +4961,54 @@ def redistribute_flow_from(cls, node, g_copy):
 
         # 减少下游节点的 total_TEU
         # g_copy.nodes[j]["total_TEU"] -= delta
+
+
+@classmethod
+def simulate_underload_cascade(cls, g_original, alpha_list, beta_list,
+                               attack_func:callable, metric_func:callable):
+    """
+    考虑欠载的模型  beta为下界  alpha为上界
+    海运网络级联失效模拟
+    """
+    N0 = g_original.number_of_nodes()
+
+    # 初始选择一个节点
+    first_remove_item = attack_func(g_original, 0.5)["targets"][0]
+    results = {}
+
+    for alpha in alpha_list:
+        print(f"{alpha} 级联开始：")
+        for beta in tqdm(beta_list, desc=f"beta 扫描"):
+            g_copy = g_original.copy()
+            # 初始化容量
+            _, Capacity = cls.calculate_load_strength_func(alpha, beta, g_copy)
+
+            remove_items = [first_remove_item]
+
+            while len(remove_items) > 0:
+                # 1. 流量重新分配（针对即将失效的节点）
+                for node in remove_items:
+                    cls.redistribute_flow_from(node, g_copy)
+                    # 2. 删除节点
+                    g_copy.remove_node(node)
+
+                # ai给的代码是在重新分配后统一删除 但是我觉得应该在重新分配一个节点后就删除该节点
+                # 这涉及到同步还是异步的问题
+                # 2. 删除节点
+                # g_copy.remove_nodes_from(remove_items)
+
+                if g_copy.number_of_nodes() == 0:
+                    break
+
+                # 3. 重新计算动态负载
+                current_load, _ = cls.calculate_load_strength_func(alpha, beta, g_copy)
+
+                # 4. 判断新一轮失效
+                remove_items = []
+                for node in current_load:
+                    if current_load[node] < Capacity[node][0] \
+                            or current_load[node] > Capacity[node][1]:
+                        remove_items.append(node)
+            metric = metric_func(g_copy, N0)
+            results[(alpha, beta)] = metric
+    return results
