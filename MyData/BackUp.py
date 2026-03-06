@@ -5012,3 +5012,48 @@ def simulate_underload_cascade(cls, g_original, alpha_list, beta_list,
             metric = metric_func(g_copy, N0)
             results[(alpha, beta)] = metric
     return results
+
+@classmethod
+def cascade_attack_unload(cls, time:str):
+    """
+    具有欠载的攻击流程函数
+    :param time:
+    :return:
+    """
+    # [beta, alpha]  节点容量的上下限
+    alpha_list = np.linspace(1, 2, 11)
+    beta_list = np.linspace(0, 1, 11)
+
+    DiG, _ = Main.get_certain_networks_by_years(time)
+
+    configure = {
+        "random": Robustness.node_attack_random,
+        "degree": Robustness.node_attack_degree,
+        "strength": Robustness.node_attack_strength,
+        "betweenness": Robustness.node_attack_betweenness
+    }
+
+    for beta in beta_list:
+        print(f"beta = {beta} 开始：")
+        data = {
+            "Alpha": [alpha for alpha in alpha_list],
+            "random": [],
+            "degree": [],
+            "strength": [],
+            "betweenness": []
+        }
+        for alpha in tqdm(alpha_list):
+            for attack, func in configure.items():
+                result = Robustness.simulate_underload_cascade(DiG, alpha, beta, func, Robustness.LWCC)
+                value = float(result[(alpha, beta)])
+                data[attack].append(value)
+
+        df = pd.DataFrame(data)
+        Draw.draw_plot(
+            df,
+            f'Robustness/Cascade/Unload',
+            f"{beta} LWCC",
+            f"{time} {beta} LWCC",
+            colors=1,
+            markers=1
+        )

@@ -563,14 +563,20 @@ class Main:
         :param target_metric: "LWCC"
         :return:
         """
-        fraction_removed_list = list(np.linspace(0, 0.05, 50))
+        fraction_removed_list = list(np.linspace(0, 0.1, 50))
         DiG, _ = cls.get_certain_networks_by_years(time)
 
+        # attack_strategies = {
+        #     "random": Robustness.edge_attack_random,
+        #     "degree": Robustness.edge_attack_degree,
+        #     "strength": Robustness.edge_attack_strength,
+        #     "betweenness": Robustness.edge_attack_betweenness
+        # }
         attack_strategies = {
-            "random": Robustness.edge_attack_random,
-            "degree": Robustness.edge_attack_degree,
-            "strength": Robustness.edge_attack_strength,
-            "betweenness": Robustness.edge_attack_betweenness
+            "random": Robustness.node_attack_random,
+            "degree": Robustness.node_attack_degree,
+            "strength": Robustness.node_attack_strength,
+            "betweenness": Robustness.node_attack_betweenness
         }
         metric_funcs = {
             "LSCC": Robustness.LSCC,
@@ -587,7 +593,7 @@ class Main:
                 metric_funcs,
                 fraction_removed_list
             )
-        (pathlib.Path(f'Output/Robustness/Edges/{time} edge attack.json')
+        (pathlib.Path(f'Output/Robustness/Nodes/{time} node attack.json')
          .write_text(json.dumps(attack_results, indent=2)))
 
         data = {
@@ -600,9 +606,9 @@ class Main:
         df = pd.DataFrame(data)
         Draw.draw_plot(
             df,
-            'Robustness/Edges/',
+            'Robustness/Nodes/',
             target_metric,
-            f'{time} {target_metric} edges attack',
+            f'{time} {target_metric} nodes attack',
             margin_rate=0.1,
             is_label_step=False,
             colors=3,
@@ -654,8 +660,9 @@ class Main:
         :return:
         """
         # [beta, alpha]  节点容量的上下限
-        alpha_list = np.linspace(1, 2, 11)
-        beta_list = np.linspace(0, 1, 11)
+        # 使用numpy输出干净的小数 不然会出现 0.6000000000001 这种
+        alpha_list = np.round(np.linspace(1, 2, 51), 3)
+        beta_list = np.round(np.linspace(0, 1, 51), 3)
 
         DiG, _ = Main.get_certain_networks_by_years(time)
 
@@ -667,15 +674,16 @@ class Main:
         }
 
         for beta in beta_list:
-            print(f"beat = {beta} 开始：")
+            print(f"beta = {beta} 开始：")
             data = {
-                "Alpha": [alpha for alpha in alpha_list],
+                "Alpha": [],
                 "random": [],
                 "degree": [],
                 "strength": [],
                 "betweenness": []
             }
             for alpha in tqdm(alpha_list):
+                data["Alpha"].append(alpha)
                 for attack, func in configure.items():
                     result = Robustness.simulate_underload_cascade(DiG, alpha, beta, func, Robustness.LWCC)
                     value = float(result[(alpha, beta)])
@@ -684,9 +692,9 @@ class Main:
             df = pd.DataFrame(data)
             Draw.draw_plot(
                 df,
-                f'Robustness/Cascade/',
-                f"{beta} LWCC",
-                f"{time} {beta} LWCC",
+                f'Robustness/Cascade/Unload/',
+                f"beta={beta} LWCC",
+                f"{time}_LWCC_beta_{beta} ",
                 colors=1,
                 markers=1
             )

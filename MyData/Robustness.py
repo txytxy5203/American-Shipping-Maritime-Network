@@ -320,9 +320,6 @@ class Robustness:
         first_remove_item = attack_func(g_original, 0.5)["targets"][0]
         results = {}
 
-        # alpha 和 beta 的list 还是放到函数外边处理吧
-        # for alpha in alpha_list:
-        #     for beta in tqdm(beta_list, desc=f"beta 扫描"):
         g_copy = g_original.copy()
         # 初始化容量
         _, Capacity = cls.calculate_load_strength_func(alpha, beta, g_copy)
@@ -350,6 +347,7 @@ class Robustness:
             # 4. 判断新一轮失效
             remove_items = []
             for node in current_load:
+                # 当前的 load 不能超出 capacity 的上下界
                 if current_load[node] < Capacity[node][0] \
                         or current_load[node] > Capacity[node][1]:
                     remove_items.append(node)
@@ -361,7 +359,7 @@ class Robustness:
     @classmethod
     def redistribute_flow_from(cls, node, g_copy):
         """
-        只需要改边  节点的total_TEU信息不要动 在外边更新
+        只需要更新边的volumeTEU信息  节点的total_TEU信息不要动 在函数外边更新
         当 node 即将失效时：
         - 其上游节点把原本发往 node 的流量
           按权重比例重新分配到其他下游节点
