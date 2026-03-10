@@ -5021,8 +5021,9 @@ def cascade_attack_unload(cls, time:str):
     :return:
     """
     # [beta, alpha]  节点容量的上下限
-    alpha_list = np.linspace(1, 2, 11)
-    beta_list = np.linspace(0, 1, 11)
+    # 使用numpy输出干净的小数 不然会出现 0.6000000000001 这种
+    alpha_list = np.round(np.linspace(1, 2, 51), 3)
+    beta_list = np.round(np.linspace(0, 1, 51), 3)
 
     DiG, _ = Main.get_certain_networks_by_years(time)
 
@@ -5036,13 +5037,14 @@ def cascade_attack_unload(cls, time:str):
     for beta in beta_list:
         print(f"beta = {beta} 开始：")
         data = {
-            "Alpha": [alpha for alpha in alpha_list],
+            "Alpha": [],
             "random": [],
             "degree": [],
             "strength": [],
             "betweenness": []
         }
         for alpha in tqdm(alpha_list):
+            data["Alpha"].append(alpha)
             for attack, func in configure.items():
                 result = Robustness.simulate_underload_cascade(DiG, alpha, beta, func, Robustness.LWCC)
                 value = float(result[(alpha, beta)])
@@ -5051,9 +5053,61 @@ def cascade_attack_unload(cls, time:str):
         df = pd.DataFrame(data)
         Draw.draw_plot(
             df,
-            f'Robustness/Cascade/Unload',
-            f"{beta} LWCC",
-            f"{time} {beta} LWCC",
+            f'Robustness/Cascade/Unload/',
+            f"beta={beta} LWCC",
+            f"{time}_LWCC_beta_{beta} ",
             colors=1,
             markers=1
         )
+
+
+years = [2017, 2018, 2019, 2020]
+
+threshold = 0.1
+
+results = []
+
+for year in years:
+
+    file = f"Output/Robustness/Cascade/Unload/{year}_LWCC_beta_0.92.csv"
+
+    df = pd.read_csv(file)
+
+    collapse_prob = [
+        np.mean(df["random"] < threshold),
+        np.mean(df["degree"] < threshold),
+        np.mean(df["strength"] < threshold),
+        np.mean(df["betweenness"] < threshold)
+    ]
+
+    results.append(collapse_prob)
+
+results = np.array(results)
+
+labels = ["Random", "Degree", "Strength", "Betweenness"]
+
+x = np.arange(len(labels))
+width = 0.18
+
+plt.figure(figsize=(8,6))
+
+plt.bar(x - 1.5*width, results[0], width, label="2017")
+plt.bar(x - 0.5*width, results[1], width, label="2018")
+plt.bar(x + 0.5*width, results[2], width, label="2019")
+plt.bar(x + 1.5*width, results[3], width, label="2020")
+
+plt.xticks(x, labels)
+
+plt.ylabel("Collapse Probability")
+plt.xlabel("Attack Strategy")
+plt.title("Collapse Probability under Different Attack Strategies")
+
+plt.ylim(0,1)
+
+plt.legend()
+
+plt.grid(axis="y", alpha=0.3)
+
+plt.tight_layout()
+
+plt.show()

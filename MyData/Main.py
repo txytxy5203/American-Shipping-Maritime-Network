@@ -5,6 +5,7 @@ import pathlib
 import networkx as nx
 import numpy as np
 import pandas as pd
+from matplotlib import pyplot as plt
 from tqdm import tqdm
 
 from MyData.DirectedWeighted import DirectedWeighted
@@ -661,8 +662,9 @@ class Main:
         """
         # [beta, alpha]  节点容量的上下限
         # 使用numpy输出干净的小数 不然会出现 0.6000000000001 这种
-        alpha_list = np.round(np.linspace(1, 2, 51), 3)
-        beta_list = np.round(np.linspace(0, 1, 51), 3)
+        # 调节alpha和beta的范围和密度
+        alpha_list = np.round(np.linspace(1, 2, 101), 3)
+        beta_list = np.round(np.linspace(0, 1, 101), 3)
 
         DiG, _ = Main.get_certain_networks_by_years(time)
 
@@ -694,7 +696,112 @@ class Main:
                 df,
                 f'Robustness/Cascade/Unload/',
                 f"beta={beta} LWCC",
-                f"{time}_LWCC_beta_{beta} ",
+                f"{time}_LWCC_beta_{beta}",
                 colors=1,
                 markers=1
             )
+
+    #regionbeta并行版本
+    # @classmethod
+    # def cascade_attack_unload(cls, time: str):
+    #
+    #     alpha_list = np.round(np.linspace(1, 2, 51), 3)
+    #     beta_list = np.round(np.linspace(0, 1, 51), 3)
+    #
+    #     DiG, _ = Main.get_certain_networks_by_years(time)
+    #
+    #     configure = {
+    #         "random": Robustness.node_attack_random,
+    #         "degree": Robustness.node_attack_degree,
+    #         "strength": Robustness.node_attack_strength,
+    #         "betweenness": Robustness.node_attack_betweenness
+    #     }
+    #
+    #     tasks = [
+    #         (cls, DiG, time, beta, alpha_list, configure)
+    #         for beta in beta_list
+    #     ]
+    #
+    #     # CPU核心数
+    #     workers = os.cpu_count() - 1
+    #
+    #     print(f"使用 {workers} 个进程并行计算")
+    #
+    #     with Pool(workers) as pool:
+    #         pool.map(_cascade_single_beta, tasks)
+    # @classmethod
+    # def _cascade_single_beta(args):
+    #     cls, DiG, time, beta, alpha_list, configure = args
+    #
+    #     data = {
+    #         "Alpha": [],
+    #         "random": [],
+    #         "degree": [],
+    #         "strength": [],
+    #         "betweenness": []
+    #     }
+    #
+    #     for alpha in alpha_list:
+    #         data["Alpha"].append(alpha)
+    #
+    #         for attack, func in configure.items():
+    #             result = cls.simulate_underload_cascade(
+    #                 DiG, alpha, beta, func, cls.LWCC
+    #             )
+    #
+    #             value = float(result[(alpha, beta)])
+    #             data[attack].append(value)
+    #
+    #     df = pd.DataFrame(data)
+    #
+    #     Draw.draw_plot(
+    #         df,
+    #         'Robustness/Cascade/Unload/',
+    #         f"beta={beta} LWCC",
+    #         f"{time}_LWCC_beta_{beta}",
+    #         colors=1,
+    #         markers=1
+    #     )
+    #
+    #     return beta
+    #endregion
+
+    @classmethod
+    def different_strategies_lwcc_cdf(cls):
+        """
+        cdf图  目前没有适配Draw类 没办法只能这样了
+
+        :return:
+        """
+        times = ["2017", "2018", "2019", "2020"]
+        for time in times:
+            # 读取数据
+            df = pd.read_csv(f"Output/Robustness/Cascade/Unload/{time}_LWCC_beta_0.8.csv")
+
+            attacks = ["random", "degree", "strength", "betweenness"]
+
+            plt.figure(figsize=(7, 5))
+
+            for attack in attacks:
+                data = df[attack].values
+                data = np.sort(data)
+
+                cdf = np.arange(len(data)) / len(data)
+
+                plt.plot(data, cdf, label=attack.capitalize())
+
+            plt.xlabel("LWCC")
+            plt.ylabel("CDF")
+            plt.legend()
+
+            plt.grid(alpha=0.3)
+
+            plt.tight_layout()
+
+            for for_mat in ["png", "eps"]:  # png and eps
+                plt.savefig(f'Output/Robustness/Cascade/Unload/Strategy/'
+                            f'{time}_different_strategies_LWCC.{for_mat}',
+                            format=for_mat,  # 显式指定格式（可选，但更稳妥）
+                            dpi=300,
+                            bbox_inches='tight'  # 去除图片周围多余空白
+                            )

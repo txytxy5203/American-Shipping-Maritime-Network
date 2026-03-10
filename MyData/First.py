@@ -79,8 +79,61 @@ sys.path.append('../Algorithm')
 # )
 #endregion
 
+
+
+
+
+
+
+
+
+# # 崩溃阈值
+# threshold = 0.1
+#
+# data = df["strength"].values
+# data = np.sort(data)
+#
+# cdf = np.arange(len(data)) / len(data)
+#
+# plt.plot(data, cdf)
+# plt.show()
+
+# # 提取不同攻击策略的数据
+# data = [
+#     df["random"].values,
+#     df["degree"].values,
+#     df["strength"].values,
+#     df["betweenness"].values
+# ]
+
+
+# labels = ["Random", "Degree", "Strength", "Betweenness"]
+#
+# # 画图
+# plt.figure(figsize=(8,6))
+#
+# plt.boxplot(
+#     data,
+#     labels=labels,
+#     showmeans=True,
+#     showfliers=False,
+#     whis=(40,60)
+# )
+#
+# plt.xlabel("Attack Strategy")
+# plt.ylabel("LWCC")
+# plt.title("Cascade robustness under different attack strategies")
+#
+# plt.grid(alpha=0.3)
+#
+# plt.tight_layout()
+# plt.show()
+
+
+
+
 # # 所有beta文件
-# files = sorted(glob.glob("Output/Robustness/Cascade/Unload/2017_LWCC_beta_*.csv"))
+# files = sorted(glob.glob("Output/Robustness/Cascade/Unload/2020_LWCC_beta_*.csv"))
 #
 # beta_list = []
 # alpha_list = None
@@ -98,37 +151,46 @@ sys.path.append('../Algorithm')
 #     if alpha_list is None:
 #         alpha_list = df["Alpha"].values
 #
-#     matrix_strength.append(df["random"].values)
+#     matrix_strength.append(df["betweenness"].values)
 #
 # matrix_strength = np.array(matrix_strength)
-# # np.savetxt(
-# #     "strength.csv",
-# #     matrix_strength,
-# #     delimiter=","
-# # )
+# np.savetxt(
+#     "betweenness.csv",
+#     matrix_strength,
+#     delimiter=","
+# )
 #
 # plt.figure(figsize=(8,6))
 #
 # sns.heatmap(
 #     matrix_strength,
-#     xticklabels=np.round(alpha_list,2),
-#     yticklabels=np.round(beta_list,2),
+#     xticklabels=np.round(alpha_list,3),
+#     yticklabels=np.round(beta_list,3),
 #     cmap="viridis"
 # )
 #
 # plt.xlabel("Alpha (capacity upper bound)")
 # plt.ylabel("Beta (capacity lower bound)")
-# plt.title("Cascade Phase Diagram (Strength Attack)")
+# plt.title("Cascade Phase Diagram (Betweenness Attack)")
 #
 # plt.show()
 
 
-alpha_list = np.round(np.linspace(1, 2, 51), 3)
-print(alpha_list)
 
-print(os.cpu_count())
-# # 并行
+
+
+
+
+
+# TODO  alpha平均上升多少 LWCC上升多少  beta平均下降多少 LWCC上升多少
+# TODO 随机攻击的结果要多次实验取平均
+
+
+# 并行
 # years = ["2017","2018","2019","2020"]
 # if __name__ == "__main__":
 #     with Pool(4) as p:
 #         p.map(Main.cascade_attack_unload, years)
+
+
+
