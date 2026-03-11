@@ -770,7 +770,7 @@ class Main:
     def different_strategies_lwcc_cdf(cls):
         """
         cdf图  目前没有适配Draw类 没办法只能这样了
-
+        不同的攻击策略对于LWCC的影响
         :return:
         """
         times = ["2017", "2018", "2019", "2020"]
@@ -805,3 +805,97 @@ class Main:
                             dpi=300,
                             bbox_inches='tight'  # 去除图片周围多余空白
                             )
+
+    @classmethod
+    def different_years_lwcc_bar(cls):
+        """
+        所有alpha和beta可能的参数下  网络崩溃的概率
+        不同的年份所有参数下网络崩溃的概率
+        :return:
+        """
+        years = [2017, 2018, 2019, 2020]
+        betas = np.arange(0, 1.01, 0.1)
+
+        threshold = 0.1
+
+        random_prob = []
+        degree_prob = []
+        strength_prob = []
+        betweenness_prob = []
+
+        for year in years:
+
+            r_list = []
+            d_list = []
+            s_list = []
+            b_list = []
+
+            for beta in betas:
+                file = f"Output/Robustness/Cascade/Unload/{year}_LWCC_beta_{beta:.1f}.csv"
+
+                df = pd.read_csv(file)
+
+                r_list.append(np.mean(df["random"] < threshold))
+                d_list.append(np.mean(df["degree"] < threshold))
+                s_list.append(np.mean(df["strength"] < threshold))
+                b_list.append(np.mean(df["betweenness"] < threshold))
+
+            # 对所有 beta 取平均
+            random_prob.append(np.mean(r_list))
+            degree_prob.append(np.mean(d_list))
+            strength_prob.append(np.mean(s_list))
+            betweenness_prob.append(np.mean(b_list))
+
+        data = [random_prob, degree_prob, strength_prob, betweenness_prob]
+        labels = ["Random", "Degree", "Strength", "Betweenness"]
+
+        colors = ["#0072B2", "#E69F00", "#009E73", "#D55E00"]
+
+        x = np.arange(len(years))
+        width = 0.18
+
+        plt.figure(figsize=(8, 6))
+
+        bars = []
+
+        for i in range(4):
+            bars.append(
+                plt.bar(x + (i - 1.5) * width, data[i], width,
+                        label=labels[i],
+                        color=colors[i])
+            )
+
+        plt.xticks(x, years)
+
+        plt.xlabel("Year")
+        plt.ylabel("Collapse Probability")
+
+        plt.ylim(0, 1)
+
+        plt.legend(frameon=False)
+
+        plt.grid(axis="y", linestyle="--", alpha=0.5)
+
+        ax = plt.gca()
+        ax.spines["top"].set_visible(False)
+        ax.spines["right"].set_visible(False)
+
+        # 标注数值
+        for bar_group in bars:
+            for bar in bar_group:
+                height = bar.get_height()
+                plt.text(bar.get_x() + bar.get_width() / 2,
+                         height + 0.02,
+                         f"{height:.2f}",
+                         ha="center",
+                         va="bottom",
+                         fontsize=9)
+
+        plt.tight_layout()
+        for for_mat in ["png", "eps", "pdf"]:  # png and eps
+            plt.savefig(f'Output/Robustness/Cascade/Unload/Year/'
+                        f'collapse_probability_different_years.{for_mat}',
+                        format=for_mat,  # 显式指定格式（可选，但更稳妥）
+                        dpi=300,
+                        bbox_inches='tight'  # 去除图片周围多余空白
+                        )

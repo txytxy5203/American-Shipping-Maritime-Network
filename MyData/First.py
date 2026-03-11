@@ -83,6 +83,129 @@ sys.path.append('../Algorithm')
 
 
 
+# years = [2017, 2018, 2019, 2020]
+# threshold = 0.1
+#
+#
+# random_prob = []
+# degree_prob = []
+# strength_prob = []
+# betweenness_prob = []
+#
+# for year in years:
+#
+#     file = f"Output/Robustness/Cascade/Unload/{year}_LWCC_beta_0.1.csv"
+#     df = pd.read_csv(file)
+#
+#     random_prob.append(np.mean(df["random"] < threshold))
+#     degree_prob.append(np.mean(df["degree"] < threshold))
+#     strength_prob.append(np.mean(df["strength"] < threshold))
+#     betweenness_prob.append(np.mean(df["betweenness"] < threshold))
+#
+# # 攻击策略数据
+# data = [random_prob, degree_prob, strength_prob, betweenness_prob]
+# labels = ["Random", "Degree", "Strength", "Betweenness"]
+#
+# # 期刊风格配色
+# colors = ["#4C72B0", "#55A868", "#C44E52", "#8172B2"]
+#
+# x = np.arange(len(years))
+# width = 0.18
+#
+# plt.figure(figsize=(8,6))
+#
+# bars = []
+#
+# for i in range(4):
+#     bars.append(
+#         plt.bar(x + (i-1.5)*width, data[i], width,
+#                 label=labels[i],
+#                 color=colors[i])
+#     )
+#
+# plt.xticks(x, years, fontsize=11)
+#
+# plt.xlabel("Year", fontsize=12)
+# plt.ylabel("Collapse Probability", fontsize=12)
+#
+# plt.ylim(0,1)
+#
+# plt.legend(frameon=False)
+#
+# plt.grid(axis="y", linestyle="--", alpha=0.5)
+#
+# # 去掉上右边框（期刊常见风格）
+# ax = plt.gca()
+# ax.spines["top"].set_visible(False)
+# ax.spines["right"].set_visible(False)
+#
+# # 自动标注柱子数值
+# for bar_group in bars:
+#     for bar in bar_group:
+#         height = bar.get_height()
+#         plt.text(bar.get_x() + bar.get_width()/2,
+#                  height + 0.02,
+#                  f"{height:.2f}",
+#                  ha="center",
+#                  va="bottom",
+#                  fontsize=9)
+#
+# plt.tight_layout()
+#
+# # 保存论文图
+# plt.savefig("collapse_probability_years.pdf")
+# plt.savefig("collapse_probability_years.eps")
+
+# plt.show()
+
+
+
+# years = [2017, 2018, 2019, 2020]
+#
+# threshold = 0.1
+#
+# random_prob = []
+# degree_prob = []
+# strength_prob = []
+# betweenness_prob = []
+#
+# for year in years:
+#     file = f"Output/Robustness/Cascade/Unload/{year}_LWCC_beta_0.4.csv"
+#
+#     df = pd.read_csv(file)
+#
+#     random_prob.append(np.mean(df["random"] < threshold))
+#     degree_prob.append(np.mean(df["degree"] < threshold))
+#     strength_prob.append(np.mean(df["strength"] < threshold))
+#     betweenness_prob.append(np.mean(df["betweenness"] < threshold))
+#
+# x = np.arange(len(years))
+# width = 0.2
+#
+# plt.figure(figsize=(8, 6))
+#
+# plt.bar(x - 1.5 * width, random_prob, width, label="Random")
+# plt.bar(x - 0.5 * width, degree_prob, width, label="Degree")
+# plt.bar(x + 0.5 * width, strength_prob, width, label="Strength")
+# plt.bar(x + 1.5 * width, betweenness_prob, width, label="Betweenness")
+#
+# plt.xticks(x, years)
+#
+# plt.xlabel("Year")
+# plt.ylabel("Collapse Probability")
+#
+# plt.title("Collapse Probability across Years")
+#
+# plt.ylim(0, 1)
+#
+# plt.legend()
+#
+# plt.grid(axis="y", alpha=0.3)
+#
+# plt.tight_layout()
+#
+# plt.show()
+
 
 
 
@@ -128,56 +251,6 @@ sys.path.append('../Algorithm')
 #
 # plt.tight_layout()
 # plt.show()
-
-
-
-
-# # 所有beta文件
-# files = sorted(glob.glob("Output/Robustness/Cascade/Unload/2020_LWCC_beta_*.csv"))
-#
-# beta_list = []
-# alpha_list = None
-#
-# # 假设先做 strength attack
-# matrix_strength = []
-#
-# for file in files:
-#
-#     beta = float(file.split("_")[-1].replace(".csv",""))
-#     beta_list.append(beta)
-#
-#     df = pd.read_csv(file)
-#
-#     if alpha_list is None:
-#         alpha_list = df["Alpha"].values
-#
-#     matrix_strength.append(df["betweenness"].values)
-#
-# matrix_strength = np.array(matrix_strength)
-# np.savetxt(
-#     "betweenness.csv",
-#     matrix_strength,
-#     delimiter=","
-# )
-#
-# plt.figure(figsize=(8,6))
-#
-# sns.heatmap(
-#     matrix_strength,
-#     xticklabels=np.round(alpha_list,3),
-#     yticklabels=np.round(beta_list,3),
-#     cmap="viridis"
-# )
-#
-# plt.xlabel("Alpha (capacity upper bound)")
-# plt.ylabel("Beta (capacity lower bound)")
-# plt.title("Cascade Phase Diagram (Betweenness Attack)")
-#
-# plt.show()
-
-
-
-
 
 
 
