@@ -849,6 +849,7 @@ class Main:
         data = [random_prob, degree_prob, strength_prob, betweenness_prob]
         labels = ["Random", "Degree", "Strength", "Betweenness"]
 
+        # colors = ["#f17fb8", "#79d0e7", "#69c85e", "#fed67b"]
         colors = ["#0072B2", "#E69F00", "#009E73", "#D55E00"]
 
         x = np.arange(len(years))
@@ -862,7 +863,10 @@ class Main:
             bars.append(
                 plt.bar(x + (i - 1.5) * width, data[i], width,
                         label=labels[i],
-                        color=colors[i])
+                        color=colors[i],
+                        edgecolor="black",
+                        linewidth=0.8
+                )
             )
 
         plt.xticks(x, years)
@@ -877,8 +881,8 @@ class Main:
         plt.grid(axis="y", linestyle="--", alpha=0.5)
 
         ax = plt.gca()
-        ax.spines["top"].set_visible(False)
-        ax.spines["right"].set_visible(False)
+        # ax.spines["top"].set_visible(False)
+        # ax.spines["right"].set_visible(False)
 
         # 标注数值
         for bar_group in bars:
@@ -898,4 +902,164 @@ class Main:
                         format=for_mat,  # 显式指定格式（可选，但更稳妥）
                         dpi=300,
                         bbox_inches='tight'  # 去除图片周围多余空白
+            )
+
+    @classmethod
+    def different_years_lwcc_boxplot(cls):
+        """
+        不同年份的LWCC的箱线图
+        :return:
+        """
+        years = [2017, 2018, 2019, 2020]
+        betas = np.arange(0, 1.01, 0.1)
+
+        alpha_target = 2.0
+
+        data_by_year = []
+
+        for year in years:
+
+            lwcc_values = []
+
+            for beta in betas:
+
+                file = f"Output/Robustness/Cascade/Unload/{year}_LWCC_beta_{beta:.1f}.csv"
+
+                df = pd.read_csv(file)
+
+                # 找到 alpha 对应的行
+                row = df[df["Alpha"] == alpha_target]
+
+                if not row.empty:
+                    # 四种攻击策略全部加入
+                    lwcc_values.append(row["random"].values[0])
+                    lwcc_values.append(row["degree"].values[0])
+                    lwcc_values.append(row["strength"].values[0])
+                    lwcc_values.append(row["betweenness"].values[0])
+
+            data_by_year.append(lwcc_values)
+
+        plt.figure(figsize=(8, 6))
+
+        box = plt.boxplot(
+            data_by_year,
+            patch_artist=True,
+            widths=0.5
+        )
+
+        colors = ["#0072B2", "#E69F00", "#009E73", "#D55E00"]
+
+        for patch, color in zip(box['boxes'], colors):
+            patch.set_facecolor(color)
+
+        # 计算中位数
+        means = [np.median(d) for d in data_by_year]
+
+        # 标注中位数
+        for i, mean in enumerate(means):
+            plt.text(
+                i + 1,
+                mean - 0.015,
+                f"{mean:.3f}",
+                ha='center',
+                fontsize=10
+            )
+
+        plt.xticks([1, 2, 3, 4], years)
+
+        plt.xlabel("Year")
+        plt.ylabel("LWCC")
+        plt.ylim(0.4, 1.0)
+
+        plt.grid(axis="y", linestyle="--", alpha=0.5)
+
+        ax = plt.gca()
+        # ax.spines["top"].set_visible(False)
+        # ax.spines["right"].set_visible(False)
+
+        plt.tight_layout()
+
+        for for_mat in ["png", "eps", "pdf"]:  # png and eps
+            plt.savefig(f'Output/Robustness/Cascade/Unload/Year/'
+                        f'lwcc_boxplot_alpha_{alpha_target}.{for_mat}',
+                        format=for_mat,  # 显式指定格式（可选，但更稳妥）
+                        dpi=300,
+                        bbox_inches='tight'  # 去除图片周围多余空白
                         )
+
+    # region 单一beta值的崩溃概率图
+    # years = [2017, 2018, 2019, 2020]
+    # threshold = 0.1
+    #
+    #
+    # random_prob = []
+    # degree_prob = []
+    # strength_prob = []
+    # betweenness_prob = []
+    #
+    # for year in years:
+    #
+    #     file = f"Output/Robustness/Cascade/Unload/{year}_LWCC_beta_0.1.csv"
+    #     df = pd.read_csv(file)
+    #
+    #     random_prob.append(np.mean(df["random"] < threshold))
+    #     degree_prob.append(np.mean(df["degree"] < threshold))
+    #     strength_prob.append(np.mean(df["strength"] < threshold))
+    #     betweenness_prob.append(np.mean(df["betweenness"] < threshold))
+    #
+    # # 攻击策略数据
+    # data = [random_prob, degree_prob, strength_prob, betweenness_prob]
+    # labels = ["Random", "Degree", "Strength", "Betweenness"]
+    #
+    # # 期刊风格配色
+    # colors = ["#4C72B0", "#55A868", "#C44E52", "#8172B2"]
+    #
+    # x = np.arange(len(years))
+    # width = 0.18
+    #
+    # plt.figure(figsize=(8,6))
+    #
+    # bars = []
+    #
+    # for i in range(4):
+    #     bars.append(
+    #         plt.bar(x + (i-1.5)*width, data[i], width,
+    #                 label=labels[i],
+    #                 color=colors[i])
+    #     )
+    #
+    # plt.xticks(x, years, fontsize=11)
+    #
+    # plt.xlabel("Year", fontsize=12)
+    # plt.ylabel("Collapse Probability", fontsize=12)
+    #
+    # plt.ylim(0,1)
+    #
+    # plt.legend(frameon=False)
+    #
+    # plt.grid(axis="y", linestyle="--", alpha=0.5)
+    #
+    # # 去掉上右边框（期刊常见风格）
+    # ax = plt.gca()
+    # ax.spines["top"].set_visible(False)
+    # ax.spines["right"].set_visible(False)
+    #
+    # # 自动标注柱子数值
+    # for bar_group in bars:
+    #     for bar in bar_group:
+    #         height = bar.get_height()
+    #         plt.text(bar.get_x() + bar.get_width()/2,
+    #                  height + 0.02,
+    #                  f"{height:.2f}",
+    #                  ha="center",
+    #                  va="bottom",
+    #                  fontsize=9)
+    #
+    # plt.tight_layout()
+    #
+    # # 保存论文图
+    # plt.savefig("collapse_probability_years.pdf")
+    # plt.savefig("collapse_probability_years.eps")
+    #
+    # plt.show()
+    # endregion
