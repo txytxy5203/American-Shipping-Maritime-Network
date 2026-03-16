@@ -687,7 +687,7 @@ class Main:
             for alpha in tqdm(alpha_list):
                 data["Alpha"].append(alpha)
                 for attack, func in configure.items():
-                    result = Robustness.simulate_underload_cascade(DiG, alpha, beta, func, Robustness.LWCC)
+                    result = Robustness.simulate_underload_cascade(DiG, alpha, beta, func,"", Robustness.LWCC)
                     value = float(result[(alpha, beta)])
                     data[attack].append(value)
 
@@ -908,6 +908,7 @@ class Main:
     def different_years_lwcc_boxplot(cls):
         """
         不同年份的LWCC的箱线图
+        每个LWCC的值都是取alpha为2.0的时候的值 因为稳定了
         :return:
         """
         years = [2017, 2018, 2019, 2020]
@@ -986,6 +987,74 @@ class Main:
                         dpi=300,
                         bbox_inches='tight'  # 去除图片周围多余空白
                         )
+
+    @classmethod
+    def cascade_attack_unload_ports(cls, time: str):
+        """
+        针对每一个港口进行单节点攻击的级联仿真，评估每个港口的重要性
+        :param time: 年份字符串
+        :return:
+        """
+        # 专家提示：单节点遍历计算量极大。
+        # 如果网络有 500 个节点，500 * 101(alpha) * 101(beta) = 510万次仿真！
+        # 建议在初步测试时，先把步长调大，例如 10 个点 (np.linspace(1, 2, 11))
+        alpha_list = np.round(np.linspace(1, 2, 6), 2)
+        beta_list = np.round(np.linspace(0, 1, 6), 2)
+
+        DiG, _ = Main.get_certain_networks_by_years(time)
+
+        # 获取网络中港口节点  这里只取teu前30的node
+        total_teu = [(node, attr['total_TEU']) for node, attr in DiG.nodes(data=True)]  # 总度列表（入度+出度）
+        total_teu.sort(key=lambda x: x[1], reverse=True)
+        nodes = [node for node,teu in total_teu]
+        nodes = nodes[:30]
+
+        for beta in beta_list:
+            print(f"\n--- 正在处理 beta = {beta} ---")
+
+            # 初始化数据字典，以 Alpha 为第一列，后续每一列代表攻击某个港口后的网络连通性
+            data = {"Alpha": []}
+            for node in nodes:
+                data[node] = []
+
+            # 遍历 Alpha，加入进度条
+            for alpha in tqdm(alpha_list, desc=f"Beta={beta} Alpha Loop"):
+                data["Alpha"].append(alpha)
+
+                # 遍历每一个港口进行单独攻击
+                for node in nodes:
+                    # 运行级联失效仿真
+                    result = Robustness.simulate_underload_cascade(DiG, alpha, beta,
+                                                                   None,node, Robustness.LWCC)
+                    # 提取结果
+                    value = float(result[(alpha, beta)])
+                    data[node].append(value)
+
+            # 转换为 DataFrame
+            df = pd.DataFrame(data)
+
+            # 确保输出目录存在
+            save_dir = f'Output/Robustness/Cascade/Unload/Port/'
+            os.makedirs(save_dir, exist_ok=True)
+
+            # 保存为 CSV
+            save_path = f"{save_dir}{time}_LWCC_beta_{beta}.csv"
+            df.to_csv(save_path, index=False)
+
+            # ⚠️ 这里我注释掉了原有的绘图代码
+            # 因为如果你的节点超过 10 个，画在同一张折线图上会完全糊成一团。
+            # 建议的做法是：跑完数据后，单独写一个脚本，找出导致网络崩溃最严重的 Top 10 港口，再画图。
+            """
+            Draw.draw_plot(
+                df,
+                f'Robustness/Cascade/Unload/',
+                f"beta={beta} LWCC (All Nodes)",
+                f"{time}_LWCC_beta_{beta}",
+                colors=1,
+                markers=1
+            )
+            """
+
 
     # region 单一beta值的崩溃概率图
     # years = [2017, 2018, 2019, 2020]

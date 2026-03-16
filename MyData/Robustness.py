@@ -309,7 +309,7 @@ class Robustness:
 
     @classmethod
     def simulate_underload_cascade(cls, g_original, alpha, beta,
-                                   attack_func:callable, metric_func:callable):
+                                   attack_func:callable = None,target_port:str = "", metric_func:callable = None):
         """
         考虑欠载的模型  beta为下界  alpha为上界
         海运网络级联失效模拟
@@ -317,7 +317,12 @@ class Robustness:
         N0 = g_original.number_of_nodes()
 
         # 初始选择一个节点
-        first_remove_item = attack_func(g_original, 0.5)["targets"][0]
+        # 根据攻击策略来选择port or 指定port来攻击
+        if target_port == "" and attack_func is not None:
+            first_remove_item = attack_func(g_original, 0.5)["targets"][0]
+        else:
+            first_remove_item = target_port
+
         results = {}
 
         g_copy = g_original.copy()
