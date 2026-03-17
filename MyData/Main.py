@@ -904,7 +904,7 @@ class Main:
             )
 
     @classmethod
-    def different_years_lwcc_bar(cls):
+    def different_years_phase_boundary(cls):
         """
         不同年份的相变线变化图
         :return:
