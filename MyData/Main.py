@@ -1,3 +1,4 @@
+import glob
 import json
 import os
 import pathlib
@@ -7,6 +8,7 @@ import numpy as np
 import pandas as pd
 from matplotlib import pyplot as plt
 from tqdm import tqdm
+import seaborn as sns
 
 from MyData.DirectedWeighted import DirectedWeighted
 from MyData.Draw import Draw
@@ -809,8 +811,8 @@ class Main:
     @classmethod
     def different_years_lwcc_bar(cls):
         """
-        所有alpha和beta可能的参数下  网络崩溃的概率
-        不同的年份所有参数下网络崩溃的概率
+        所有alpha和beta可能的参数下
+        不同的年份所有参数下 平均lwcc
         :return:
         """
         years = [2017, 2018, 2019, 2020]
@@ -831,14 +833,14 @@ class Main:
             b_list = []
 
             for beta in betas:
-                file = f"Output/Robustness/Cascade/Unload/{year}_LWCC_beta_{beta:.1f}.csv"
+                file = f"Output/Robustness/Cascade/Unload/step 1e-2/{year}_LWCC_beta_{beta:.1f}.csv"
 
                 df = pd.read_csv(file)
 
-                r_list.append(np.mean(df["random"] < threshold))
-                d_list.append(np.mean(df["degree"] < threshold))
-                s_list.append(np.mean(df["strength"] < threshold))
-                b_list.append(np.mean(df["betweenness"] < threshold))
+                r_list.append(np.mean(df["random"]))
+                d_list.append(np.mean(df["degree"]))
+                s_list.append(np.mean(df["strength"]))
+                b_list.append(np.mean(df["betweenness"]))
 
             # 对所有 beta 取平均
             random_prob.append(np.mean(r_list))
@@ -855,7 +857,7 @@ class Main:
         x = np.arange(len(years))
         width = 0.18
 
-        plt.figure(figsize=(8, 6))
+        plt.figure(figsize=(10, 8))
 
         bars = []
 
@@ -872,7 +874,7 @@ class Main:
         plt.xticks(x, years)
 
         plt.xlabel("Year")
-        plt.ylabel("Collapse Probability")
+        plt.ylabel("Average LWCC")
 
         plt.ylim(0, 1)
 
@@ -880,9 +882,6 @@ class Main:
 
         plt.grid(axis="y", linestyle="--", alpha=0.5)
 
-        ax = plt.gca()
-        # ax.spines["top"].set_visible(False)
-        # ax.spines["right"].set_visible(False)
 
         # 标注数值
         for bar_group in bars:
@@ -898,10 +897,137 @@ class Main:
         plt.tight_layout()
         for for_mat in ["png", "eps", "pdf"]:  # png and eps
             plt.savefig(f'Output/Robustness/Cascade/Unload/Year/'
-                        f'collapse_probability_different_years.{for_mat}',
+                        f'lwcc_different_years.{for_mat}',
                         format=for_mat,  # 显式指定格式（可选，但更稳妥）
                         dpi=300,
                         bbox_inches='tight'  # 去除图片周围多余空白
+            )
+
+    @classmethod
+    def different_years_lwcc_bar(cls):
+        """
+        不同年份的相变线变化图
+        :return:
+        """
+        # --- 1. 数据读取与计算函数 ---
+        def get_phase_boundary(year):
+            # 这里的路径请根据你的实际情况微调
+            path_pattern = f"Output/Robustness/Cascade/Unload/step 1e-2/{year}_LWCC_beta_*.csv"
+            files = sorted(glob.glob(path_pattern))
+            if not files:
+                print(f"Warning: No files found for {year}")
+                return None, None, None
+
+            beta_list = []
+            matrix_strength = []
+            alpha_values = None
+
+            for file in files:
+                b_val = float(file.split("_")[-1].replace(".csv", ""))
+                beta_list.append(b_val)
+                df = pd.read_csv(file)
+                if alpha_values is None:
+                    alpha_values = df["Alpha"].values
+                # 我们使用 strength 攻击的结果作为演示，你可以根据需要换成 degree 等
+                matrix_strength.append(df["strength"].values)
+
+            return np.array(alpha_values), np.array(beta_list), np.array(matrix_strength)
+
+        def calculate_resilience_area(alphas, betas, matrix):
+            """计算相变线右上方的生存面积"""
+            critical_heights = []
+            valid_alphas = []
+            for j in range(matrix.shape[1]):
+                column = matrix[:, j]
+                indices = np.where(column >= 0.5)[0]
+                if len(indices) > 0:
+                    # 找到最稳健的临界点（由于纵轴反转，beta 越小，存活高度越高）
+                    beta_c = betas[np.min(indices)]
+                    critical_heights.append(1.0 - beta_c)
+                    valid_alphas.append(alphas[j])
+
+            if len(valid_alphas) < 2: return 0.0
+            return simpson(y=critical_heights, x=valid_alphas)
+
+        # --- 2. 核心执行逻辑 ---
+        years = [2017, 2018, 2019, 2020]
+        colors = ["#0072B2", "#E69F00", "#009E73", "#D55E00"]
+        linestyles = ['-', '--', '-.', ':']
+
+        area_results = {}
+        plot_data = {}
+
+        for year in years:
+            alphas, betas, matrix = get_phase_boundary(year)
+            if matrix is not None:
+                area = calculate_resilience_area(alphas, betas, matrix)
+                area_results[year] = area
+                plot_data[year] = (alphas, betas, matrix)
+
+        # --- 3. 绘制主图与插图 ---
+        fig, ax = plt.subplots(figsize=(10, 8))
+
+        for i, year in enumerate(years):
+            if year in plot_data:
+                alphas, betas, matrix = plot_data[year]
+                X_val, Y_val = np.meshgrid(alphas, betas)
+
+                # 绘制主图等高线
+                ax.contour(X_val, Y_val, matrix, levels=[0.5],
+                           colors=colors[i], linestyles=linestyles[i], linewidths=2.5)
+
+                # 在图例中显示面积数值
+                area_val = area_results[year]
+                ax.plot([], [], color=colors[i], linestyle=linestyles[i],
+                        label=f"{year}")
+
+        # 主图设置
+        ax.set_ylim(1.0, 0.0)  # 核心：反转纵轴，0在上，1在下
+        ax.set_xlim(1.0, 1.8)  # 聚焦相变区间
+        ax.set_title("Evolution of Network Resilience Boundaries (2017-2020)", fontsize=15, pad=15)
+        ax.set_xlabel(r"$\alpha$", fontsize=13)
+        ax.set_ylabel(r"$\beta$", fontsize=13)
+        ax.legend(frameon=False, loc='center right', fontsize=11)
+
+        # --- 修正后的插图 (Inset Plot) 绘制逻辑 ---
+        # 这里的 [0.08, 0.08, 0.35, 0.3] 分别对应 [左, 下, 宽, 高]
+        axins = ax.inset_axes([0.78, 0.74, 0.2, 0.2])
+
+        # 关键：使用数字索引 np.arange(len(years)) 避免 ConversionError
+        x_indices = np.arange(len(years))
+        y_areas = [area_results[y] for y in years]
+
+        bars = axins.bar(x_indices, y_areas, color=colors, edgecolor='black', alpha=0.8, width=0.6)
+
+        # 强制设置刻度并贴上年份标签
+        axins.set_xticks(x_indices)
+        axins.set_xticklabels([str(y) for y in years], fontsize=9)
+
+        # 添加插图的轴标签
+        axins.set_xlabel("Year", fontsize=9)
+        axins.set_ylabel("Resilience Area", fontsize=9)
+
+        # 插图美化
+        # axins.set_title("Total Survival Area", fontsize=11, fontweight='bold')
+        axins.set_ylim(0, max(y_areas) * 1.3)
+        axins.grid(axis='y', linestyle='--', alpha=0.4)
+        axins.tick_params(axis='y', labelsize=8)
+
+        # 在柱状图上方标出数值
+        for bar in bars:
+            height = bar.get_height()
+            axins.text(bar.get_x() + bar.get_width() / 2., height + 0.005,
+                       f'{height:.3f}', ha='center', va='bottom', fontsize=8, fontweight='bold')
+
+        plt.tight_layout()
+
+        # 保存图像
+        save_dir = 'Output/Robustness/Cascade/Unload/Year/'
+        os.makedirs(save_dir, exist_ok=True)
+        for fmt in ['png', 'pdf', 'eps']:
+            plt.savefig(f"{save_dir}integrated_phase_boundary.{fmt}",
+                        dpi=300,
+                        bbox_inches='tight'
             )
 
     @classmethod
@@ -1054,6 +1180,70 @@ class Main:
                 markers=1
             )
             """
+
+    @classmethod
+    def different_ports_lwcc_bar(cls):
+        """
+
+        :return:
+        """
+        # 1. 获取所有 beta 对应的 CSV 文件路径
+        # 请根据你的实际路径修改匹配模式
+        times = ["2017", "2018", "2019", "2020"]
+        for time in times:
+            file_pattern = f"Output/Robustness/Cascade/Unload/Port/{time}_LWCC_beta_*.csv"
+            files = glob.glob(file_pattern)
+
+            if not files:
+                print("未找到对应的 CSV 文件，请检查路径和文件名！")
+                return
+
+            print(f"共找到 {len(files)} 个数据文件，正在进行全参数聚合...")
+
+            all_means = []
+
+            for file in files:
+                # 读取单个 beta 的数据
+                df = pd.read_csv(file)
+
+                # 排除 Alpha 列，对所有港口在该 beta 下的 Alpha 维度求平均
+                # 这得到的是该 beta 下每个港口的平均表现
+                beta_mean = df.drop(columns=['Alpha']).mean()
+                all_means.append(beta_mean)
+
+            # 2. 对所有 beta 维度的结果再求平均
+            # 最终得到每个港口在 (Alpha, Beta) 二维空间下的总平均值
+            final_impact = pd.concat(all_means, axis=1).mean(axis=1).sort_values(ascending=False)
+
+            # 3. 结果保存与展示
+            # 选取破坏力最强（存活率最低）的前 30 个港口进行可视化
+            top_n = 15
+            plot_data = final_impact.tail(top_n).sort_values()  # tail 是存活率最低的
+
+            plt.figure(figsize=(14, 7))
+            sns.barplot(x=plot_data.index,
+                        y=plot_data.values,
+                        edgecolor="black",
+                        linewidth=0.8
+            )
+
+            plt.ylabel("Average LWCC", fontsize=12)
+            plt.xlabel("Port", fontsize=12)
+
+            plt.xticks(ha='right',)
+            plt.grid(axis='y', linestyle='--', alpha=0.6)
+
+            plt.tight_layout()
+            for for_mat in ["png", "eps", "pdf"]:  # png and eps
+                plt.savefig(f'Output/Robustness/Cascade/Unload/Port/'
+                            f'{time} Top 30 Most Impactful Ports (Grand Average across All Alpha & Beta).{for_mat}',
+                            format=for_mat,  # 显式指定格式（可选，但更稳妥）
+                            dpi=300,
+                            bbox_inches='tight'  # 去除图片周围多余空白
+                )
+
+            print("\n--- 全球港口破坏力排名 (前10名) ---")
+            print(plot_data.head(10))
 
 
     # region 单一beta值的崩溃概率图
