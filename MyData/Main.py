@@ -6,9 +6,10 @@ import pathlib
 import networkx as nx
 import numpy as np
 import pandas as pd
+import seaborn as sns
 from matplotlib import pyplot as plt
 from tqdm import tqdm
-import seaborn as sns
+from scipy.integrate import simpson # 使用辛普森积分
 
 from MyData.DirectedWeighted import DirectedWeighted
 from MyData.Draw import Draw
@@ -71,6 +72,8 @@ class Main:
                 if time ==  year_season:
                     return DiG, G
         return None, None
+
+
 
     @classmethod
     def get_certain_networks_by_months(cls, year_month: str):
@@ -703,71 +706,6 @@ class Main:
                 markers=1
             )
 
-    #regionbeta并行版本
-    # @classmethod
-    # def cascade_attack_unload(cls, time: str):
-    #
-    #     alpha_list = np.round(np.linspace(1, 2, 51), 3)
-    #     beta_list = np.round(np.linspace(0, 1, 51), 3)
-    #
-    #     DiG, _ = Main.get_certain_networks_by_years(time)
-    #
-    #     configure = {
-    #         "random": Robustness.node_attack_random,
-    #         "degree": Robustness.node_attack_degree,
-    #         "strength": Robustness.node_attack_strength,
-    #         "betweenness": Robustness.node_attack_betweenness
-    #     }
-    #
-    #     tasks = [
-    #         (cls, DiG, time, beta, alpha_list, configure)
-    #         for beta in beta_list
-    #     ]
-    #
-    #     # CPU核心数
-    #     workers = os.cpu_count() - 1
-    #
-    #     print(f"使用 {workers} 个进程并行计算")
-    #
-    #     with Pool(workers) as pool:
-    #         pool.map(_cascade_single_beta, tasks)
-    # @classmethod
-    # def _cascade_single_beta(args):
-    #     cls, DiG, time, beta, alpha_list, configure = args
-    #
-    #     data = {
-    #         "Alpha": [],
-    #         "random": [],
-    #         "degree": [],
-    #         "strength": [],
-    #         "betweenness": []
-    #     }
-    #
-    #     for alpha in alpha_list:
-    #         data["Alpha"].append(alpha)
-    #
-    #         for attack, func in configure.items():
-    #             result = cls.simulate_underload_cascade(
-    #                 DiG, alpha, beta, func, cls.LWCC
-    #             )
-    #
-    #             value = float(result[(alpha, beta)])
-    #             data[attack].append(value)
-    #
-    #     df = pd.DataFrame(data)
-    #
-    #     Draw.draw_plot(
-    #         df,
-    #         'Robustness/Cascade/Unload/',
-    #         f"beta={beta} LWCC",
-    #         f"{time}_LWCC_beta_{beta}",
-    #         colors=1,
-    #         markers=1
-    #     )
-    #
-    #     return beta
-    #endregion
-
     @classmethod
     def different_strategies_lwcc_cdf(cls):
         """
@@ -1025,7 +963,7 @@ class Main:
         save_dir = 'Output/Robustness/Cascade/Unload/Year/'
         os.makedirs(save_dir, exist_ok=True)
         for fmt in ['png', 'pdf', 'eps']:
-            plt.savefig(f"{save_dir}integrated_phase_boundary.{fmt}",
+            plt.savefig(f"{save_dir}phase_boundary_evolution.{fmt}",
                         dpi=300,
                         bbox_inches='tight'
             )
@@ -1133,7 +1071,7 @@ class Main:
         total_teu = [(node, attr['total_TEU']) for node, attr in DiG.nodes(data=True)]  # 总度列表（入度+出度）
         total_teu.sort(key=lambda x: x[1], reverse=True)
         nodes = [node for node,teu in total_teu]
-        nodes = nodes[:30]
+        nodes = nodes[:]
 
         for beta in beta_list:
             print(f"\n--- 正在处理 beta = {beta} ---")
@@ -1245,7 +1183,93 @@ class Main:
             print("\n--- 全球港口破坏力排名 (前10名) ---")
             print(plot_data.head(10))
 
+    @classmethod
+    def different_ports_lwcc_and_teu(cls, time:str):
+        # --- 配置区 ---
+        # YEAR = "2017"
+        RISK_THRESHOLD = 0.65  # 低于此值被视为极高危
+        TOP_N_LABELS = 6  # 标注破坏力前 8 的港口名称
+        # ----------------
 
+        # 1. 提取数据 (逻辑同前)
+        file_pattern = f"Output/Robustness/Cascade/Unload/Port/{time}_LWCC_beta_*.csv"
+        files = glob.glob(file_pattern)
+        all_means = []
+        for file in files:
+            df = pd.read_csv(file)
+            all_means.append(df.drop(columns=['Alpha']).mean())
+        final_impact = pd.concat(all_means, axis=1).mean(axis=1)
+
+        # 获取网络属性
+        DiG, _ = cls.get_certain_networks_by_years(time)
+
+        # 构造绘图 DataFrame
+        data_list = []
+        for port, lwcc in final_impact.items():
+            # 假设 port 是 ID，尝试匹配 DiG 中的属性
+            # 这里为了演示，我们构造一个包含 Name, TEU, LWCC 的 DataFrame
+            node_id = int(port) if port.isdigit() else port
+            if node_id in DiG.nodes:
+                teu = float(DiG.nodes[node_id].get('total_TEU', 0))
+                name = DiG.nodes[node_id].get('name', str(node_id))  # 获取港口名称
+                if teu > 0:
+                    data_list.append({'Port': port, 'Name': name, 'TEU': teu, 'LWCC': lwcc})
+
+        plot_df = pd.DataFrame(data_list)
+
+        # --- 2. 开始绘图 (美化版) ---
+        fig, ax = plt.subplots(figsize=(12, 8), dpi=120)
+
+        # 背景点：普通港口 (淡灰色，减少视觉噪音)
+        ax.scatter(plot_df['TEU'], plot_df['LWCC'], c='#BDC3C7', s=35, alpha=1,
+                   edgecolors='black', linewidth=0.4,label='Regular Ports')
+
+        # 高危点：LWCC 较低的港口 (鲜红色，带边框)
+        high_risk = plot_df[plot_df['LWCC'] < RISK_THRESHOLD]
+        ax.scatter(high_risk['TEU'], high_risk['LWCC'], c='#E74C3C', s=60, alpha=0.9,
+                   edgecolors='black', linewidth=0.8, label='High-Risk Hubs', zorder=5)
+
+
+        # # # --- 3. 动态标注 Top N 港口 ---
+        # # # 按 LWCC 从小到大排序，取破坏力最强的
+        # top_ports = plot_df.nsmallest(TOP_N_LABELS, 'LWCC')
+        # for i, (_, row) in enumerate(top_ports.iterrows()):
+        #     # 根据 i 的奇偶性，交替文本的对齐方式
+        #     if i % 2 == 0:
+        #         ha, va = 'left', 'bottom'
+        #         x_off, y_off = 5, 5
+        #     else:
+        #         ha, va = 'right', 'top'
+        #         x_off, y_off = -5, -5
+        #
+        #     ax.annotate(row['Name'],
+        #                 xy=(row['TEU'], row['LWCC']),
+        #                 xytext=(x_off, y_off), textcoords='offset points',
+        #                 horizontalalignment=ha, verticalalignment=va,  # 设置对齐
+        #                 fontsize=9, fontweight='bold', color='#2C3E50')
+
+        # --- 4. 坐标轴与细节美化 ---
+        ax.set_xscale('log')
+        ax.set_xlabel("TEU(log)", fontsize=12, labelpad=10)
+        ax.set_ylabel("Average LWCC", fontsize=12, labelpad=10)
+        # ax.set_title(f"Vulnerability Analysis of Global Maritime Network ({YEAR})", fontsize=16, pad=20)
+
+        # 使用更加专业的网格
+        ax.grid(True, axis='x', which="both", ls="-", alpha=0.1, color='black')
+
+        # 自定义 Legend
+        ax.legend(loc='upper right', frameon=False, fontsize=10)
+
+        plt.tight_layout()
+
+        # 保存图像
+        save_dir = 'Output/Robustness/Cascade/Unload/Port/'
+        os.makedirs(save_dir, exist_ok=True)
+        for fmt in ['png', 'pdf', 'eps']:
+            plt.savefig(f"{save_dir}{time}_teu_and_lwcc.{fmt}",
+                        dpi=300,
+                        bbox_inches='tight'
+            )
     # region 单一beta值的崩溃概率图
     # years = [2017, 2018, 2019, 2020]
     # threshold = 0.1

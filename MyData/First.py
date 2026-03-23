@@ -13,11 +13,13 @@ import pandas as pd
 import numpy as np
 import igraph as ig
 import matplotlib.pyplot as plt
+from matplotlib import cm # 引入颜色映射
+import matplotlib.colors as mcolors
 from mpl_toolkits.basemap import Basemap
 from scipy.special import comb
 from networkx.algorithms.assortativity import degree_assortativity_coefficient
 from tqdm import tqdm
-from scipy.integrate import simpson # 使用辛普森积分
+
 
 from Algorithm.ConstructNetwork import ConstructNetwork
 from sklearn.preprocessing import minmax_scale
@@ -81,7 +83,150 @@ sys.path.append('../Algorithm')
 #endregion
 
 
-Main.different
+Main.different_ports_lwcc_and_teu("2018")
+Main.different_ports_lwcc_and_teu("2019")
+Main.different_ports_lwcc_and_teu("2020")
+
+
+
+
+
+
+# beta = 0.4
+# time = 2020
+# # 1. 读取数据
+# # 请确保文件名与实际路径一致，注意文件名中可能存在的空格
+# file_path = f"Output/Robustness/Cascade/Unload/step 2e-2/{time}_LWCC_beta_{beta} .csv"
+# df = pd.read_csv(file_path)
+#
+# # 2. 创建画布
+# fig, ax = plt.subplots(figsize=(10, 6), dpi=120)
+#
+# # 3. 绘制四条折线
+# # 使用不同的颜色、线型和标记，并错开 zorder 防止遮挡
+# ax.plot(df['Alpha'], df['random'],
+#         label='Random', color='#3498DB', linewidth=2,
+#         marker='o', markersize=5, alpha=0.8, zorder=4)
+#
+# ax.plot(df['Alpha'], df['degree'],
+#         label='Degree', color='#E67E22', linewidth=2, linestyle='--',
+#         marker='s', markersize=5, alpha=0.9, zorder=3)
+#
+# ax.plot(df['Alpha'], df['strength'],
+#         label='Strength', color='#2ECC71', linewidth=2,
+#         marker='^', markersize=6, alpha=0.8, zorder=2)
+#
+# ax.plot(df['Alpha'], df['betweenness'],
+#         label='Betweenness', color='#E74C3C', linewidth=2,
+#         marker='D', markersize=5, alpha=0.8, zorder=1)
+#
+# # 4. 坐标轴与图表美化
+# ax.set_xlabel(r"$\alpha$", fontsize=13, fontweight='bold', labelpad=10)
+# ax.set_ylabel(fr"$\beta$={beta}  LWCC", fontsize=13, fontweight='bold', labelpad=10)
+# # ax.set_title(r"Network Resilience under Different Attack Strategies ($\beta=0.4$, 2020)", fontsize=15, pad=15, fontweight='bold')
+#
+# # 设置刻度字体大小
+# ax.tick_params(axis='both', which='major', labelsize=11)
+#
+# # 5. 图例设置
+# # 将图例放在右下角，避免遮挡相变的关键区域 (左下角)
+# ax.legend(loc='lower right', fontsize=11, frameon=True, shadow=False, edgecolor='black')
+#
+# # 紧凑布局并显示
+# plt.tight_layout()
+# for for_mat in ["png", "eps"]:  # png and eps
+#         plt.savefig(f'Output/Robustness/Cascade/Unload/Strategy/'
+#                     f'{time}_different_strategies_beta_{beta}_LWCC.{for_mat}',
+#                     format=for_mat,  # 显式指定格式（可选，但更稳妥）
+#                     dpi=300,
+#                     bbox_inches='tight'  # 去除图片周围多余空白
+#         )
+
+
+
+# #region三维柱状图
+# # === 前面的数据读取部分保持不变 ===
+# files = sorted(glob.glob("Output/Robustness/Cascade/Unload/step 1e-2/2017_LWCC_beta_*.csv"))
+#
+# beta_list = []
+# alpha_list = None
+# matrix_strength = []
+#
+# for file in files:
+#     beta = float(file.split("_")[-1].replace(".csv",""))
+#     beta_list.append(beta)
+#     df = pd.read_csv(file)
+#     if alpha_list is None:
+#         alpha_list = df["Alpha"].values
+#     matrix_strength.append(df["strength"].values)
+#
+# matrix_strength = np.array(matrix_strength)
+# # ====================================
+#
+# # === 1. 数据重塑 (假设你已经有了 alpha_list, beta_list 和 matrix_strength) ===
+# # 为了防止图表太挤，建议如果步长太细，可以先进行切片采样（例如每隔 5 个点采样一个）
+# sample_step = 5  # 如果你的数据点非常多(如 100x100)，请调大这个值
+# a_sub = alpha_list[::sample_step]
+# b_sub = beta_list[::sample_step]
+# z_sub = matrix_strength[::sample_step, ::sample_step]
+#
+# # 创建网格索引
+# x_data, y_data = np.meshgrid(np.arange(len(a_sub)), np.arange(len(b_sub)))
+#
+# # 将二维矩阵拉平为一维，供 bar3d 使用
+# x_flat = x_data.flatten()
+# y_flat = y_data.flatten()
+# z_flat = np.zeros_like(x_flat) # 柱子的底部起点都在 Z=0
+# dz = z_sub.flatten()           # 柱子的高度
+#
+# # 设置柱子的粗细 (0.5~0.8 之间比较美观，留出缝隙)
+# dx = dy = 0.6
+#
+# # === 2. 绘图 ===
+# fig = plt.figure(figsize=(14, 10))
+# ax = fig.add_subplot(111, projection='3d')
+#
+# # 使用颜色映射：高度越高，颜色越暖
+# colors = plt.cm.viridis(dz)
+#
+# # 绘制三维柱状图
+# bars = ax.bar3d(x_flat, y_flat, z_flat, dx, dy, dz,
+#                 color=colors,
+#                 alpha=0.8,
+#                 shade=True) # shade=True 增加光照阴影，立体感更强
+#
+# # --- 3. 坐标轴标签替换 ---
+# # 设置显示的步长：2 表示隔一个显示一个，3 表示隔两个显示一个
+# tick_step = 2
+#
+# # 1. 计算 X 轴 (Alpha) 的索引和位置
+# # np.arange(0, len, step) 确保我们只拿到 0, 2, 4... 这样的整数索引
+# x_indices = np.arange(0, len(a_sub), tick_step).astype(int)
+# ax.set_xticks(x_indices + dx/2)
+# # 使用列表推导式提取对应的 Alpha 值并格式化
+# ax.set_xticklabels([f"{a_sub[i]:.2f}" for i in x_indices], rotation=45)
+#
+# # 2. 计算 Y 轴 (Beta) 的索引和位置
+# y_indices = np.arange(0, len(b_sub), tick_step).astype(int)
+# ax.set_yticks(y_indices + dy/2)
+# ax.set_yticklabels([f"{b_sub[i]:.2f}" for i in y_indices])
+#
+# ax.set_xlabel(r"$\alpha$ (Capacity)", labelpad=15)
+# ax.set_ylabel(r"$\beta$ (Load)", labelpad=15)
+# ax.set_zlabel("LWCC", labelpad=10)
+#
+#
+# ax.set_title("3D Bar Representation of Network Resilience", fontsize=15)
+# ax.set_ylim(len(b_sub), 0)
+#
+# # 视角微调
+# ax.view_init(elev=25, azim=-120)
+#
+# plt.tight_layout()
+# plt.show()
+
+#endregion
+
 
 
 
@@ -131,17 +276,6 @@ Main.different
 #     cbar_kws={'label': 'LWCC'}
 # )
 #
-# # --- 3. 提取并绘制全向相变边界 ---
-# # 我们取 LWCC = 0.5 作为相变的临界阈值（即生死线）
-# # levels=[0.5] 表示只画出存活率从 0 跳变到 1 的中间线
-# CS = plt.contour(
-#     X, Y, matrix_strength,
-#     levels=[0.5],
-#     colors='red',
-#     linewidths=3,
-#     linestyles='--'
-# )
-#
 # # --- 4. 坐标轴美化 ---
 # # 保持每 10 个刻度显示一个标签
 # step = 10
@@ -154,18 +288,9 @@ Main.different
 # plt.ylabel(r"$\beta$ (Underload Threshold)")
 # plt.title("Integrated Phase Boundary (Overload & Underload Effects)")
 #
-# # 如果你想在图例中显示这条红线
-# from matplotlib.lines import Line2D
-# custom_lines = [Line2D([0], [0], color='red', lw=3, linestyle='--')]
-# plt.legend(custom_lines, ['Complete Phase Boundary'], loc='upper right')
-#
 # plt.tight_layout()
 # plt.show()
-#
-#
-#
-#
-#
+
 # # # 确保 alpha_list 和 beta_list 是一维的 numpy 数组，方便索引
 # # alpha_array = np.array(alpha_list)
 # # beta_array = np.array(beta_list)
