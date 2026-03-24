@@ -1270,6 +1270,111 @@ class Main:
                         dpi=300,
                         bbox_inches='tight'
             )
+
+    @classmethod
+    def different_alpha_beta_lwcc(cls, time:str):
+        """
+
+        :param time:
+        :return:
+        """
+        # region三维柱状图
+        # === 前面的数据读取部分保持不变 ===
+        files = sorted(glob.glob(f"Output/Robustness/Cascade/Unload/step 1e-2/{time}_LWCC_beta_*.csv"))
+
+        beta_list = []
+        alpha_list = None
+        matrix_strength = []
+
+        for file in files:
+            beta = float(file.split("_")[-1].replace(".csv", ""))
+            beta_list.append(beta)
+            df = pd.read_csv(file)
+            if alpha_list is None:
+                alpha_list = df["Alpha"].values
+            matrix_strength.append(df["strength"].values)
+
+        matrix_strength = np.array(matrix_strength)
+        # ====================================
+
+        # === 1. 数据重塑 (假设你已经有了 alpha_list, beta_list 和 matrix_strength) ===
+        # 为了防止图表太挤，建议如果步长太细，可以先进行切片采样（例如每隔 5 个点采样一个）
+        sample_step = 5  # 如果你的数据点非常多(如 100x100)，请调大这个值
+        a_sub = alpha_list[::sample_step]
+        b_sub = beta_list[::sample_step]
+        z_sub = matrix_strength[::sample_step, ::sample_step]
+
+        # 创建网格索引
+        x_data, y_data = np.meshgrid(np.arange(len(a_sub)), np.arange(len(b_sub)))
+
+        # 将二维矩阵拉平为一维，供 bar3d 使用
+        x_flat = x_data.flatten()
+        y_flat = y_data.flatten()
+        z_flat = np.zeros_like(x_flat)  # 柱子的底部起点都在 Z=0
+        dz = z_sub.flatten()  # 柱子的高度
+
+        # 设置柱子的粗细 (0.5~0.8 之间比较美观，留出缝隙)
+        dx = dy = 0.6
+
+        # === 2. 绘图 ===
+        fig = plt.figure(figsize=(14, 12))
+        ax = fig.add_subplot(111, projection='3d')
+
+        # 使用颜色映射：高度越高，颜色越暖
+        colors = plt.cm.plasma(dz)
+
+        # 绘制三维柱状图
+        bars = ax.bar3d(x_flat, y_flat, z_flat, dx, dy, dz,
+                        color=colors,
+                        alpha=0.8,
+                        shade=True)  # shade=True 增加光照阴影，立体感更强
+
+        # --- 3. 坐标轴标签替换 ---
+        # 设置显示的步长：2 表示隔一个显示一个，3 表示隔两个显示一个
+        tick_step = 2
+
+        # 1. 计算 X 轴 (Alpha) 的索引和位置
+        # np.arange(0, len, step) 确保我们只拿到 0, 2, 4... 这样的整数索引
+        x_indices = np.arange(0, len(a_sub), tick_step).astype(int)
+        ax.set_xticks(x_indices + dx / 2)
+        # 使用列表推导式提取对应的 Alpha 值并格式化
+        ax.set_xticklabels([f"{a_sub[i]:.2f}" for i in x_indices], rotation=45)
+
+        # 2. 计算 Y 轴 (Beta) 的索引和位置
+        y_indices = np.arange(0, len(b_sub), tick_step).astype(int)
+        ax.set_yticks(y_indices + dy / 2)
+        ax.set_yticklabels([f"{b_sub[i]:.2f}" for i in y_indices])
+
+        ax.set_xlabel(r"$\alpha$ (Capacity)", labelpad=15)
+        ax.set_ylabel(r"$\beta$ (Load)", labelpad=15)
+        ax.set_zlabel("LWCC", labelpad=10)
+
+        # ax.set_title("3D Bar Representation of Network Resilience", fontsize=15)
+        ax.set_ylim(len(b_sub), 0)
+
+        # 视角微调
+        ax.view_init(elev=25, azim=-120)
+
+        # ===================== 新增：颜色数值图例（色标） =====================
+        # 绑定当前使用的 plasma 配色 + LWCC 数值范围
+        sm = plt.cm.ScalarMappable(cmap=plt.cm.plasma, norm=plt.Normalize(vmin=dz.min(), vmax=dz.max()))
+        sm.set_array([])  # 空数组，仅用于映射颜色
+
+        # 添加色标，调整大小和位置
+        cbar = fig.colorbar(sm, ax=ax, shrink=0.6, aspect=20, pad=0.1)
+
+        cbar.set_ticks([0, 0.2, 0.4, 0.6, 0.8, 1.0])
+        cbar.set_ticklabels(['0', '0.2', '0.4', '0.6', '0.8', '1'])  # 明确显示1
+        # plt.tight_layout()
+
+        # 保存图像
+        save_dir = 'Output/Robustness/Cascade/Unload/Year/'
+        os.makedirs(save_dir, exist_ok=True)
+        for fmt in ['png', 'pdf', 'eps']:
+            plt.savefig(f"{save_dir}{time}_alpha_beta_lwcc.{fmt}",
+                        dpi=300,
+                        bbox_inches='tight'
+            )
     # region 单一beta值的崩溃概率图
     # years = [2017, 2018, 2019, 2020]
     # threshold = 0.1
