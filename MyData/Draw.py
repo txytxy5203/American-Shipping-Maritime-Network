@@ -657,11 +657,8 @@ class Draw:
         :param title:
         :return:
         """
-
         # 读取港口坐标数据
         Port_Data = Read.Read_Port_Data()
-
-
 
         port_info = {}  # key 为港口   value为各种信息组成的tuple
         for idx, port_data in df.iterrows():

@@ -81,13 +81,6 @@ sys.path.append('../Algorithm')
 #     markers=1
 # )
 #endregion
-
-Main.different_alpha_beta_lwcc("2017")
-Main.different_alpha_beta_lwcc("2018")
-Main.different_alpha_beta_lwcc("2019")
-Main.different_alpha_beta_lwcc("2020")
-
-
 # beta = 0.4
 # time = 2020
 # # 1. 读取数据
@@ -269,5 +262,36 @@ Main.different_alpha_beta_lwcc("2020")
 #     with Pool(4) as p:
 #         p.map(Main.cascade_attack_unload_ports, years)
 
+
+# for DiG, G, time in Main.get_networks_by_years():
+#     core_numbers = nx.core_number(G)
+#     # 确定最大k值（所有节点核数的最大值）
+#     # max_k = max(core_numbers.values())
+#     # k_core = nx.k_core(G, k=max_k, core_number=core_numbers)
+#     # center_nodes = [node for node, attr in k_core.nodes(data=True) if attr['total_TEU'] > 100000]
+#
+#     center_nodes = [node for node, attr in DiG.nodes(data=True)
+#                         if attr['total_TEU'] > 50000]
+#
+#     data = {
+#         "Port": [],
+#         "TEU": [],
+#         "Continent": [],
+#         "Colors": []
+#     }
+#     for node in center_nodes:
+#         data["Port"].append(node)
+#         data["TEU"].append(DiG.nodes[node]['total_TEU'])
+#
+#         # continent = DiG.nodes[node]['continent']
+#         # data["Continent"].append(continent)
+#         # data["Colors"].append(Draw.continent_color_mapping[continent])
+#
+#     df = pd.DataFrame(data)
+#
+#     Draw.draw_world_ports_map(df,
+#                               "Years/WorldMap/",
+#                               f"Ports {time}"
+#     )
 
 

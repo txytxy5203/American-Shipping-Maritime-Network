@@ -106,7 +106,7 @@ def draw_nodes_edges_picture():
     ax2.tick_params(axis='y')
 
     # 4. 横坐标整年刻度
-    ax1.set_xlabel('Year')
+    ax1.set_xlabel('Years')
     ax1.set_xticks(df['year'])
     ax1.set_xticklabels(df['year'])
 
@@ -204,7 +204,7 @@ def draw_degree_of_connection_of_all_countries_to_the_US():
     plt.ylim(10.5, 0.5)
 
     # 5) 坐标轴
-    plt.xlabel('Year')
+    plt.xlabel('Years')
     plt.ylabel('Rank')
     plt.title('Top 10 Countries Ranked by U.S. Connection (2017–2021)', pad=15)
 
@@ -347,7 +347,7 @@ def draw_density_avgDegree_picture():
     ax2.tick_params(axis='y')
 
     # 4. 横坐标整年刻度
-    ax1.set_xlabel('Year')
+    ax1.set_xlabel('Years')
     ax1.set_xticks(df['year'])
     ax1.set_xticklabels(df['year'])
 
@@ -365,7 +365,7 @@ def draw_density_avgDegree_picture():
     # ax1.grid(False)
     # ax1.set_xticks(df['year'])
     # ax1.set_xticklabels(df['year'])
-    # ax1.set_xlabel('Year')
+    # ax1.set_xlabel('Years')
     # ax1.set_ylabel('Density')
     # ax1.set_title('Network Density Evolution (2017–2021)', pad=15)
     # ax1.legend(frameon=False, loc='upper right')   # 图例
@@ -401,7 +401,7 @@ def draw_length_efficiency_picture():
     ax2.tick_params(axis='y')
 
     # 4. 横坐标整年刻度
-    ax1.set_xlabel('Year')
+    ax1.set_xlabel('Years')
     ax1.set_xticks(df['year'])
     ax1.set_xticklabels(df['year'])
 
@@ -2034,7 +2034,7 @@ def write_US_TEU_change_value():
         if attr.get("Country", None) == "United States" and not DiGraph_2017.has_node(node):
             # 2017年没有的  2021年有的
             US_TEU_change_value[node] = DiGraph_2021.nodes[node]["total_TEU"]
-    pathlib.Path('Figure/Year/US_TEU_change_value.json').write_text(json.dumps(US_TEU_change_value, indent=2))
+    pathlib.Path('Figure/Years/US_TEU_change_value.json').write_text(json.dumps(US_TEU_change_value, indent=2))
 def draw_US_TEU_change_value():
     """
     画出美国2017和2021的港口TEU变化量
@@ -2123,7 +2123,7 @@ def write_US_BC_change_value():
     top_nodes = sorted(betweenness_change.items(), key=lambda item: abs(item[1]), reverse=True)[:N]
 
     # 保存结果
-    pathlib.Path('Figure/Year/US_BC_change_value.json').write_text(json.dumps(dict(top_nodes), indent=2))
+    pathlib.Path('Figure/Years/US_BC_change_value.json').write_text(json.dumps(dict(top_nodes), indent=2))
 def draw_US_BC_change_value():
 
     # 2. 读港口坐标
@@ -2218,7 +2218,7 @@ def draw_US_top5_port_TEU_change():
         plt.plot(years, teu_values, marker=markers[i % len(markers)], color=colors[i % len(colors)], label=node)
 
     plt.title('Top 5 US Ports TEU Over Years')
-    plt.xlabel('Year')
+    plt.xlabel('Years')
     plt.ylabel('Total TEU')
     plt.legend()
     plt.box(True)  # 去除边框

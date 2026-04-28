@@ -811,7 +811,7 @@ class Main:
 
         plt.xticks(x, years)
 
-        plt.xlabel("Year")
+        plt.xlabel("Years")
         plt.ylabel("Average LWCC")
 
         plt.ylim(0, 1)
@@ -834,7 +834,7 @@ class Main:
 
         plt.tight_layout()
         for for_mat in ["png", "eps", "pdf"]:  # png and eps
-            plt.savefig(f'Output/Robustness/Cascade/Unload/Year/'
+            plt.savefig(f'Output/Robustness/Cascade/Unload/Years/'
                         f'lwcc_different_years.{for_mat}',
                         format=for_mat,  # 显式指定格式（可选，但更稳妥）
                         dpi=300,
@@ -942,7 +942,7 @@ class Main:
         axins.set_xticklabels([str(y) for y in years], fontsize=9)
 
         # 添加插图的轴标签
-        axins.set_xlabel("Year", fontsize=9)
+        axins.set_xlabel("Years", fontsize=9)
         axins.set_ylabel("Resilience Area", fontsize=9)
 
         # 插图美化
@@ -1032,7 +1032,7 @@ class Main:
 
         plt.xticks([1, 2, 3, 4], years)
 
-        plt.xlabel("Year")
+        plt.xlabel("Years")
         plt.ylabel("LWCC")
         plt.ylim(0.4, 1.0)
 
@@ -1045,7 +1045,7 @@ class Main:
         plt.tight_layout()
 
         for for_mat in ["png", "eps", "pdf"]:  # png and eps
-            plt.savefig(f'Output/Robustness/Cascade/Unload/Year/'
+            plt.savefig(f'Output/Robustness/Cascade/Unload/Years/'
                         f'lwcc_boxplot_alpha_{alpha_target}.{for_mat}',
                         format=for_mat,  # 显式指定格式（可选，但更稳妥）
                         dpi=300,
@@ -1317,7 +1317,7 @@ class Main:
         dx = dy = 0.6
 
         # === 2. 绘图 ===
-        fig = plt.figure(figsize=(14, 12))
+        fig = plt.figure(figsize=(20, 12))
         ax = fig.add_subplot(111, projection='3d')
 
         # 使用颜色映射：高度越高，颜色越暖
@@ -1365,7 +1365,10 @@ class Main:
 
         cbar.set_ticks([0, 0.2, 0.4, 0.6, 0.8, 1.0])
         cbar.set_ticklabels(['0', '0.2', '0.4', '0.6', '0.8', '1'])  # 明确显示1
-        # plt.tight_layout()
+        plt.tight_layout()
+        # 适当调大 left 的数值，给左侧 Y 轴（Beta）腾出空间
+        # 适当调小 right 的数值，给右侧色标腾出空间
+        fig.subplots_adjust(left=0.2, right=1.0, bottom=0.1, top=0.9)
 
         # 保存图像
         save_dir = 'Output/Robustness/Cascade/Unload/Year/'
@@ -1375,6 +1378,45 @@ class Main:
                         dpi=300,
                         bbox_inches='tight'
             )
+
+    @classmethod
+    def degree_distribution_years(cls):
+        """画出每年的度分布图   级联的论文介绍网络的时候使用"""
+
+        times = ["2017", "2018", "2019", "2020"]  # 可以在这里修改要画的时间段
+        data = {}
+
+        for time in times:
+            _, G = Main.get_certain_networks_by_years(time)
+            degree_frequency = Undirected.get_degree_distribution(G)  # 返回 {度值: 频率} 的字典
+            # 先获取所有可能的度值（确保后续索引统一）
+            all_degrees = sorted(degree_frequency.keys())  # 该时间段存在的度值（排序后）
+            time_frequency_dict = {deg: degree_frequency[deg] for deg in all_degrees}
+            # 存储该时间段的频率字典（而非 (degree, frequency) 元组列表）
+            data[time] = time_frequency_dict
+
+        # 1. 收集所有时间段的所有度值（作为最终 DataFrame 的索引）
+        all_unique_degrees = set()
+        for time_dict in data.values():
+            all_unique_degrees.update(time_dict.keys())
+        all_unique_degrees = sorted(list(all_unique_degrees))  # 排序后的所有度值（统一索引）
+
+        # 2. 构建规整的 DataFrame：每行是一个度值，每列是一个时间段，值为频率（缺失填 0）
+        df_data = {}
+        for time in times:
+            # 对于每个时间段，按统一的度值索引填充频率（无该度值则填 0）
+            df_data[time] = [(deg, data[time].get(deg, 0)) for deg in all_unique_degrees]
+
+        # 3. 创建 DataFrame，度值作为索引
+        df = pd.DataFrame(df_data)
+        Draw.draw_scatter_list(
+            df,
+            "Years/Undirected/DegreeDistribution/",
+            "Degree",
+            "Frequency",
+            f"DegreeDistribution",
+            "loglog"
+        )
     # region 单一beta值的崩溃概率图
     # years = [2017, 2018, 2019, 2020]
     # threshold = 0.1
@@ -1418,7 +1460,7 @@ class Main:
     #
     # plt.xticks(x, years, fontsize=11)
     #
-    # plt.xlabel("Year", fontsize=12)
+    # plt.xlabel("Years", fontsize=12)
     # plt.ylabel("Collapse Probability", fontsize=12)
     #
     # plt.ylim(0,1)
