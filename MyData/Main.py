@@ -795,7 +795,12 @@ class Main:
         x = np.arange(len(years))
         width = 0.18
 
-        plt.figure(figsize=(10, 8))
+        plt.figure(figsize=(16, 10))
+
+        # --- 全局字体设置 ---
+        Draw.draw_settings()
+
+
 
         bars = []
 
@@ -816,7 +821,9 @@ class Main:
 
         plt.ylim(0, 1)
 
-        plt.legend(frameon=False)
+        # 图例加上边框（frameon=True）
+        plt.legend(frameon=True, edgecolor='black',
+                   prop={'weight': 'bold', 'size': 18})
 
         plt.grid(axis="y", linestyle="--", alpha=0.5)
 
@@ -830,11 +837,22 @@ class Main:
                          f"{height:.2f}",
                          ha="center",
                          va="bottom",
-                         fontsize=9)
+                         fontsize=18,
+                         fontweight="bold")
+
+        # ==================== 关键：刻度标签加粗 ====================
+        ax = plt.gca()  # 获取当前坐标轴对象
+
+        # 方法：遍历刻度标签并设置字体粗细
+        for label in ax.get_xticklabels():
+            label.set_fontweight('bold')
+        for label in ax.get_yticklabels():
+            label.set_fontweight('bold')
+        # =========================================================
 
         plt.tight_layout()
         for for_mat in ["png", "eps", "pdf"]:  # png and eps
-            plt.savefig(f'Output/Robustness/Cascade/Unload/Years/'
+            plt.savefig(f'Output/Robustness/Cascade/Unload/Year/'
                         f'lwcc_different_years.{for_mat}',
                         format=for_mat,  # 显式指定格式（可选，但更稳妥）
                         dpi=300,

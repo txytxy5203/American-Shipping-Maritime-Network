@@ -293,5 +293,63 @@ sys.path.append('../Algorithm')
 #                               "Years/WorldMap/",
 #                               f"Ports {time}"
 #     )
+# DiG_year, G = Main.get_certain_networks_by_years("2020")
+# DiG_season, G_season = Main.get_certain_networks_by_seasons("2020 Summer")
+#
+# for node, attr in DiG_year.nodes(data=True):
+#
+#     if node not in DiG_season:
+#         print(node)
+#         continue
+#
+#     continent = DiG_season.nodes[node].get("continent")
+#
+#     if continent is not None:
+#         DiG_year.nodes[node]["continent"] = continent
+# nx.write_graphml(DiG_year, "../Data/2020/US/US2020_Digraph.graphml")
+
+# time = "2017"
+# data_path = "../Data/Port/country_continent.json"
+# # 一次性读取整个JSON文件
+# with open(data_path, "r", encoding="utf-8") as file:
+#     port_info = json.load(file)
+#
+# DiG, G = Main.get_certain_networks_by_years(time)
+# core_numbers = nx.core_number(G)
+# # 确定最大k值（所有节点核数的最大值）
+# max_k = max(core_numbers.values())
+#
+# k_core = nx.k_core(G, k=max_k, core_number=core_numbers)
+#
+# # center_nodes = [node for node, attr in k_core.nodes(data=True) if attr['total_TEU'] > 100000]
+# all_node = [node for node in G.nodes()]
+#
+#
+#
+# data = {
+#     "Port": [],
+#     "TEU": [],
+#     "Continent": [],
+#     "Colors":[]
+# }
+# for node in all_node:
+#
+#
+#     continent = DiG.nodes[node].get('continent')
+#     if continent is None:
+#         continue
+#     data["Port"].append(node)
+#     data["TEU"].append(DiG.nodes[node]['total_TEU'])
+#     data["Continent"].append(continent)
+#     data["Colors"].append(Draw.continent_color_mapping[continent])
+#
+# df = pd.DataFrame(data)
+# df.to_csv(f'Output/Years/WorldMap/CenterPort{time}.csv',
+#           index=False)
+# Draw.draw_world_ports_map(df,
+#                           "Years/WorldMap/",
+#                           f"Center Ports {time}"
+# )
 
 
+Main.different_years_lwcc_bar()

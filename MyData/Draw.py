@@ -105,6 +105,16 @@ class Draw:
     #endregion
 
     @classmethod
+    def draw_settings(cls):
+        # --- 全局字体设置 ---
+        plt.rcParams['font.sans-serif'] = ['Times New Roman']  # 设置默认字体
+        plt.rcParams['font.size'] = 18  # 设置默认字体大小
+        plt.rcParams['axes.labelsize'] = 30  # 设置轴标签字体大小
+        plt.rcParams['xtick.labelsize'] = 18  # 设置X轴刻度标签字体大小
+        plt.rcParams['ytick.labelsize'] = 18  # 设置Y轴刻度标签字体大小
+
+
+    @classmethod
     def draw_plot(cls,
                   df:DataFrame,
                   save_path:str,
@@ -760,31 +770,31 @@ class Draw:
             'UN': 'Unknown'
         }
 
-        # # 生成图例（包含大洲颜色+缩写+全称）   TODO 图例之后是一个问题  暂时先这么用着
+        # 生成图例（包含大洲颜色+缩写+全称）   TODO 图例之后是一个问题  暂时先这么用着
+        legend_elements = [
+            Line2D(
+                [0], [0], marker='o', color='w',
+                markerfacecolor=color, markersize=10,
+                label=f'{code} ({continent_fullname[code]})'
+            ) for code, color in cls.continent_color_mapping.items()
+        ]
+        # 图例：红色=remove，蓝色=add（替换原大洲图例逻辑）
         # legend_elements = [
+        #     # 蓝色节点：add
         #     Line2D(
         #         [0], [0], marker='o', color='w',
-        #         markerfacecolor=color, markersize=10,
-        #         label=f'{code} ({continent_fullname[code]})'
-        #     ) for code, color in cls.continent_color_mapping.items()
+        #         markerfacecolor='blue',  # 蓝色（可根据需求调整色号）
+        #         markersize=10,
+        #         label='add (Blue)'  # 标签：状态+颜色
+        #     ),
+        #     # 红色节点：remove
+        #     Line2D(
+        #         [0], [0], marker='o', color='w',
+        #         markerfacecolor='red',  # 红色（可根据需求调整色号）
+        #         markersize=10,
+        #         label='remove (Red)'  # 标签：状态+颜色
+        #     )
         # ]
-        # 图例：红色=remove，蓝色=add（替换原大洲图例逻辑）
-        legend_elements = [
-            # 蓝色节点：add
-            Line2D(
-                [0], [0], marker='o', color='w',
-                markerfacecolor='blue',  # 蓝色（可根据需求调整色号）
-                markersize=10,
-                label='add (Blue)'  # 标签：状态+颜色
-            ),
-            # 红色节点：remove
-            Line2D(
-                [0], [0], marker='o', color='w',
-                markerfacecolor='red',  # 红色（可根据需求调整色号）
-                markersize=10,
-                label='remove (Red)'  # 标签：状态+颜色
-            )
-        ]
 
         ax.legend(
             handles=legend_elements,
