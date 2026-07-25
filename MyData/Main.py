@@ -220,7 +220,38 @@ class Main:
             "Months/Undirected/AverageShortestLength/",
             "Average Shortest Path Length",
             "Average Shortest Path Length",
-            1
+            1,
+            is_label_step=True
+        )
+
+    @classmethod
+    def efficiency(cls):
+        """
+        效率的变化趋势
+        :return:
+        """
+        data = {
+            "Time":[],
+            "Network":[],
+            "Null Model":[]
+        }
+        for DiG, G, time in cls.get_networks_by_months():
+            null_model = NullModel.create_edges_nodes_null_model(G)
+
+            efficiency = 1 / Undirected.calculate_average_shortest_path_length(G)
+            null_model = 1 / Undirected.calculate_average_shortest_path_length(null_model)
+
+            data["Time"].append(time)
+            data["Network"].append(efficiency)
+            data["Null Model"].append(null_model)
+        df = pd.DataFrame(data)
+        Draw.draw_plot(
+            df,
+            "Months/Undirected/AverageShortestLength/",
+            "Efficiency",
+            "Efficiency",
+            1,
+            is_label_step=True
         )
 
     @classmethod

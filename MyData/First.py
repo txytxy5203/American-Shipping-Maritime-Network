@@ -42,6 +42,9 @@ from MyData.Robustness import Robustness
 
 sys.path.append('../Algorithm')
 
+# Main.efficiency()
+
+
 
 #region待处理
 # Main.nodes_or_edges_attack("2017", "LWCC")
@@ -352,4 +355,4 @@ sys.path.append('../Algorithm')
 # )
 
 
-Main.different_years_lwcc_bar()
+# Main.different_years_lwcc_bar()
